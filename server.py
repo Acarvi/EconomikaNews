@@ -138,6 +138,21 @@ def run_viral_scan():
     except Exception as e:
         print(f"  ❌ Scan error: {e}")
 
+def self_ping():
+    """Ping itself to prevent Render from sleeping (free tier)."""
+    # RENDER_EXTERNAL_URL is automatically set by Render
+    url = os.environ.get("RENDER_EXTERNAL_URL")
+    if not url:
+        return
+    
+    try:
+        import requests
+        health_url = f"{url.rstrip('/')}/health"
+        response = requests.get(health_url, timeout=10)
+        print(f"[{datetime.now()}] 💓 Self-ping: {health_url} -> {response.status_code}")
+    except Exception as e:
+        print(f"[{datetime.now()}] ❌ Self-ping error: {e}")
+
 # --- SCHEDULER ---
 
 scheduler = BackgroundScheduler()
@@ -161,6 +176,14 @@ def start_scheduler():
         trigger='date',
         run_date=datetime.now().replace(second=30),
         id="initial_scan"
+    )
+
+    # Keep-alive ping every 10 minutes
+    scheduler.add_job(
+        self_ping,
+        trigger=IntervalTrigger(minutes=10),
+        id="keep_alive_ping",
+        replace_existing=True
     )
 
 @app.on_event("shutdown")

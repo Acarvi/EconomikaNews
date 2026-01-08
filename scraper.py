@@ -55,27 +55,34 @@ def scrape_tweet_with_browser(url: str) -> Optional[Dict[str, Any]]:
                 try:
                     # search is often more robust than get_tweet_by_id when API changes occur
                     # We search for the specific tweet ID
-                    results = await client.search_tweet(f"status:{tweet_id}", 'Latest')
-                    if not results:
-                         # Try search by URL
-                         results = await client.search_tweet(url, 'Latest')
-                    
-                    if not results:
+                    # IMPORTANT: Use get_tweet_by_id for direct accuracy, search_tweet is fuzzy
+                    try:
+                        tweet = await client.get_tweet_by_id(tweet_id)
+                    except Exception as e:
+                        print(f"   [Twikit ID Lookup Error] {e}")
+                        # Fallback to search if direct lookup fails
+                        results = await client.search_tweet(f"status:{tweet_id}", 'Latest')
+                        tweet = results[0] if results else None
+                     
+                    if not tweet:
                         return None
                         
-                    tweet = results[0]
-                    # verify it's the right one - sometimes search is fuzzy
-                    # but usually for ID search it's exact if found
-                    
                     full_text = getattr(tweet, 'full_text', getattr(tweet, 'text', ''))
                     
                     # Initialize defaults to prevent UnboundLocalError
                     media_url = None
                     is_video = False
                     
+                    # Helper to find URL in various possible attributes
+                    def find_media_url(obj):
+                        for attr in ['media_url_https', 'media_url', 'display_url']:
+                            val = getattr(obj, attr, None)
+                            if val and isinstance(val, str) and val.startswith('http'):
+                                return val
+                        return None
+
                     if hasattr(tweet, 'media') and tweet.media:
                         first_media = tweet.media[0]
-                        media_url = getattr(first_media, 'media_url_https', None)
                         m_type = getattr(first_media, 'type', '')
                         if m_type == 'video':
                             is_video = True
@@ -86,9 +93,17 @@ def scrape_tweet_with_browser(url: str) -> Optional[Dict[str, Any]]:
                                 if mp4s:
                                     best_v = max(mp4s, key=lambda x: x.get('bitrate', 0))
                                     media_url = best_v.get('url')
-                        elif m_type == 'photo':
+                            if not media_url: # fallback to thumbnail if video URL failed
+                                media_url = find_media_url(first_media)
+                        else:
+                            # photo or other
                             is_video = False
-                            media_url = getattr(first_media, 'media_url_https', None)
+                            media_url = find_media_url(first_media)
+                    
+                    # Final check: if we expected media but got none, return None to avoid corrupt flows
+                    if not media_url:
+                        print(f"   [Scraper] No se pudo extraer URL de media para {tweet_id}")
+                        return None
 
                     # Robust user extraction
                     user_name = "Economika"

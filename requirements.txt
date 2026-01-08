@@ -1,0 +1,9 @@
+yt-dlp
+google-genai
+requests
+moviepy
+Pillow
+twikit
+opencv-python
+numpy
+ffpyplayer

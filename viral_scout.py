@@ -189,6 +189,14 @@ class ViralScout:
                         first_media = tweet.media[0]
                         m_type = getattr(first_media, 'type', '')
                         
+                        # Helper to find URL in various possible attributes
+                        def find_media_url(obj):
+                            for attr in ['media_url_https', 'media_url', 'display_url']:
+                                val = getattr(obj, attr, None)
+                                if val and isinstance(val, str) and val.startswith('http'):
+                                    return val
+                            return None
+
                         if m_type == 'video':
                             has_video = True
                             # Get best video URL
@@ -200,10 +208,10 @@ class ViralScout:
                                     if mp4s:
                                         best_v = max(mp4s, key=lambda x: x.get('bitrate', 0))
                                         media_url = best_v.get('url')
-                            thumbnail_url = getattr(first_media, 'media_url_https', None)
+                            thumbnail_url = find_media_url(first_media)
                         else:
                             # Photo
-                            media_url = getattr(first_media, 'media_url_https', None)
+                            media_url = find_media_url(first_media)
                             thumbnail_url = media_url
 
                     # Extract Stats
