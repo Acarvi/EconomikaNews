@@ -194,16 +194,12 @@ def generate_ai_content(tweet_text: str) -> dict:
         print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
         return {}
     
-    # EXCLUSIVELY Gemini 1.5 variants as requested
-    # If none of these work, the system will return an empty dict (AI skipped)
+    # 2026 Standard: Gemini Flash Lite is the cheapest/best for this task
     model_names = [
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-flash-8b-latest",
-        "gemini-1.5-flash-8b-001",
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash-001",
-        "gemini-1.5-flash-002",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash-8b", # Legacy fallback
     ]
     
     for model_name in model_names:
@@ -231,7 +227,7 @@ def generate_ai_content(tweet_text: str) -> dict:
                 text = text[text.find("{"):text.rfind("}")+1]
             
             data = json.loads(text)
-            print(f"  ✅ AI content generated with {model_name}")
+            print(f"  ✅ AI content generated with {model_name}", flush=True)
             return {
                 'headline': data.get('headline', ''),
                 'caption': data.get('caption', ''),
@@ -239,10 +235,13 @@ def generate_ai_content(tweet_text: str) -> dict:
                 'slug': data.get('slug', '')
             }
         except Exception as e:
-            print(f"  ⚠️  Model {model_name} failed: {str(e)[:80]}")
+            if "404" in str(e):
+                print(f"  ℹ️  Model {model_name} is not available (404)", flush=True)
+            else:
+                print(f"  ⚠️  Model {model_name} failed: {str(e)[:80]}", flush=True)
             continue
     
-    print("  ❌ All AI models failed")
+    print("  ❌ No Gemini 1.5 models available. Skipping AI generation as requested.", flush=True)
     return {}
 
 def run_viral_scan():
