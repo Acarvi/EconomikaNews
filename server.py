@@ -1,21 +1,23 @@
 """
 Economika Cloud Server - FastAPI Backend
-Runs on Render (free tier) with scheduled Viral Scout scanning.
+Runs on Render (free tier) with scheduled Viral Scout scanning and publishing queue.
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from pydantic import BaseModel
 import json
 import os
+import requests
 from datetime import datetime
 from typing import List, Dict, Optional
 
 # Initialize FastAPI
 app = FastAPI(
     title="Economika Viral Scout API",
-    description="Backend for automated Twitter viral content scanning",
-    version="1.0.0"
+    description="Backend for automated Twitter viral content scanning and scheduled publishing",
+    version="2.0.0"
 )
 
 # CORS for local client access
@@ -29,7 +31,9 @@ app.add_middleware(
 
 # Data storage (in-memory + file persistence)
 DATA_FILE = "pending_tweets.json"
+QUEUE_FILE = "publishing_queue.json"
 pending_tweets: List[Dict] = []
+publishing_queue: List[Dict] = []
 last_scan: Optional[datetime] = None
 
 def load_pending():
@@ -42,8 +46,15 @@ def save_pending():
     with open(DATA_FILE, 'w') as f:
         json.dump(pending_tweets, f, indent=2, default=str)
 
-# Load on startup
-load_pending()
+def load_queue():
+    global publishing_queue
+    if os.path.exists(QUEUE_FILE):
+        with open(QUEUE_FILE, 'r') as f:
+            publishing_queue = json.load(f)
+
+def save_queue():
+    with open(QUEUE_FILE, 'w') as f:
+        json.dump(publishing_queue, f, indent=2, default=str)
 
 # --- ENDPOINTS ---
 
@@ -97,10 +108,107 @@ def clear_pending():
     save_pending()
     return {"success": True}
 
+# --- PUBLISHING QUEUE ---
+
+class ScheduledPost(BaseModel):
+    video_url: str
+    caption: str
+    target_time: str  # ISO format datetime
+    platforms: List[str] = ["instagram_reel", "instagram_story", "facebook_reel"]
+
+class ScheduleBatchRequest(BaseModel):
+    posts: List[ScheduledPost]
+
+@app.post("/schedule")
+def schedule_batch(request: ScheduleBatchRequest):
+    """Add a batch of posts to the publishing queue."""
+    global publishing_queue
+    
+    for post in request.posts:
+        publishing_queue.append({
+            "video_url": post.video_url,
+            "caption": post.caption,
+            "target_time": post.target_time,
+            "platforms": post.platforms,
+            "status": "pending",
+            "added_at": datetime.now().isoformat()
+        })
+    
+    save_queue()
+    return {"success": True, "queued": len(request.posts), "total_in_queue": len(publishing_queue)}
+
+@app.get("/queue")
+def get_queue():
+    """Get all posts in the publishing queue."""
+    return {"count": len(publishing_queue), "posts": publishing_queue}
+
+@app.delete("/queue")
+def clear_queue():
+    """Clear the publishing queue."""
+    global publishing_queue
+    publishing_queue = []
+    save_queue()
+    return {"success": True}
+
 # --- SCHEDULED VIRAL SCOUT ---
 
+# AI Content Generation (Cloud-side)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+SYSTEM_INSTRUCTION = """Eres el Redactor Jefe de Economika Noticias. Línea editorial liberal-libertaria.
+Transforma este tuit en contenido para Reels.
+
+REGLAS:
+- headline: Máx 15 palabras, MAYÚSCULAS, sin emojis.
+- caption: Texto profesional con hashtags (#Economika #Libertad #Geopolitica).
+- shorts_title: Máx 100 caracteres, SEO-optimizado.
+- slug: 2-4 palabras, minúsculas, guiones_bajos.
+
+Responde SOLO con JSON válido:
+{"headline": "...", "caption": "...", "shorts_title": "...", "slug": "..."}"""
+
+def generate_ai_content(tweet_text: str) -> dict:
+    """Generate headline, caption, shorts_title using Gemini API."""
+    if not GEMINI_API_KEY:
+        print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
+        return {}
+    
+    try:
+        from google import genai
+        from google.genai import types
+        
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        
+        prompt = f"{SYSTEM_INSTRUCTION}\n\nTUIT:\n\"{tweet_text}\""
+        
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type='application/json',
+            )
+        )
+        
+        text = response.text
+        # Parse JSON
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "{" in text:
+            text = text[text.find("{"):text.rfind("}")+1]
+        
+        data = json.loads(text)
+        return {
+            'headline': data.get('headline', ''),
+            'caption': data.get('caption', ''),
+            'shorts_title': data.get('shorts_title', ''),
+            'slug': data.get('slug', '')
+        }
+    except Exception as e:
+        print(f"  ⚠️  AI generation error: {e}")
+        return {}
+
 def run_viral_scan():
-    """Run the viral scout and add new tweets to pending."""
+    """Run the viral scout and add new tweets to pending (with AI content generation)."""
     global pending_tweets, last_scan
     
     print(f"[{datetime.now()}] Running scheduled Viral Scout scan...")
@@ -122,6 +230,12 @@ def run_viral_scan():
             existing_ids = {t['id'] for t in pending_tweets}
             new_tweets = [h for h in hits if h['id'] not in existing_ids]
             
+            # Generate AI content for new tweets
+            for i, tweet in enumerate(new_tweets):
+                print(f"  🤖 Generating AI content for tweet {i+1}/{len(new_tweets)}...")
+                ai_content = generate_ai_content(tweet.get('description', ''))
+                tweet.update(ai_content)
+            
             pending_tweets.extend(new_tweets)
             save_pending()
             
@@ -129,7 +243,7 @@ def run_viral_scan():
             for h in hits:
                 scout.mark_as_processed(h['id'])
             
-            print(f"  ✅ Added {len(new_tweets)} new tweets. Total pending: {len(pending_tweets)}")
+            print(f"  ✅ Added {len(new_tweets)} new tweets with AI content. Total pending: {len(pending_tweets)}")
         else:
             print("  🤷 No new viral tweets found.")
         
@@ -140,18 +254,88 @@ def run_viral_scan():
 
 def self_ping():
     """Ping itself to prevent Render from sleeping (free tier)."""
-    # RENDER_EXTERNAL_URL is automatically set by Render
     url = os.environ.get("RENDER_EXTERNAL_URL")
     if not url:
         return
     
     try:
-        import requests
         health_url = f"{url.rstrip('/')}/health"
         response = requests.get(health_url, timeout=10)
         print(f"[{datetime.now()}] 💓 Self-ping: {health_url} -> {response.status_code}")
     except Exception as e:
         print(f"[{datetime.now()}] ❌ Self-ping error: {e}")
+
+def process_publishing_queue():
+    """Process the publishing queue - publish posts whose target time has passed."""
+    global publishing_queue
+    
+    if not publishing_queue:
+        return
+    
+    now = datetime.now()
+    published_ids = []
+    
+    # Load config from environment variables (set in Render)
+    config = {
+        "access_token": os.environ.get("IG_ACCESS_TOKEN"),
+        "ig_user_id": os.environ.get("IG_USER_ID"),
+        "fb_page_id": os.environ.get("FB_PAGE_ID")
+    }
+    
+    if not config["access_token"] or not config["ig_user_id"]:
+        print(f"[{now}] ⚠️  Publishing queue: Missing IG credentials in environment.")
+        return
+    
+    for i, post in enumerate(publishing_queue):
+        if post["status"] != "pending":
+            continue
+        
+        try:
+            target_time = datetime.fromisoformat(post["target_time"])
+        except:
+            print(f"[{now}] ⚠️  Invalid target_time format for post {i}")
+            publishing_queue[i]["status"] = "error"
+            continue
+        
+        if now >= target_time:
+            print(f"[{now}] 📤 Publishing queued post: {post['video_url'][:50]}...")
+            try:
+                from publisher import upload_reel, upload_story, upload_facebook_reel
+                
+                # Instagram Reel
+                if "instagram_reel" in post["platforms"]:
+                    result = upload_reel(
+                        post["video_url"],
+                        post["caption"],
+                        config["access_token"],
+                        config["ig_user_id"]
+                    )
+                    if result and "id" in result:
+                        print(f"[{now}] ✅ IG Reel published!")
+                
+                # Instagram Story
+                if "instagram_story" in post["platforms"]:
+                    upload_story(post["video_url"], config["access_token"], config["ig_user_id"])
+                
+                # Facebook Reel
+                if "facebook_reel" in post["platforms"] and config["fb_page_id"]:
+                    upload_facebook_reel(post["video_url"], post["caption"], config["access_token"], config["fb_page_id"])
+                
+                publishing_queue[i]["status"] = "published"
+                publishing_queue[i]["published_at"] = now.isoformat()
+                
+            except Exception as e:
+                print(f"[{now}] ❌ Publish error: {e}")
+                publishing_queue[i]["status"] = "error"
+                publishing_queue[i]["error"] = str(e)
+    
+    # Clean up published posts older than 24 hours
+    threshold = now.timestamp() - 86400
+    publishing_queue = [
+        p for p in publishing_queue 
+        if p["status"] == "pending" or datetime.fromisoformat(p.get("added_at", now.isoformat())).timestamp() > threshold
+    ]
+    save_queue()
 
 # --- SCHEDULER ---
 
@@ -160,6 +344,10 @@ scheduler = BackgroundScheduler()
 @app.on_event("startup")
 def start_scheduler():
     """Start the background scheduler on app startup."""
+    # Load data
+    load_pending()
+    load_queue()
+    
     # Run scan every hour
     scheduler.add_job(
         run_viral_scan,
@@ -167,15 +355,25 @@ def start_scheduler():
         id="viral_scout_hourly",
         replace_existing=True
     )
-    scheduler.start()
-    print("🚀 Scheduler started - Viral Scout will run every hour")
     
-    # Run initial scan after 30 seconds (give time for server to fully start)
+    # Process publishing queue every minute
+    scheduler.add_job(
+        process_publishing_queue,
+        trigger=IntervalTrigger(minutes=1),
+        id="publishing_queue_processor",
+        replace_existing=True
+    )
+    
+    scheduler.start()
+    print("🚀 Scheduler started - Viral Scout (hourly) + Publishing Queue (every minute)")
+    
+    # Run initial scan after 30 seconds
     scheduler.add_job(
         run_viral_scan,
         trigger='date',
         run_date=datetime.now().replace(second=30),
-        id="initial_scan"
+        id="initial_scan",
+        misfire_grace_time=3600  # Allow running even if late
     )
 
     # Keep-alive ping every 10 minutes

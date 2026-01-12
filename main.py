@@ -26,18 +26,33 @@ import publisher # New automation module
 
 # --- CONFIG & HELPERS ---
 
+LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
+
 class StatusManager:
-    """Manages status updates for both CLI and GUI."""
-    def __init__(self, gui_status_var=None, gui_log_widget=None):
+    """Manages status updates for both CLI and GUI, with optional file logging."""
+    def __init__(self, gui_status_var=None, gui_log_widget=None, enable_file_log=True):
         self.gui_status_var = gui_status_var
         self.gui_log_widget = gui_log_widget
+        self.log_file = None
+        if enable_file_log:
+            log_filename = datetime.now().strftime("%Y%m%d_%H%M%S") + "_session.log"
+            self.log_file = os.path.join(LOGS_DIR, log_filename)
+            with open(self.log_file, 'w', encoding='utf-8') as f:
+                f.write(f"=== Economika Session Log - {datetime.now().isoformat()} ===\n\n")
 
     def update(self, message: str):
-        print(message)  # Always print to console
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        print(f"[{timestamp}] {message}")  # Always print to console
+        
+        # Write to file log
+        if self.log_file:
+            try:
+                with open(self.log_file, 'a', encoding='utf-8') as f:
+                    f.write(f"[{timestamp}] {message}\n")
+            except: pass
         
         # Schedule UI updates on the main thread using a widget's .after()
-        # We prefer gui_log_widget as it's a real widget, gui_status_var is just data.
-        
         target_widget = self.gui_log_widget
         
         if target_widget:
@@ -47,15 +62,15 @@ class StatusManager:
                         self.gui_status_var.set(message)
                     
                     self.gui_log_widget.configure(state='normal')
-                    self.gui_log_widget.insert(tk.END, f"[{datetime.now().strftime('%H:%M:%S')}] {message}\n")
+                    self.gui_log_widget.insert(tk.END, f"[{timestamp}] {message}\n")
                     self.gui_log_widget.see(tk.END)
                     self.gui_log_widget.configure(state='disabled')
                 except: pass
             target_widget.after(0, _ui_update)
         elif self.gui_status_var:
             # Fallback if no log widget is available (mostly CLI or headless)
-            # Setting StringVar directly is often thread-safe, but we lack .after() here
             self.gui_status_var.set(message)
+
 
 def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = None) -> Dict:
     """Helper to generate AI content and render video for a single item."""
@@ -74,10 +89,17 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         success, media_path = download_media(tweet_url, thumbnail_url=tweet_data.get('thumbnail'))
         if not success: media_path = None
     
-    # 2. AI Gen (with feedback support)
-    status.update("   Generating AI content...")
-    from ai_handler import generate_content_ai # Ensure import
-    headline, caption, slug, shorts_title = generate_content_ai(tweet_data, media_path, feedback)
+    # 2. AI Gen - SKIP IF CLOUD ALREADY PROVIDED CONTENT
+    if tweet_data.get('headline') and tweet_data.get('caption') and not feedback:
+        status.update("   ⚡ Using pre-generated cloud content...")
+        headline = tweet_data['headline']
+        caption = tweet_data['caption']
+        slug = tweet_data.get('slug', 'noticia')
+        shorts_title = tweet_data.get('shorts_title', headline[:100])
+    else:
+        status.update("   Generating AI content...")
+        from ai_handler import generate_content_ai
+        headline, caption, slug, shorts_title = generate_content_ai(tweet_data, media_path, feedback)
 
     # 3. Folder Setup
     clean_slug = re.sub(r'[^a-z0-9_]', '', slug.lower().replace(" ", "_").replace("-", "_"))
@@ -99,7 +121,15 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
     status.update("   Rendering Video...")
     output_name = f"{base_name}.mp4"
     skip_subtitles = tweet_data.get('skip_subtitles', False)
-    if is_video and media_path:
+    
+    # CRITICAL FIX: Check actual file extension, as Viral Scout metadata might be outdated/wrong
+    actual_is_video = is_video
+    if media_path:
+        ext = media_path.lower()
+        if ext.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+            actual_is_video = False
+    
+    if actual_is_video and media_path:
         temp_reel_path = process_video_for_reel(media_path, headline, uploader_id, output_name, skip_subtitles=skip_subtitles)
     else:
         temp_reel_path = generate_reel_from_image(media_path, headline, uploader_id, output_name)
@@ -108,10 +138,8 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
     if temp_reel_path and os.path.exists(temp_reel_path) and temp_reel_path != final_reel_path:
         shutil.move(temp_reel_path, final_reel_path)
     
-    # Cleanup temp media
-    try:
-        if media_path and os.path.exists(media_path): os.remove(media_path)
-    except: pass
+    # NOTE: We do NOT delete media_path here anymore.
+    # Cleanup happens in PostAiCurationManager._finish_close to allow RAW publishing.
 
     return {
         'folder': item_folder_path,
@@ -370,10 +398,22 @@ class PostAiCurationManager:
             messagebox.showwarning("Feedback necesario", "Por favor escribe qué quieres cambiar en el campo de feedback.")
             return
 
-        self.btn_regen.config(state="disabled", text="⏳ REGENERANDO CON IA...")
-        self.items[self.current_idx] = self.process_callback(item, feedback)
+        self.btn_regen.config(state="disabled", text="⏳ REGENERANDO...")
+        
+        def regen_task():
+            try:
+                new_item = self.process_callback(item, feedback)
+                self.root.after(0, lambda: self._finish_regen(new_item))
+            except Exception as e:
+                self.root.after(0, lambda: self.status.update(f"   ❌ Error regenerando: {e}"))
+                self.root.after(0, lambda: self.btn_regen.config(state="normal", text="🔄 REGENERAR IA"))
+        
+        threading.Thread(target=regen_task, daemon=True).start()
+    
+    def _finish_regen(self, new_item):
+        self.items[self.current_idx] = new_item
         self.btn_regen.config(state="normal", text="🔄 REGENERAR IA")
-        self.load_item() # Refresh current item
+        self.load_item()
 
     def remove_subtitles(self):
         """Re-render the current video without subtitles."""
@@ -385,8 +425,18 @@ class PostAiCurationManager:
         tweet_data = item.get('tweet_data', {})
         tweet_data['skip_subtitles'] = True
         
-        # Re-render using callback
-        self.items[self.current_idx] = self.process_callback(item, None)
+        def remove_subs_task():
+            try:
+                new_item = self.process_callback(item, None)
+                self.root.after(0, lambda: self._finish_remove_subs(new_item))
+            except Exception as e:
+                self.root.after(0, lambda: self.status.update(f"   ❌ Error quitando subs: {e}"))
+                self.root.after(0, lambda: self.btn_remove_subs.config(state="normal", text="🚫 QUITAR SUBS"))
+        
+        threading.Thread(target=remove_subs_task, daemon=True).start()
+    
+    def _finish_remove_subs(self, new_item):
+        self.items[self.current_idx] = new_item
         self.btn_remove_subs.config(state="normal", text="🚫 QUITAR SUBS")
         self.status.update(f"   ✅ Vídeo re-renderizado sin subtítulos.")
         self.load_item()
@@ -459,28 +509,61 @@ class PostAiCurationManager:
         threading.Thread(target=run_raw_publish, daemon=True).start()
 
     def on_finish(self):
+        # Stop video preview immediately to prevent audio loop
+        if self.cap: 
+            self.cap.release()
+            self.cap = None
+        if hasattr(self, 'player') and self.player:
+            self.player.close_player()
+            self.player = None
+        
         self.status.update(f"\n✨ Curación finalizada. {len(self.approved_folders)} reels guardados.")
         
-        # Trigger batch scheduling if any posts were queued
+        # Trigger batch scheduling in background thread if any posts were queued
         if self.scheduled_posts:
             self.status.update(f"📅 Programando {len(self.scheduled_posts)} posts para Instagram...")
-            try:
-                scheduled_times = publisher.schedule_batch(self.scheduled_posts)
-                for i, t in enumerate(scheduled_times):
-                    self.status.update(f"   ⏰ Post {i+1} programado para {t}")
-            except Exception as e:
-                self.status.update(f"   ❌ Error programando: {e}")
+            
+            def schedule_task():
+                try:
+                    scheduled_times = publisher.schedule_batch(self.scheduled_posts)
+                    for i, t in enumerate(scheduled_times):
+                        self.status.update(f"   ⏰ Post {i+1} programado para {t}")
+                    if scheduled_times:
+                        self.root.after(0, lambda: messagebox.showinfo("Programación", f"¡{len(scheduled_times)} posts programados!"))
+                except Exception as e:
+                    self.status.update(f"   ❌ Error programando: {e}")
+                finally:
+                    self.root.after(0, self._finish_close)
+            
+            threading.Thread(target=schedule_task, daemon=True).start()
+        else:
+            self._finish_close()
+    
+    def _finish_close(self):
+        # Cleanup original media files now that curation is complete
+        self._cleanup_original_media()
         
         if self.approved_folders:
             try: os.startfile(self.approved_folders[-1])
             except: pass
-        self.on_close()
+        self.root.destroy()
 
     def on_close(self):
         if self.cap: self.cap.release()
         if hasattr(self, 'player') and self.player:
             self.player.close_player()
+        # Cleanup original media on manual close too
+        self._cleanup_original_media()
         self.root.destroy()
+    
+    def _cleanup_original_media(self):
+        """Delete original downloaded media files after curation is complete."""
+        for item in self.items:
+            try:
+                media_path = item.get('tweet_data', {}).get('local_media_path')
+                if media_path and os.path.exists(media_path):
+                    os.remove(media_path)
+            except: pass
 
 class PreAiCurationManager:
     """Stage 1: Filter original tweets before using Gemini AI."""
@@ -1005,10 +1088,25 @@ def run_gui():
     CLOUD_SERVER_URL = "https://economikanoticias.onrender.com"
     
     def fetch_from_cloud():
-        """Fetch pending tweets from Render cloud server."""
+        """Fetch pending tweets from Render cloud server and start background pre-download."""
         nonlocal viral_scout_cache
         btn_cloud.config(state="disabled", text="⏳ Sync...")
         status_var.set("Conectando con servidor cloud...")
+        
+        def background_predownload(tweets):
+            """Pre-download media for all tweets in the background."""
+            for i, tweet in enumerate(tweets):
+                if tweet.get('local_media_path') and os.path.exists(tweet.get('local_media_path', '')):
+                    continue  # Already downloaded
+                try:
+                    download_url = tweet.get('media_url') or tweet.get('thumbnail')
+                    if download_url:
+                        success, path = download_media(tweet.get('url', ''), thumbnail_url=download_url)
+                        if success:
+                            tweet['local_media_path'] = path
+                except:
+                    pass
+            root.after(0, lambda: status_var.set(f"✅ {len(tweets)} previews listos para revisar"))
         
         def cloud_task():
             try:
@@ -1026,7 +1124,9 @@ def run_gui():
                         input_text.insert(tk.END, urls + "\n")
                         # Cache the rich data
                         viral_scout_cache = tweets
-                        status_var.set(f"☁️ {len(tweets)} tweets cargados desde cloud")
+                        status_var.set(f"☁️ {len(tweets)} tweets cargados. Descargando previews...")
+                        # Start background pre-download
+                        threading.Thread(target=background_predownload, args=(tweets,), daemon=True).start()
                     else:
                         status_var.set("☁️ No hay tweets pendientes en cloud")
                     btn_cloud.config(state="normal", text="☁️ Cloud")
@@ -1041,7 +1141,27 @@ def run_gui():
     btn_cloud = create_modern_button(btn_row, "☁️ Cloud", fetch_from_cloud, "#3498db")
     btn_cloud.pack(side="left", padx=5)
     
-    btn_scout = create_modern_button(btn_row, "🔍 Scout", lambda: None, "#9b59b6")  # Will be configured later
+    def trigger_cloud_scan():
+        """Trigger a manual viral scout scan on the Render server."""
+        btn_scout.config(state="disabled", text="⏳ Scanning...")
+        status_var.set("Solicitando escaneo al servidor cloud...")
+        
+        def scout_task():
+            try:
+                import requests
+                response = requests.post(f"{CLOUD_SERVER_URL}/scan", timeout=60)
+                if response.status_code == 200:
+                    root.after(0, lambda: status_var.set("✅ Escaneo cloud completado. Pulsa 'Cloud' para cargar."))
+                else:
+                    root.after(0, lambda: status_var.set(f"⚠️ Error cloud: {response.status_code}"))
+                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Scout"))
+            except Exception as e:
+                root.after(0, lambda: status_var.set(f"❌ Error conexión cloud: {str(e)[:40]}"))
+                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Scout"))
+        
+        threading.Thread(target=scout_task, daemon=True).start()
+
+    btn_scout = create_modern_button(btn_row, "🔍 Scout", trigger_cloud_scan, "#9b59b6")
     btn_scout.pack(side="right")
     
     # Action Button (big red)
@@ -1118,6 +1238,9 @@ def run_gui():
     
     # Initial refresh
     root.after(500, refresh_scheduled)
+    
+    # NEW: Auto-sync from cloud on startup
+    root.after(1500, fetch_from_cloud)
     
     # Status bar at bottom
     status_var = tk.StringVar(value="Listo para comenzar")
