@@ -173,39 +173,51 @@ def generate_ai_content(tweet_text: str) -> dict:
         print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
         return {}
     
-    try:
-        from google import genai
-        from google.genai import types
-        
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        
-        prompt = f"{SYSTEM_INSTRUCTION}\n\nTUIT:\n\"{tweet_text}\""
-        
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type='application/json',
+    # Models to try in order of preference
+    model_names = [
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-latest", 
+        "gemini-pro"
+    ]
+    
+    for model_name in model_names:
+        try:
+            from google import genai
+            from google.genai import types
+            
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            
+            prompt = f"{SYSTEM_INSTRUCTION}\n\nTUIT:\n\"{tweet_text}\""
+            
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                )
             )
-        )
-        
-        text = response.text
-        # Parse JSON
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "{" in text:
-            text = text[text.find("{"):text.rfind("}")+1]
-        
-        data = json.loads(text)
-        return {
-            'headline': data.get('headline', ''),
-            'caption': data.get('caption', ''),
-            'shorts_title': data.get('shorts_title', ''),
-            'slug': data.get('slug', '')
-        }
-    except Exception as e:
-        print(f"  ⚠️  AI generation error: {e}")
-        return {}
+            
+            text = response.text
+            # Parse JSON
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "{" in text:
+                text = text[text.find("{"):text.rfind("}")+1]
+            
+            data = json.loads(text)
+            print(f"  ✅ AI content generated with {model_name}")
+            return {
+                'headline': data.get('headline', ''),
+                'caption': data.get('caption', ''),
+                'shorts_title': data.get('shorts_title', ''),
+                'slug': data.get('slug', '')
+            }
+        except Exception as e:
+            print(f"  ⚠️  Model {model_name} failed: {str(e)[:80]}")
+            continue
+    
+    print("  ❌ All AI models failed")
+    return {}
 
 def run_viral_scan():
     """Run the viral scout and add new tweets to pending (with AI content generation)."""
