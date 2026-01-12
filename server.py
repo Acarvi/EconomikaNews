@@ -86,6 +86,19 @@ def get_pending():
         "last_scan": last_scan.isoformat() if last_scan else None
     }
 
+@app.get("/debug/models")
+def list_available_models():
+    """Debug endpoint to list all available models for this API key."""
+    if not GEMINI_API_KEY:
+        return {"error": "GEMINI_API_KEY not set"}
+    try:
+        from google import genai
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        models = [m.name for m in client.models.list_models()]
+        return {"available_models": models}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/pending/{tweet_id}/mark-processed")
 def mark_processed(tweet_id: str):
     """Mark a tweet as processed (removes from pending)."""
@@ -178,12 +191,14 @@ def generate_ai_content(tweet_text: str) -> dict:
         print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
         return {}
     
-    # Absolute cheapest models first (trying exact API strings)
+    # Prioritizing Gemini 1.5 variants as requested
     model_names = [
-        "gemini-1.5-flash-8b-latest",
+        "gemini-1.5-flash-8b",
         "gemini-1.5-flash-8b-001",
-        "gemini-1.5-flash-8b", 
-        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-8b-latest",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash-002",
         "gemini-2.0-flash",
     ]
     
