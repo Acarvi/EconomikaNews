@@ -43,7 +43,7 @@ class StatusManager:
 
     def update(self, message: str):
         timestamp = datetime.now().strftime('%H:%M:%S')
-        print(f"[{timestamp}] {message}")  # Always print to console
+        print(f"[{timestamp}] {message}", flush=True)  # Added flush for real-time visibility
         
         # Write to file log
         if self.log_file:
@@ -904,21 +904,13 @@ def batch_process(urls: list, status: StatusManager):
         if not url: continue
         status.update(f"🔎 Scrapeando {i+1}/{total}: {url}")
         try:
-            # If we have rich data from Viral Scout, use it directly
-            if rich_data and rich_data.get('media_url'):
-                data = {
-                    'id': rich_data.get('id'),
-                    'title': rich_data.get('description', '')[:100],
-                    'description': rich_data.get('description', ''),
-                    'uploader': rich_data.get('user', ''),
-                    'uploader_id': rich_data.get('user', ''),
-                    'thumbnail': rich_data.get('thumbnail'),
-                    'url': rich_data.get('media_url'),
-                    'media_url': rich_data.get('media_url'),
-                    'is_video': rich_data.get('is_video', False),
-                    'reposts': rich_data.get('reposts', 0),
-                    'likes': rich_data.get('likes', 0),
-                }
+            # If we have rich data from Viral Scout / Cloud, use it directly
+            if rich_data:
+                data = rich_data.copy()
+                data.setdefault('title', rich_data.get('description', '')[:100])
+                data.setdefault('uploader', rich_data.get('user', ''))
+                data.setdefault('uploader_id', rich_data.get('user', ''))
+                data.setdefault('media_url', rich_data.get('media_url'))
                 status.update(f"   ✅ Usando datos de Viral Scout...")
             else:
                 data = scrape_tweet(url)
@@ -974,6 +966,10 @@ def batch_process(urls: list, status: StatusManager):
         try:
             rendered = render_item_assets(item_data, status)
             pending_curation.append(rendered)
+            
+            # MEMORY OPTIMIZATION: Free up RAM after each render
+            import gc
+            gc.collect()
         except Exception as e:
             status.update(f"   ❌ Error procesando: {e}")
             
