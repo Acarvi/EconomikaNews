@@ -61,11 +61,14 @@ def save_queue():
 @app.get("/")
 def root():
     """Root endpoint with API info."""
+    now = datetime.now().isoformat()
+    print(f"[{now}] 📥 Root access from client")
     return {
         "name": "Economika Viral Scout API",
         "status": "running",
         "pending_count": len(pending_tweets),
-        "last_scan": last_scan.isoformat() if last_scan else None
+        "last_scan": last_scan.isoformat() if last_scan else None,
+        "time": now
     }
 
 @app.get("/health")
@@ -97,6 +100,7 @@ def mark_processed(tweet_id: str):
 @app.post("/scan")
 def trigger_scan():
     """Manually trigger a viral scout scan."""
+    print(f"[{datetime.now()}] 🔍 Manual scan triggered via API")
     run_viral_scan()
     return {"success": True, "pending_count": len(pending_tweets)}
 
@@ -240,24 +244,32 @@ def run_viral_scan():
         if hits:
             # Add new tweets (avoid duplicates)
             existing_ids = {t['id'] for t in pending_tweets}
-            new_tweets = [h for h in hits if h['id'] not in existing_ids]
+            new_added = 0
+            for h in hits:
+                if h['id'] not in existing_ids:
+                    pending_tweets.append(h)
+                    new_added += 1
             
-            # Generate AI content for new tweets
-            for i, tweet in enumerate(new_tweets):
-                print(f"  🤖 Generating AI content for tweet {i+1}/{len(new_tweets)}...")
-                ai_content = generate_ai_content(tweet.get('description', ''))
-                tweet.update(ai_content)
+            # CRITICAL: Generate AI content for ANY pending tweet that doesn't have it
+            # This fixes tweets that were added during the previous "404 error" phase
+            ai_fixed = 0
+            for i, tweet in enumerate(pending_tweets):
+                if not tweet.get('headline'):
+                    print(f"  🤖 Retrying AI generation for tweet {tweet.get('id')} ({i+1}/{len(pending_tweets)})...", flush=True)
+                    ai_content = generate_ai_content(tweet.get('description', ''))
+                    if ai_content:
+                        tweet.update(ai_content)
+                        ai_fixed += 1
             
-            pending_tweets.extend(new_tweets)
             save_pending()
             
             # Mark as processed in local history
             for h in hits:
                 scout.mark_as_processed(h['id'])
             
-            print(f"  ✅ Added {len(new_tweets)} new tweets with AI content. Total pending: {len(pending_tweets)}")
+            print(f"  ✅ Scan complete. Added: {new_added}, AI Fixed/Generated: {ai_fixed}. Total pending: {len(pending_tweets)}", flush=True)
         else:
-            print("  🤷 No new viral tweets found.")
+            print("  🤷 No new viral tweets found.", flush=True)
         
         last_scan = datetime.now()
         
