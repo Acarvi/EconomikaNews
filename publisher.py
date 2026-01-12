@@ -219,7 +219,7 @@ def schedule_batch(posts_to_schedule, server_url=None):
     
     # Default server URL (can be overridden or set via env)
     if not server_url:
-        server_url = os.environ.get("ECONOMIKA_SERVER_URL", "https://economika-server.onrender.com")
+        server_url = os.environ.get("ECONOMIKA_SERVER_URL", "https://economikanoticias.onrender.com")
     
     config = load_config()
     if not config:
