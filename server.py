@@ -79,6 +79,7 @@ def health_check():
 @app.get("/pending")
 def get_pending():
     """Get all pending viral tweets."""
+    print(f"[{datetime.now()}] 📤 Client requested pending tweets list", flush=True)
     return {
         "count": len(pending_tweets),
         "tweets": pending_tweets,
@@ -391,13 +392,14 @@ def start_scheduler():
     scheduler.start()
     print("🚀 Scheduler started - Viral Scout (hourly) + Publishing Queue (every minute)")
     
-    # Run initial scan after 30 seconds
+    # Run initial scan after 10 seconds of startup
+    from datetime import timedelta
     scheduler.add_job(
         run_viral_scan,
         trigger='date',
-        run_date=datetime.now().replace(second=30),
+        run_date=datetime.now() + timedelta(seconds=10),
         id="initial_scan",
-        misfire_grace_time=3600  # Allow running even if late
+        misfire_grace_time=3600
     )
 
     # Keep-alive ping every 10 minutes
