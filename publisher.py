@@ -211,8 +211,8 @@ def save_scheduled_posts(posts):
 
 def schedule_batch(posts_to_schedule, server_url=None):
     """
-    Upload videos to temp host and send the batch to the cloud server for scheduled publishing.
     The local script finishes immediately after sending; the server handles the wait times.
+    If tweet_ids are provided, it will notify the server to mark them as processed.
     Returns list of scheduled times as strings.
     """
     from datetime import datetime, timedelta
@@ -302,6 +302,16 @@ def schedule_batch(posts_to_schedule, server_url=None):
             if response.status_code == 200:
                 result = response.json()
                 print(f"[SUCCESS] Server queued {result.get('queued', 0)} posts. Total in queue: {result.get('total_in_queue', 0)}")
+                
+                # NEW: Notify server to remove these from pending
+                for post in posts_to_schedule:
+                    tweet_id = post.get('tweet_data', {}).get('id')
+                    if tweet_id:
+                        try:
+                            requests.post(f"{server_url.rstrip('/')}/pending/{tweet_id}/mark-processed", timeout=10)
+                            print(f"[INFO] Marked tweet {tweet_id} as processed in cloud.")
+                        except:
+                            print(f"[WARNING] Failed to mark tweet {tweet_id} as processed.")
             else:
                 print(f"[ERROR] Server returned {response.status_code}: {response.text}")
         except Exception as e:
