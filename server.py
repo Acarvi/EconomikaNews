@@ -173,11 +173,11 @@ def generate_ai_content(tweet_text: str) -> dict:
         print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
         return {}
     
-    # Models to try in order of preference
+    # Absolute cheapest models first
     model_names = [
+        "gemini-1.5-flash-8b", 
+        "gemini-1.5-flash",
         "gemini-2.0-flash",
-        "gemini-1.5-flash-latest", 
-        "gemini-pro"
     ]
     
     for model_name in model_names:

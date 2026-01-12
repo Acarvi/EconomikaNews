@@ -115,13 +115,11 @@ def generate_content_ai(tweet_data: Dict, media_path: str = None, feedback: str 
         except Exception as e:
             print(f"   ! Media analysis skipped: {e}")
 
-    # Optimized model selection (trying the most reliable first)
-    # Note: New SDK uses 'gemini-1.5-flash' without 'models/' prefix internally usually
+    # Optimized model selection (Absolute cheapest first)
     model_names = [
+        'gemini-1.5-flash-8b',
         'gemini-1.5-flash',
-        'gemini-1.5-flash-8b', 
-        'gemini-1.5-pro',
-        'gemini-2.0-flash-exp'
+        'gemini-2.0-flash'
     ]
     
     for model_name in model_names:
