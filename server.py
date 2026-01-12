@@ -94,9 +94,12 @@ def list_available_models():
     try:
         from google import genai
         client = genai.Client(api_key=GEMINI_API_KEY)
-        models = [m.name for m in client.models.list_models()]
-        return {"available_models": models}
+        # Fix: New SDK uses .list() with an iterator
+        models_iter = client.models.list()
+        models_list = [m.name for m in models_iter]
+        return {"available_models": models_list}
     except Exception as e:
+        print(f"DEBUG ERROR: {e}")
         return {"error": str(e)}
 
 @app.post("/pending/{tweet_id}/mark-processed")
@@ -191,15 +194,16 @@ def generate_ai_content(tweet_text: str) -> dict:
         print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
         return {}
     
-    # Prioritizing Gemini 1.5 variants as requested
+    # EXCLUSIVELY Gemini 1.5 variants as requested
+    # If none of these work, the system will return an empty dict (AI skipped)
     model_names = [
         "gemini-1.5-flash-8b",
-        "gemini-1.5-flash-8b-001",
         "gemini-1.5-flash-8b-latest",
+        "gemini-1.5-flash-8b-001",
         "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
         "gemini-1.5-flash-001",
         "gemini-1.5-flash-002",
-        "gemini-2.0-flash",
     ]
     
     for model_name in model_names:
