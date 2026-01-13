@@ -322,13 +322,16 @@ def process_publishing_queue():
     
     # Load config from environment variables (set in Render)
     config = {
-        "access_token": os.environ.get("IG_ACCESS_TOKEN"),
+        "access_token": os.environ.get("IG_ACCESS_TOKEN") or os.environ.get("IG_ACCESS_TOKE"),
         "ig_user_id": os.environ.get("IG_USER_ID"),
         "fb_page_id": os.environ.get("FB_PAGE_ID")
     }
     
     if not config["access_token"] or not config["ig_user_id"]:
-        print(f"[{now}] ⚠️  Publishing queue: Missing IG credentials in environment.")
+        missing = []
+        if not config["access_token"]: missing.append("IG_ACCESS_TOKEN")
+        if not config["ig_user_id"]: missing.append("IG_USER_ID")
+        print(f"[{now}] ⚠️  Publishing queue: Missing credentials in environment: {', '.join(missing)}")
         return
     
     for i, post in enumerate(publishing_queue):
