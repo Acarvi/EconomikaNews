@@ -215,7 +215,7 @@ def schedule_batch(posts_to_schedule, server_url=None):
     If tweet_ids are provided, it will notify the server to mark them as processed.
     Returns list of scheduled times as strings.
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     
     # Default server URL (can be overridden or set via env)
     if not server_url:
@@ -225,7 +225,9 @@ def schedule_batch(posts_to_schedule, server_url=None):
     if not config:
         raise Exception("No se encontró configuración de API de Instagram")
     
-    now = datetime.now()
+    # CRITICAL: Use timezone-aware datetime to avoid offset bugs
+    # Server is in UTC, so we need to convert local time to UTC
+    now = datetime.now(timezone.utc)
     
     # Define today's active window
     today_start = now.replace(hour=ACTIVE_START_HOUR, minute=0, second=0, microsecond=0)
