@@ -160,8 +160,21 @@ def schedule_batch(request: ScheduleBatchRequest):
 
 @app.get("/queue")
 def get_queue():
-    """Get all posts in the publishing queue."""
-    return {"count": len(publishing_queue), "posts": publishing_queue}
+    """Get current publishing queue."""
+    return {"queue": publishing_queue, "count": len(publishing_queue)}
+
+@app.get("/debug/queue")
+def debug_queue():
+    """Debug endpoint to inspect queue and credentials."""
+    config = {
+        "has_access_token": bool(os.environ.get("IG_ACCESS_TOKEN") or os.environ.get("IG_ACCESS_TOKE")),
+        "has_ig_user_id": bool(os.environ.get("IG_USER_ID")),
+        "has_fb_page_id": bool(os.environ.get("FB_PAGE_ID")),
+        "queue_length": len(publishing_queue),
+        "pending_count": sum(1 for p in publishing_queue if p.get("status") == "pending"),
+        "current_time": datetime.now().isoformat()
+    }
+    return config
 
 @app.delete("/queue")
 def clear_queue():
@@ -314,10 +327,12 @@ def process_publishing_queue():
     """Process the publishing queue - publish posts whose target time has passed."""
     global publishing_queue
     
+    now = datetime.now()
+    print(f"[{now}] 🔍 Checking publishing queue... ({len(publishing_queue)} total posts)", flush=True)
+    
     if not publishing_queue:
         return
     
-    now = datetime.now()
     published_ids = []
     
     # Load config from environment variables (set in Render)
@@ -331,8 +346,11 @@ def process_publishing_queue():
         missing = []
         if not config["access_token"]: missing.append("IG_ACCESS_TOKEN")
         if not config["ig_user_id"]: missing.append("IG_USER_ID")
-        print(f"[{now}] ⚠️  Publishing queue: Missing credentials in environment: {', '.join(missing)}")
+        print(f"[{now}] ⚠️  Publishing queue: Missing credentials in environment: {', '.join(missing)}", flush=True)
         return
+    
+    pending_count = sum(1 for p in publishing_queue if p.get("status") == "pending")
+    print(f"[{now}] 📊 Queue status: {pending_count} pending posts", flush=True)
     
     for i, post in enumerate(publishing_queue):
         if post["status"] != "pending":
@@ -340,10 +358,14 @@ def process_publishing_queue():
         
         try:
             target_time = datetime.fromisoformat(post["target_time"])
-        except:
-            print(f"[{now}] ⚠️  Invalid target_time format for post {i}")
+        except Exception as e:
+            print(f"[{now}] ⚠️  Invalid target_time format for post {i}: {e}", flush=True)
             publishing_queue[i]["status"] = "error"
             continue
+        
+        time_until = (target_time - now).total_seconds()
+        if time_until > 60:
+            print(f"[{now}] ⏰ Post {i+1}: scheduled for {target_time.strftime('%H:%M')}, {int(time_until/60)} min remaining", flush=True)
         
         if now >= target_time:
             print(f"[{now}] 📤 Publishing queued post: {post['video_url'][:50]}...")
