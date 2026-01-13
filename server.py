@@ -331,7 +331,9 @@ def process_publishing_queue():
     """Process the publishing queue - publish posts whose target time has passed."""
     global publishing_queue
     
-    now = datetime.now()
+    # CRITICAL: Use timezone-aware datetime to match client
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
     print(f"[{now}] 🔍 Checking publishing queue... ({len(publishing_queue)} total posts)", flush=True)
     
     if not publishing_queue:
