@@ -51,10 +51,14 @@ def load_queue():
     if os.path.exists(QUEUE_FILE):
         with open(QUEUE_FILE, 'r') as f:
             publishing_queue = json.load(f)
+            print(f"[STARTUP] Loaded {len(publishing_queue)} posts from queue file", flush=True)
+    else:
+        print(f"[STARTUP] No queue file found, starting fresh", flush=True)
 
 def save_queue():
     with open(QUEUE_FILE, 'w') as f:
         json.dump(publishing_queue, f, indent=2, default=str)
+    print(f"[QUEUE] Saved {len(publishing_queue)} posts to {QUEUE_FILE}", flush=True)
 
 # --- ENDPOINTS ---
 
