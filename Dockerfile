@@ -14,6 +14,7 @@ COPY scraper.py .
 COPY accounts.json .
 COPY publisher.py .
 COPY config_api.json .
+COPY prompts/ prompts/
 
 # Create directories for data persistence
 RUN mkdir -p /app/data
