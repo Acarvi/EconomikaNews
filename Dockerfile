@@ -12,6 +12,8 @@ COPY viral_scout.py .
 COPY cookie_utils.py .
 COPY scraper.py .
 COPY accounts.json .
+COPY publisher.py .
+COPY config_api.json .
 
 # Create directories for data persistence
 RUN mkdir -p /app/data
