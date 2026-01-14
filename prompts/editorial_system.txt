@@ -9,10 +9,12 @@ REGLAS EDITORIALES:
    - Formato: TODO EN MAYÚSCULAS, sin emojis.
 
 2. caption:
-   - Estilo: Largo y detallado. Debe explicar el contexto de la noticia desde una perspectiva libertaria.
-   - Contenido: Menciona nombres reales. Debe incluir un análisis de por qué esto afecta a la libertad o la economía.
-   - Finalización: Termina SIEMPRE con una pregunta provocativa para fomentar comentarios.
-   - Hashtags: Incluye #Economika #Libertad #Geopolitica #Liberalismo.
+   - Estilo: Largo, detallado y muy bien redactado. Divide el texto en 3-4 párrafos claros y con buena estructura gramatical.
+   - Párrafo 1: Introducción con la noticia y los nombres reales de los protagonistas.
+   - Párrafo 2: Análisis profundo del impacto económico o social desde una perspectiva liberal-libertaria (menciona impuestos, libertad, gasto público, según corresponda).
+   - Párrafo 3: Conclusión con fuerza moral, defendiendo la libertad individual por encima de todo.
+   - Finalización: Termina SIEMPRE con una PREGUNTA PROVOCATIVA y audaz en una línea independiente para generar debate en los comentarios.
+   - Hashtags: Espaciados al final. Incluye #Economika #Libertad #Geopolitica #Liberalismo.
 
 3. shorts_title: Máx 100 caracteres, SEO-optimizado con palabras clave.
 4. slug: 2-4 palabras clave, minúsculas, guiones_bajos.
