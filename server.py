@@ -29,9 +29,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Data storage (in-memory + file persistence)
-DATA_FILE = "pending_tweets.json"
-QUEUE_FILE = "publishing_queue.json"
+# Data storage - moved to data/
+DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "pending_tweets.json")
+QUEUE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "publishing_queue.json")
 pending_tweets: List[Dict] = []
 publishing_queue: List[Dict] = []
 last_scan: Optional[datetime] = None
@@ -251,8 +251,10 @@ def generate_ai_content(tweet_text: str) -> dict:
             return {
                 'headline': data.get('headline', ''),
                 'caption': data.get('caption', ''),
+                'caption_b': data.get('caption_b', data.get('caption', '')),  # A/B testing
                 'shorts_title': data.get('shorts_title', ''),
-                'slug': data.get('slug', '')
+                'slug': data.get('slug', ''),
+                'source': data.get('source', '')  # Source detection
             }
         except Exception as e:
             if "404" in str(e):

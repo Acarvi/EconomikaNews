@@ -1,43 +1,28 @@
-# Twitter to Instagram Reel Generator
+# 🗞️ Economika Noticias
 
-Convierte tuits (de X/Twitter) en Reels listos para Instagram automáticamente.
+Sistema automatizado de creación y publicación de contenido para redes sociales con enfoque liberal-libertario.
 
-## Uso
+## 🚀 Características Principales
+- **Viral Scout**: Escaneo inteligente de tendencias en Twitter (X).
+- **IA Content Engine**: Generación de titulares impactantes y captions detallados usando Google Gemini.
+- **A/B Testing**: Publicación dual (Branded vs Raw) para maximizar el alcance.
+- **Detección de Fuente**: Identificación automática de la fuente original de los medios.
+- **Multi-plataforma**: Soporte para Instagram Reels, Stories y Facebook Reels.
+- **Auto-Cleanup**: Sistema integrado para evitar la saturación de archivos locales.
 
-```bash
-python main.py <url_del_tuit>
-```
+## 📁 Estructura del Proyecto
+- `main.py`: Interfaz gráfica y orquestador principal.
+- `server.py`: Backend en la nube (Render) para publicación programada.
+- `generator.py`: Motor de renderizado de video (MoviePy).
+- `ai_handler.py`: Integración con la API de Google Gemini.
+- `publisher.py`: Lógica de subida a redes sociales y hosting temporal (Catbox).
+- `docs/`: Guías detalladas y documentación técnica.
+- `tools/`: Scripts de utilidad y diagnóstico.
+- `utils/`: Utilidades del sistema (Cleanup, etc).
 
-O con el archivo `.bat`:
+## 🛠️ Requisitos Rápidos
+1. **Python 3.10+**
+2. **FFmpeg** instalado en el sistema.
+3. **API Keys**: Google Gemini, Instagram Graph API.
 
-```bash
-run.bat https://x.com/usuario/status/123456789
-```
-
-## Qué hace
-
-1. **Extrae** el contenido del tuit (texto, autor, media)
-2. **Descarga** el video o imagen
-3. **Genera** un titular viral y caption para Instagram
-4. **Crea** un video vertical 1080x1920 con:
-   - Fondo desenfocado
-   - Imagen/video centrado
-   - Texto superpuesto
-
-## Output
-
-Los archivos generados se guardan en:
-- `output/<tweet_id>_reel.mp4` - El video listo para subir
-- `output/<tweet_id>_caption.md` - El caption de Instagram
-
-## Requisitos
-
-```bash
-pip install -r requirements.txt
-```
-
-Dependencias:
-- `yt-dlp` - Descarga de media
-- `moviepy` - Edición de video
-- `Pillow` - Procesamiento de imágenes
-- `requests` - Descargas HTTP
+Para más detalles, consulta [DEVELOPER.md](file:///d:/MEGA/Scripts/EconomikaNoticias/docs/DEVELOPER.md).

@@ -6,15 +6,13 @@ WORKDIR /app
 COPY requirements-server.txt .
 RUN pip install --no-cache-dir -r requirements-server.txt
 
-# Copy necessary files only (not local configs)
-COPY server.py .
-COPY viral_scout.py .
-COPY cookie_utils.py .
-COPY scraper.py .
-COPY accounts.json .
-COPY publisher.py .
-COPY config_api.json .
+# Copy directories and entry points
+COPY core/ core/
+COPY config/ config/
+COPY data/ data/
 COPY prompts/ prompts/
+COPY server.py .
+COPY requirements.txt .
 
 # Create directories for data persistence
 RUN mkdir -p /app/data

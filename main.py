@@ -10,10 +10,10 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
 from datetime import datetime
-from scraper import scrape_tweet
-from downloader import download_media, DOWNLOADS_DIR
-from ai_handler import generate_content_ai
-from generator import generate_reel_from_image, process_video_for_reel, OUTPUT_DIR
+from core.scraper import scrape_tweet
+from core.downloader import download_media, DOWNLOADS_DIR
+from core.ai_handler import generate_content_ai
+from core.generator import generate_reel_from_image, process_video_for_reel, OUTPUT_DIR
 import cv2
 import numpy as np
 from PIL import Image, ImageTk, ImageDraw
@@ -22,7 +22,8 @@ try:
 except ImportError:
     MediaPlayer = None
 
-import publisher # New automation module
+import core.publisher as publisher # New automation module
+from utils.cleanup import cleanup_old_files, cleanup_temp_files
 
 # --- CONFIG & HELPERS ---
 
@@ -96,10 +97,12 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         caption = tweet_data['caption']
         slug = tweet_data.get('slug', 'noticia')
         shorts_title = tweet_data.get('shorts_title', headline[:100])
+        caption_b = tweet_data.get('caption_b', caption)  # Fallback to same caption
+        source = tweet_data.get('source', '')
     else:
         status.update("   Generating AI content...")
-        from ai_handler import generate_content_ai
-        headline, caption, slug, shorts_title = generate_content_ai(tweet_data, media_path, feedback)
+        from core.ai_handler import generate_content_ai
+        headline, caption, slug, shorts_title, caption_b, source = generate_content_ai(tweet_data, media_path, feedback)
 
     # 3. Folder Setup
     clean_slug = re.sub(r'[^a-z0-9_]', '', slug.lower().replace(" ", "_").replace("-", "_"))
@@ -111,7 +114,7 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
     # 4. Save artifacts
     caption_path = os.path.join(item_folder_path, f"{base_name}.md")
     with open(caption_path, 'w', encoding='utf-8') as f:
-        f.write(f"# {headline}\n\n### 📹 SHORTS\n{shorts_title}\n\n### 📝 CAPTION\n{caption}\n")
+        f.write(f"# {headline}\n\n### 📹 SHORTS\n{shorts_title}\n\n### 📝 CAPTION (A)\n{caption}\n\n### 📝 CAPTION (B)\n{caption_b}\n")
     
     html_path = os.path.join(item_folder_path, "copiar_movil.html")
     from main import generate_mobile_html
@@ -147,6 +150,8 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         'headline': headline,
         'shorts_title': shorts_title,
         'caption': caption,
+        'caption_b': caption_b,  # New: For A/B testing
+        'source': source,  # New: Detected source
         'tweet_data': tweet_data
     }
 
@@ -229,13 +234,20 @@ class PostAiCurationManager:
         self.btn_mute = tk.Button(self.action_btn_frame2, text="🔊", bg="#555", fg="white", font=("Segoe UI", 12), width=4, command=self.toggle_mute)
         self.btn_mute.pack(side="left", padx=(0, 10))
         
-        self.btn_batch = tk.Button(self.action_btn_frame2, text="📅 PROGRAMAR", bg="#9b59b6", fg="white", font=("Segoe UI Black", 10),
+        self.btn_batch = tk.Button(self.action_btn_frame2, text="📅 A/B TEST", bg="#9b59b6", fg="white", font=("Segoe UI Black", 10),
                                    padx=10, pady=6, borderwidth=0, command=self.add_to_batch)
         self.btn_batch.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
         self.btn_raw = tk.Button(self.action_btn_frame2, text="🎬 RAW", bg="#2c3e50", fg="white", font=("Segoe UI Black", 10),
                                  padx=10, pady=6, borderwidth=0, command=self.publish_raw)
         self.btn_raw.pack(side="right", fill="x", expand=True, padx=(5, 0))
+        
+        # Third row: Source display
+        self.source_frame = tk.Frame(self.info_frame, bg="#121212")
+        self.source_frame.pack(fill="x", pady=(10, 0))
+        
+        self.source_label = tk.Label(self.source_frame, text="", font=("Segoe UI", 10), fg="#3498db", bg="#121212")
+        self.source_label.pack(side="left")
         
         # Asset Loading
         self.overlay_np = None
@@ -264,6 +276,13 @@ class PostAiCurationManager:
         
         self.feedback_text.delete('1.0', tk.END)
         self.feedback_text.insert(tk.END, "") # Clear each time
+        
+        # Display detected source
+        source = item.get('source', '')
+        if source:
+            self.source_label.config(text=f"📰 Fuente detectada: {source}", fg="#27ae60")
+        else:
+            self.source_label.config(text="📰 Fuente: No detectada", fg="#888")
 
         if self.cap: self.cap.release()
         try:
@@ -452,15 +471,39 @@ class PostAiCurationManager:
         self.btn_mute.config(text="🔇" if self.is_muted else "🔊")
 
     def add_to_batch(self):
-        """Add current item to the scheduled batch and move to next."""
+        """Add current item to A/B testing batch: schedules TWO posts (branded A + raw B)."""
         item = self.items[self.current_idx]
-        caption = self.caption_text.get('1.0', tk.END).strip()
+        caption_a = self.caption_text.get('1.0', tk.END).strip()
+        caption_b = item.get('caption_b', caption_a)  # Use AI-generated B or fallback to A
+        
+        # A/B Testing: Schedule branded version with caption A
         self.scheduled_posts.append({
             'reel_path': item['reel_path'],
-            'caption': caption,
-            'folder': item['folder']
+            'caption': caption_a,
+            'folder': item['folder'],
+            'variant': 'A (Branded)'
         })
-        self.status.update(f"   📅 Reel añadido al batch de programación ({len(self.scheduled_posts)} en cola).")
+        
+        # A/B Testing: Schedule raw version with caption B
+        raw_video_path = item.get('tweet_data', {}).get('local_media_path')
+        if raw_video_path and os.path.exists(raw_video_path):
+            self.scheduled_posts.append({
+                'reel_path': raw_video_path,
+                'caption': caption_b,
+                'folder': item['folder'],
+                'variant': 'B (Raw)'
+            })
+            self.status.update(f"   📅 A/B Test añadido: 2 posts programados ({len(self.scheduled_posts)} total en cola).")
+        else:
+            # Fallback: use branded version for B too with different caption
+            self.scheduled_posts.append({
+                'reel_path': item['reel_path'],
+                'caption': caption_b,
+                'folder': item['folder'],
+                'variant': 'B (Branded Alt Caption)'
+            })
+            self.status.update(f"   📅 A/B Test añadido (sin RAW): 2 posts programados ({len(self.scheduled_posts)} total).")
+        
         self.approved_folders.append(item['folder'])
         self.next_item()
 
@@ -956,22 +999,38 @@ def batch_process(urls: list, status: StatusManager):
         status.update("✨ Proceso cancelado o ningún item seleccionado.")
         return
 
-    # --- STAGE 3: PROCESS KEPT ITEMS ---
-    status.update(f"⚙️ Procesando {len(kept_after_filter)} items seleccionados...")
+    # --- STAGE 3: PROCESS KEPT ITEMS (PARALLEL) ---
+    status.update(f"⚙️ Procesando {len(kept_after_filter)} items seleccionados (en paralelo)...")
     pending_curation = []
     
-    for i, item_data in enumerate(kept_after_filter):
-        if i > 0: time.sleep(5) # RPM Safety
-        status.update(f"\n[{i+1}/{len(kept_after_filter)}] Redactando y Renderizando...")
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    # Use max 2 workers to avoid crashing the PC, even with NVENC
+    max_workers = 2
+    
+    def process_item(item_data, idx, total_items):
         try:
+            status.update(f"[{idx+1}/{total_items}] Renderizando: {item_data.get('title', 'Sin título')[:30]}...")
             rendered = render_item_assets(item_data, status)
-            pending_curation.append(rendered)
             
             # MEMORY OPTIMIZATION: Free up RAM after each render
             import gc
             gc.collect()
+            return rendered
         except Exception as e:
-            status.update(f"   ❌ Error procesando: {e}")
+            status.update(f"   ❌ Error en item {idx+1}: {e}")
+            return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_item = {executor.submit(process_item, data, i, len(kept_after_filter)): data for i, data in enumerate(kept_after_filter)}
+        
+        for future in as_completed(future_to_item):
+            result = future.result()
+            if result:
+                pending_curation.append(result)
+            
+    # Sort pending_curation to maintain original order if possible (optional)
+    # For now, append order is fine as they go to a reviewer gallery anyway
             
     # --- STAGE 4: POST-AI CURATION & FEEDBACK ---
     if pending_curation:
@@ -1330,6 +1389,13 @@ if __name__ == "__main__":
     import warnings
     warnings.simplefilter("ignore") # Suppress FutureWings for cleaner output
     
+    # Run automated cleanup on startup
+    try:
+        cleanup_temp_files(os.path.dirname(os.path.abspath(__file__)))
+        cleanup_old_files(os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"), days_to_keep=7)
+    except Exception as e:
+        print(f"[CLEANUP] Startup cleanup failed: {e}")
+
     if len(sys.argv) > 1:
         # CLI Mode
         urls = sys.argv[1:]

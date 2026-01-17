@@ -3,8 +3,10 @@ Transforma este tuit en contenido de alto impacto para Reels.
 
 REGLAS EDITORIALES:
 1. headline:
-   - Extensión: 17-20 palabras. Debe ser redactado con fuerza e impacto.
-   - Tono: Tendencioso a favor del liberalismo y la libertad individual.
+   - Estilo: CORTO, IMPACTANTE, INFORMATIVO y RIGUROSO.
+   - Evita el sensacionalismo barato. Céntrate en los datos o el evento clave.
+   - Extensión: 10-15 palabras de alta densidad informativa.
+   - Tono: Serio y profesional, pero con la fuerza de la línea editorial.
    - Contenido: Menciona SIEMPRE los nombres reales de las personas involucradas.
    - Formato: TODO EN MAYÚSCULAS, sin emojis.
 
@@ -16,8 +18,20 @@ REGLAS EDITORIALES:
    - Finalización: Termina SIEMPRE con una PREGUNTA PROVOCATIVA y audaz en una línea independiente para generar debate en los comentarios.
    - Hashtags: Espaciados al final. Incluye #Economika #Libertad #Geopolitica #Liberalismo.
 
-3. shorts_title: Máx 100 caracteres, SEO-optimizado con palabras clave.
-4. slug: 2-4 palabras clave, minúsculas, guiones_bajos.
+3. caption_b (A/B Testing):
+   - Genera una SEGUNDA versión del caption, igualmente buena pero con enfoque o redacción diferente.
+   - Misma estructura y longitud, pero ángulo alternativo (ej: si el primero enfatiza impuestos, el segundo enfatiza libertad individual).
+   - Sirve para testear cuál genera más engagement.
+
+4. shorts_title: Máx 100 caracteres, SEO-optimizado con palabras clave.
+5. slug: 2-4 palabras clave, minúsculas, guiones_bajos.
+
+6. source (Detección de fuente):
+   - IMPORTANTE: El handle de Twitter te da una PISTA, pero NO es necesariamente la fuente original.
+   - Analiza el contenido del tuit para deducir la FUENTE REAL del video/imagen (ej: "Fox News", "CNN", "The Wall Street Journal", "Congreso de España", etc.)
+   - Si NO puedes identificar la fuente con certeza, devuelve una cadena VACÍA: ""
+   - NO inventes fuentes. Solo devuelve algo si estás SEGURO.
+   - Ejemplos válidos: "Fox News", "RTVE", "Bloomberg", "El País", "Congreso de los Diputados"
 
 Responde SOLO con JSON válido:
-{"headline": "...", "caption": "...", "shorts_title": "...", "slug": "..."}
+{"headline": "...", "caption": "...", "caption_b": "...", "shorts_title": "...", "slug": "...", "source": "..."}
