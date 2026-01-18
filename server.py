@@ -270,10 +270,11 @@ def run_viral_scan():
     """Run the viral scout and add new tweets to pending (with AI content generation)."""
     global pending_tweets, last_scan
     
-    print(f"[{datetime.now()}] Running scheduled Viral Scout scan...")
+    now = datetime.now().isoformat()
+    print(f"[{now}] 🔍 [SCAN] Starting scheduled Viral Scout scan...", flush=True)
     
     try:
-        from viral_scout import ViralScout
+        from core.viral_scout import ViralScout
         scout = ViralScout()
         
         hits = scout.scan(
@@ -281,8 +282,10 @@ def run_viral_scan():
             min_ratio=1.0,
             ignore_history=False,
             must_have_media=True,
-            progress_callback=lambda msg: print(f"  {msg}")
+            progress_callback=lambda msg: print(f"  [SCOUT] {msg}", flush=True)
         )
+        
+        print(f"[{datetime.now().isoformat()}] 📥 [SCAN] Scout returned {len(hits)} viral hits", flush=True)
         
         if hits:
             # Add new tweets (avoid duplicates)
@@ -317,7 +320,9 @@ def run_viral_scan():
         last_scan = datetime.now()
         
     except Exception as e:
-        print(f"  ❌ Scan error: {e}")
+        print(f"[{datetime.now().isoformat()}] ❌ [SCAN ERROR]: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
 def self_ping():
     """Ping itself to prevent Render from sleeping (free tier)."""
@@ -381,7 +386,7 @@ def process_publishing_queue():
         if now >= target_time:
             print(f"[{now}] 📤 Publishing queued post: {post['video_url'][:50]}...")
             try:
-                from publisher import upload_reel, upload_story, upload_facebook_reel
+                from core.publisher import upload_reel, upload_story, upload_facebook_reel
                 
                 # Instagram Reel
                 if "instagram_reel" in post["platforms"]:
@@ -446,7 +451,7 @@ def start_scheduler():
     )
     
     scheduler.start()
-    print("🚀 Scheduler started - Viral Scout (hourly) + Publishing Queue (every minute)")
+    print("🚀 [STARTUP] Scheduler started - Viral Scout (hourly) + Publishing Queue (every minute)", flush=True)
     
     # Run initial scan after 10 seconds of startup
     from datetime import timedelta

@@ -88,6 +88,7 @@ class ViralScout:
 
         total_accounts = len(self.accounts)
         limit_date = datetime.now() - timedelta(hours=hours_back)
+        progress_callback(f"📊 [SCOUT] Accounts to scan: {list(self.accounts.keys())}")
         
         for idx, (user_screen_name, _) in enumerate(self.accounts.items()):
             progress_callback(f"🔎 Scanning @{user_screen_name} ({idx+1}/{total_accounts})...")

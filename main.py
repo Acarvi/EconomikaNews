@@ -1309,7 +1309,7 @@ def run_gui():
     # Viral Scout function
     def run_viral_scout(hours=24, ignore_history=False, must_have_media=True):
         nonlocal viral_scout_cache
-        from viral_scout import ViralScout
+        from core.viral_scout import ViralScout
         from tkinter import simpledialog
         
         btn_scout.config(state="disabled", text="⏳ Buscando...")
@@ -1392,7 +1392,7 @@ if __name__ == "__main__":
     # Run automated cleanup on startup
     try:
         cleanup_temp_files(os.path.dirname(os.path.abspath(__file__)))
-        cleanup_old_files(os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"), days_to_keep=7)
+        cleanup_old_files(os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"), max_age_hours=7*24)
     except Exception as e:
         print(f"[CLEANUP] Startup cleanup failed: {e}")
 
