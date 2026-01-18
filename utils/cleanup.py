@@ -3,40 +3,38 @@ import shutil
 import time
 from datetime import datetime, timedelta
 
-def cleanup_old_files(output_dir, days_to_keep=7, dry_run=False):
+def cleanup_old_files(directory, max_age_hours=24, dry_run=False):
     """
-    Deletes folders in the output directory that are older than days_to_keep.
+    Deletes files/folders in the directory that are older than max_age_hours.
     """
-    if not os.path.exists(output_dir):
-        print(f"[CLEANUP] Output directory {output_dir} does not exist.")
+    if not os.path.exists(directory):
+        print(f"[CLEANUP] Directory {directory} does not exist.")
         return
 
     now = time.time()
-    cutoff = now - (days_to_keep * 86400)
+    cutoff = now - (max_age_hours * 3600)
     
-    print(f"[CLEANUP] Starting cleanup in {output_dir} (Keeping last {days_to_keep} days)...")
+    print(f"[CLEANUP] Starting cleanup in {directory} (Older than {max_age_hours}h)...")
     
-    folders_removed = 0
-    for item in os.listdir(output_dir):
-        item_path = os.path.join(output_dir, item)
-        
-        # We only care about directories in output (which are formatted as YYYYMMDD_slug)
-        if os.path.isdir(item_path):
+    removed_count = 0
+    for item in os.listdir(directory):
+        item_path = os.path.join(directory, item)
+        try:
             st = os.stat(item_path)
-            mtime = st.st_mtime
-            
-            if mtime < cutoff:
+            if st.st_mtime < cutoff:
                 if dry_run:
                     print(f"[CLEANUP][DRY-RUN] Would remove: {item}")
                 else:
-                    try:
+                    if os.path.isdir(item_path):
                         shutil.rmtree(item_path)
-                        print(f"[CLEANUP] Removed old folder: {item}")
-                        folders_removed += 1
-                    except Exception as e:
-                        print(f"[CLEANUP] Error removing {item}: {e}")
+                    else:
+                        os.remove(item_path)
+                    print(f"[CLEANUP] Removed: {item}")
+                    removed_count += 1
+        except Exception as e:
+            print(f"[CLEANUP] Error removing {item}: {e}")
     
-    print(f"[CLEANUP] Finished. Removed {folders_removed} folders.")
+    print(f"[CLEANUP] Finished. Removed {removed_count} items.")
 
 def cleanup_temp_files(root_dir):
     """

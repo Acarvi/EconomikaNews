@@ -802,24 +802,6 @@ class PreAiCurationManager:
         self.current_idx += 1
         self.load_tweet()
 
-def cleanup_old_files(directory: str, max_age_hours: int = 24):
-    """Delete files and folders older than max_age_hours."""
-    now = time.time()
-    count = 0
-    if not os.path.exists(directory): return
-    for f in os.listdir(directory):
-        path = os.path.join(directory, f)
-        try:
-            if os.stat(path).st_mtime < now - (max_age_hours * 3600):
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
-                else:
-                    os.remove(path)
-                count += 1
-        except Exception as e:
-            print(f"Error cleaning {f}: {e}")
-    if count > 0:
-        print(f"🧹 Cleaned {count} old items from {os.path.basename(directory)}")
 
 def generate_mobile_html(output_path, headline, shorts_title, caption):
     """Creates a mobile-friendly HTML with reliable copy functionality."""
