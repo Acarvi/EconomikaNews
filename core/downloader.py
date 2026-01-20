@@ -10,61 +10,82 @@ from typing import Optional, Tuple
 DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
-def download_media(url: str, output_name: str = None, thumbnail_url: str = None) -> Tuple[bool, str]:
+def download_media(url: str, output_name: str = None, thumbnail_url: str = None, is_video: bool = True) -> Tuple[bool, str]:
     """
     Download media (video or image) from a Twitter URL.
     Returns (success, file_path or error_message).
     """
+    # Fast path: Skip yt-dlp entirely for known images
+    if not is_video and thumbnail_url:
+        from .scraper import extract_tweet_id
+        tid = extract_tweet_id(url) or "media"
+        ext = "jpg"
+        if thumbnail_url and ".png" in thumbnail_url.lower(): ext = "png"
+        dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
+        success, path = download_image(thumbnail_url, dest)
+        if success: return True, path
+    
+    # Silence yt-dlp completely
+    import sys
+    import io
+    old_stderr = sys.stderr
+    sys.stderr = io.StringIO()  # Capture and discard stderr
+    
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
+        'no_progress': True,
+        'logger': type('QuietLogger', (), {'debug': lambda *a: None, 'warning': lambda *a: None, 'error': lambda *a: None})(),
         'outtmpl': os.path.join(DOWNLOADS_DIR, output_name or '%(id)s.%(ext)s'),
         'format': 'best[ext=mp4]/best',
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            if os.path.exists(filename):
-                return True, filename
-            
-            # Fallback for images inside yt-dlp info
-            for ext in ['mp4', 'jpg', 'png', 'webp']:
-                test_path = os.path.join(DOWNLOADS_DIR, f"{info.get('id', 'media')}.{ext}")
-                if os.path.exists(test_path):
-                    return True, test_path
-            
-            # If nothing found but we have a thumbnail URL, try it
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                if os.path.exists(filename):
+                    return True, filename
+                
+                # Fallback for images inside yt-dlp info
+                for ext in ['mp4', 'jpg', 'png', 'webp']:
+                    test_path = os.path.join(DOWNLOADS_DIR, f"{info.get('id', 'media')}.{ext}")
+                    if os.path.exists(test_path):
+                        return True, test_path
+                
+                # If nothing found but we have a thumbnail URL, try it
+                if thumbnail_url:
+                    from .scraper import extract_tweet_id
+                    tid = extract_tweet_id(url) or "media"
+                    ext = "jpg"
+                    if thumbnail_url and ".png" in thumbnail_url.lower(): ext = "png"
+                    dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
+                    success, path = download_image(thumbnail_url, dest)
+                    if success: return True, path
+                        
+        except Exception as e:
+            # If yt-dlp fails (e.g. no video), try direct thumbnail download
             if thumbnail_url:
-                from .scraper import extract_tweet_id
-                tid = extract_tweet_id(url) or "media"
                 ext = "jpg"
                 if ".png" in thumbnail_url.lower(): ext = "png"
-                dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
-                success, path = download_image(thumbnail_url, dest)
-                if success: return True, path
-                    
-    except Exception as e:
-        # If yt-dlp fails (e.g. no video), try direct thumbnail download
-        if thumbnail_url:
-            ext = "jpg"
-            if ".png" in thumbnail_url.lower(): ext = "png"
-            if ".webp" in thumbnail_url.lower(): ext = "webp"
-            
-            # Generate a name if not provided
-            if not output_name:
-                from .scraper import extract_tweet_id
-                tid = extract_tweet_id(url) or "media"
-                output_name = f"{tid}.{ext}"
-            
-            dest = os.path.join(DOWNLOADS_DIR, output_name)
-            success, path = download_image(thumbnail_url, dest)
-            if success:
-                return True, path
+                if ".webp" in thumbnail_url.lower(): ext = "webp"
                 
-        return False, str(e)
-    
+                # Generate a name if not provided
+                if not output_name:
+                    from .scraper import extract_tweet_id
+                    tid = extract_tweet_id(url) or "media"
+                    output_name = f"{tid}.{ext}"
+                
+                dest = os.path.join(DOWNLOADS_DIR, output_name)
+                success, path = download_image(thumbnail_url, dest)
+                if success:
+                    return True, path
+                    
+            return False, str(e)
+    finally:
+        sys.stderr = old_stderr # Restore stderr NO MATTER WHAT
+
     return False, "Failed to download media"
 
 def download_image(url: str, output_path: str) -> Tuple[bool, str]:

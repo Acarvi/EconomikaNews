@@ -3,18 +3,18 @@ import shutil
 import time
 from datetime import datetime, timedelta
 
-def cleanup_old_files(directory, max_age_hours=24, dry_run=False):
+def cleanup_old_files(directory, max_age_hours=24, dry_run=False, quiet=False):
     """
     Deletes files/folders in the directory that are older than max_age_hours.
     """
     if not os.path.exists(directory):
-        print(f"[CLEANUP] Directory {directory} does not exist.")
+        if not quiet: print(f"[CLEANUP] Directory {directory} does not exist.")
         return
 
     now = time.time()
     cutoff = now - (max_age_hours * 3600)
     
-    print(f"[CLEANUP] Starting cleanup in {directory} (Older than {max_age_hours}h)...")
+    if not quiet: print(f"[CLEANUP] Starting cleanup in {directory} (Older than {max_age_hours}h)...")
     
     removed_count = 0
     for item in os.listdir(directory):
@@ -29,12 +29,12 @@ def cleanup_old_files(directory, max_age_hours=24, dry_run=False):
                         shutil.rmtree(item_path)
                     else:
                         os.remove(item_path)
-                    print(f"[CLEANUP] Removed: {item}")
+                    if not quiet: print(f"[CLEANUP] Removed: {item}")
                     removed_count += 1
         except Exception as e:
-            print(f"[CLEANUP] Error removing {item}: {e}")
+            if not quiet: print(f"[CLEANUP] Error removing {item}: {e}")
     
-    print(f"[CLEANUP] Finished. Removed {removed_count} items.")
+    if not quiet: print(f"[CLEANUP] Finished. Removed {removed_count} items.")
 
 def cleanup_temp_files(root_dir):
     """
@@ -49,10 +49,11 @@ def cleanup_temp_files(root_dir):
             file_path = os.path.join(root_dir, file)
             try:
                 os.remove(file_path)
-                print(f"[CLEANUP] Removed temporary file: {file}")
+                # print(f"[CLEANUP] Removed temporary file: {file}") # Silenced
                 removed_count += 1
             except Exception as e:
-                print(f"[CLEANUP] Error removing temp file {file}: {e}")
+                # print(f"[CLEANUP] Error removing temp file {file}: {e}") # Silenced
+                pass
                 
     return removed_count
 

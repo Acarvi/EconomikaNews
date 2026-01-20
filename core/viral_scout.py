@@ -22,12 +22,14 @@ from datetime import datetime, timedelta
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ACCOUNTS_FILE = os.path.join(BASE_DIR, "config", "accounts.json")
 HISTORY_FILE = os.path.join(BASE_DIR, "data", "processed_history.json")
+REJECTED_FILE = os.path.join(BASE_DIR, "data", "rejected_history.json")
 COOKIES_FILE = os.path.join(BASE_DIR, "config", "x.com_cookies.txt")
 
 class ViralScout:
     def __init__(self):
         self.accounts = self.load_accounts()
-        self.history = self.load_history()
+        self.history = self.load_history(HISTORY_FILE)
+        self.rejected = self.load_history(REJECTED_FILE)
         self.client = Client('en-US')
 
     def load_accounts(self):
@@ -43,32 +45,43 @@ class ViralScout:
         with open(ACCOUNTS_FILE, 'r') as f:
             return json.load(f)
 
-    def load_history(self):
-        if not os.path.exists(HISTORY_FILE):
+    def load_history(self, filepath):
+        if not os.path.exists(filepath):
             return []
         try:
-            with open(HISTORY_FILE, 'r') as f:
-                return json.load(f)
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
         except:
             return []
 
-    def save_history(self):
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(self.history, f, indent=4)
+    def save_list(self, filepath, data_list):
+        try:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w') as f:
+                json.dump(list(set(data_list)), f, indent=4) # Dedup on save
+        except Exception as e:
+            print(f"Error saving history to {filepath}: {e}")
 
     def is_processed(self, tweet_id):
-        return tweet_id in self.history
+        return tweet_id in self.history or tweet_id in self.rejected
 
     def mark_as_processed(self, tweet_id):
         if tweet_id not in self.history:
             self.history.append(tweet_id)
-            self.save_history()
+            self.save_list(HISTORY_FILE, self.history)
 
-    async def _scan_async(self, hours_back=24, min_ratio=1.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
+    def mark_as_rejected(self, tweet_id):
+        if tweet_id not in self.rejected:
+            self.rejected.append(tweet_id)
+            self.save_list(REJECTED_FILE, self.rejected)
+
+    async def _scan_async(self, hours_back=24, min_ratio=2.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
         """
         Internal async scan using Twikit.
         Formula: (RTs * 4 + Likes) / (sqrt(Followers) * 2)
-        Viral Threshold: > 1.0
+        Viral Threshold: > 2.0 (Endurecido de 1.0 a 2.0)
         """
         viral_urls = []
         
@@ -252,7 +265,7 @@ class ViralScout:
         viral_urls.sort(key=lambda x: x['score'], reverse=True)
         return viral_urls
 
-    def scan(self, hours_back=24, min_ratio=1.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
+    def scan(self, hours_back=24, min_ratio=2.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
         """
         Sync wrapper for scan_async.
         """

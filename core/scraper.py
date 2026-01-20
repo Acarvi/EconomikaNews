@@ -149,35 +149,45 @@ def scrape_tweet(url: str) -> Optional[Dict[str, Any]]:
         print(f"[ERROR] Could not extract tweet ID from: {url}")
         return None
 
+    # Silence yt-dlp completely
+    import sys
+    import io
+    old_stderr = sys.stderr
+    sys.stderr = io.StringIO()  # Capture and discard stderr
+
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
         'extract_flat': False,
+        'logger': type('QuietLogger', (), {'debug': lambda *a: None, 'warning': lambda *a: None, 'error': lambda *a: None})(),
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"[INFO] Attempting to scrape with yt-dlp: {url}")
-            info = ydl.extract_info(url, download=False)
-            
-            return {
-                'id': tweet_id,
-                'title': info.get('title', ''),
-                'description': info.get('description', ''),
-                'uploader': info.get('uploader', ''),
-                'uploader_id': info.get('uploader_id', ''),
-                'thumbnail': info.get('thumbnail'),
-                'url': info.get('url'),
-                'formats': info.get('formats', []),
-                'duration': info.get('duration'),
-                'is_video': info.get('duration') is not None and info.get('duration') > 0,
-                'reposts': _get_stat(info, ['retweet_count', 'repost_count', 'retweetCount']),
-                'likes': _get_stat(info, ['like_count', 'favorite_count', 'likeCount', 'view_count']), # some systems use view_count for likes? unlikely but safety
-            }
-    except Exception as e:
-        print(f"[WARNING] yt-dlp failed: {e}. Trying browser fallback...")
-        return scrape_tweet_with_browser(url)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                print(f"[INFO] Attempting to scrape with yt-dlp: {url}")
+                info = ydl.extract_info(url, download=False)
+                
+                return {
+                    'id': tweet_id,
+                    'title': info.get('title', ''),
+                    'description': info.get('description', ''),
+                    'uploader': info.get('uploader', ''),
+                    'uploader_id': info.get('uploader_id', ''),
+                    'thumbnail': info.get('thumbnail'),
+                    'url': info.get('url'),
+                    'formats': info.get('formats', []),
+                    'duration': info.get('duration'),
+                    'is_video': info.get('duration') is not None and info.get('duration') > 0,
+                    'reposts': _get_stat(info, ['retweet_count', 'repost_count', 'retweetCount']),
+                    'likes': _get_stat(info, ['like_count', 'favorite_count', 'likeCount', 'view_count']),
+                }
+        except Exception as e:
+            print(f"[WARNING] yt-dlp failed: {e}. Trying browser fallback...")
+            return scrape_tweet_with_browser(url)
+    finally:
+        sys.stderr = old_stderr # Restore stderr
 
 if __name__ == "__main__":
     import sys

@@ -58,7 +58,22 @@ def load_queue():
 def save_queue():
     with open(QUEUE_FILE, 'w') as f:
         json.dump(publishing_queue, f, indent=2, default=str)
-    print(f"[QUEUE] Saved {len(publishing_queue)} posts to {QUEUE_FILE}", flush=True)
+
+def prune_old_tweets():
+    """Remove tweets older than 24h from pending list."""
+    global pending_tweets
+    from datetime import timedelta
+    initial_count = len(pending_tweets)
+    threshold = (datetime.now() - timedelta(hours=24)).isoformat()
+    
+    # Ensure added_at exists
+    for t in pending_tweets:
+        if 'added_at' not in t: t['added_at'] = datetime.now().isoformat()
+        
+    pending_tweets = [t for t in pending_tweets if t.get('added_at', datetime.now().isoformat()) > threshold]
+    if len(pending_tweets) < initial_count:
+        print(f"  [TTL] Pruned {initial_count - len(pending_tweets)} old tweets.", flush=True)
+        save_pending()
 
 # --- ENDPOINTS ---
 
@@ -80,17 +95,7 @@ def health_check():
     """Health check endpoint for keep-alive pings."""
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-@app.get("/pending")
-def get_pending():
-    """Get all pending viral tweets."""
-    print(f"[{datetime.now()}] 📤 Client requested pending tweets list", flush=True)
-    return {
-        "count": len(pending_tweets),
-        "tweets": pending_tweets,
-        "last_scan": last_scan.isoformat() if last_scan else None
-    }
-
-@app.get("/debug/models")
+@app.get("/models")
 def list_available_models():
     """Debug endpoint to list all available models for this API key."""
     if not GEMINI_API_KEY:
@@ -107,16 +112,45 @@ def list_available_models():
         return {"error": str(e)}
 
 @app.post("/pending/{tweet_id}/mark-processed")
-def mark_processed(tweet_id: str):
-    """Mark a tweet as processed (removes from pending)."""
+def mark_processed_cloud(tweet_id: str):
+    """Mark a tweet as processed (removes from pending and adds to history)."""
     global pending_tweets
+    from core.viral_scout import ViralScout
+    scout = ViralScout()
+    scout.mark_as_processed(tweet_id)
+    
     initial_count = len(pending_tweets)
     pending_tweets = [t for t in pending_tweets if t.get('id') != tweet_id]
     save_pending()
     
-    if len(pending_tweets) < initial_count:
-        return {"success": True, "remaining": len(pending_tweets)}
-    raise HTTPException(status_code=404, detail="Tweet not found")
+    return {"success": True, "remaining": len(pending_tweets)}
+
+@app.post("/pending/{tweet_id}/mark-rejected")
+def mark_rejected_cloud(tweet_id: str):
+    """Mark a tweet as rejected (removes from pending and adds to rejected list)."""
+    global pending_tweets
+    from core.viral_scout import ViralScout
+    scout = ViralScout()
+    scout.mark_as_rejected(tweet_id)
+    
+    pending_tweets = [t for t in pending_tweets if t.get('id') != tweet_id]
+    save_pending()
+    
+    return {"success": True, "remaining": len(pending_tweets)}
+
+@app.get("/pending")
+def get_pending():
+    prune_old_tweets()
+    return {"tweets": pending_tweets}
+
+@app.post("/pending/clear")
+def clear_all_pending():
+    """Emergency clear of all pending tweets."""
+    global pending_tweets
+    count = len(pending_tweets)
+    pending_tweets = []
+    save_pending()
+    return {"success": True, "cleared": count}
 
 @app.post("/scan")
 def trigger_scan():
@@ -124,14 +158,6 @@ def trigger_scan():
     print(f"[{datetime.now()}] 🔍 Manual scan triggered via API")
     run_viral_scan()
     return {"success": True, "pending_count": len(pending_tweets)}
-
-@app.delete("/pending")
-def clear_pending():
-    """Clear all pending tweets."""
-    global pending_tweets
-    pending_tweets = []
-    save_pending()
-    return {"success": True}
 
 # --- PUBLISHING QUEUE ---
 
@@ -279,7 +305,7 @@ def run_viral_scan():
         
         hits = scout.scan(
             hours_back=24,
-            min_ratio=1.0,
+            min_ratio=2.0, # Increased to match high quality standard
             ignore_history=False,
             must_have_media=True,
             progress_callback=lambda msg: print(f"  [SCOUT] {msg}", flush=True)
@@ -309,11 +335,22 @@ def run_viral_scan():
             
             save_pending()
             
-            # Mark as processed in local history
-            for h in hits:
-                scout.mark_as_processed(h['id'])
+            # TTL Cleanup: Remove tweets older than 24h to keep the list fresh
+            from datetime import timedelta
+            initial_count = len(pending_tweets)
+            now_dt = datetime.fromisoformat(now)
+            threshold = (now_dt - timedelta(hours=24)).isoformat()
             
-            print(f"  ✅ Scan complete. Added: {new_added}, AI Fixed/Generated: {ai_fixed}. Total pending: {len(pending_tweets)}", flush=True)
+            # Add timestamp if missing
+            for t in pending_tweets:
+                if 'added_at' not in t: t['added_at'] = now
+                
+            pending_tweets = [t for t in pending_tweets if t.get('added_at', now) > threshold]
+            if len(pending_tweets) < initial_count:
+                print(f"  [TTL] Pruned {initial_count - len(pending_tweets)} old tweets.")
+                save_pending()
+            
+            print(f"  ✅ Scan complete. Added: {new_added}, AI Fixed: {ai_fixed}. Total pending: {len(pending_tweets)}", flush=True)
         else:
             print("  🤷 No new viral tweets found.", flush=True)
         
@@ -397,7 +434,9 @@ def process_publishing_queue():
                         config["ig_user_id"]
                     )
                     if result and "id" in result:
-                        print(f"[{now}] ✅ IG Reel published!")
+                        print(f"[{now}] ✅ IG Reel published! ID: {result['id']}")
+                    else:
+                        raise Exception(f"IG Reel failed: {result}")
                 
                 # Instagram Story
                 if "instagram_story" in post["platforms"]:
@@ -409,11 +448,13 @@ def process_publishing_queue():
                 
                 publishing_queue[i]["status"] = "published"
                 publishing_queue[i]["published_at"] = now.isoformat()
+                print(f"[{now}] ✅ Post {i+1} successfully published.")
                 
             except Exception as e:
-                print(f"[{now}] ❌ Publish error: {e}")
+                print(f"[{now}] ❌ Publish error for post {i+1}: {e}")
                 publishing_queue[i]["status"] = "error"
-                publishing_queue[i]["error"] = str(e)
+                publishing_queue[i]["error_details"] = str(e)
+                publishing_queue[i]["last_retry"] = now.isoformat()
     
     # Clean up published posts older than 24 hours
     threshold = now.timestamp() - 86400

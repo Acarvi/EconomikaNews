@@ -24,6 +24,7 @@ except ImportError:
 
 import core.publisher as publisher # New automation module
 from utils.cleanup import cleanup_old_files, cleanup_temp_files
+import requests # Added for cloud sync
 
 # --- CONFIG & HELPERS ---
 
@@ -87,7 +88,7 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         status.update(f"   Using pre-downloaded media for {uploader_id}...")
     else:
         status.update(f"   Downloading media for {uploader_id}...")
-        success, media_path = download_media(tweet_url, thumbnail_url=tweet_data.get('thumbnail'))
+        success, media_path = download_media(tweet_url, thumbnail_url=tweet_data.get('thumbnail'), is_video=is_video)
         if not success: media_path = None
     
     # 2. AI Gen - SKIP IF CLOUD ALREADY PROVIDED CONTENT
@@ -405,8 +406,11 @@ class PostAiCurationManager:
 
     def discard(self):
         item = self.items[self.current_idx]
-        self.status.update(f"   🗑️ Reel '{os.path.basename(item['folder'])}' descartado.")
-        try: shutil.rmtree(item['folder'])
+        self.status.update(f"   🗑️ Reel '{os.path.basename(item['folder'])}' descartado y marcado como rechazado.")
+        try:
+            from core.viral_scout import ViralScout
+            ViralScout().mark_as_rejected(item.get('tweet_data', {}).get('id', ''))
+            shutil.rmtree(item['folder'])
         except: pass
         self.next_item()
 
@@ -486,23 +490,30 @@ class PostAiCurationManager:
         
         # A/B Testing: Schedule raw version with caption B
         raw_video_path = item.get('tweet_data', {}).get('local_media_path')
-        if raw_video_path and os.path.exists(raw_video_path):
+        is_image = False
+        if raw_video_path:
+            ext = raw_video_path.lower()
+            if ext.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                is_image = True
+        
+        if raw_video_path and os.path.exists(raw_video_path) and not is_image:
             self.scheduled_posts.append({
                 'reel_path': raw_video_path,
                 'caption': caption_b,
                 'folder': item['folder'],
-                'variant': 'B (Raw)'
+                'variant': 'B (Raw Video)'
             })
-            self.status.update(f"   📅 A/B Test añadido: 2 posts programados ({len(self.scheduled_posts)} total en cola).")
+            self.status.update(f"   📅 A/B Test añadido: 2 vídeos programados ({len(self.scheduled_posts)} total).")
         else:
-            # Fallback: use branded version for B too with different caption
+            # For images or missing raw, use branded version for B too with different caption
             self.scheduled_posts.append({
                 'reel_path': item['reel_path'],
                 'caption': caption_b,
                 'folder': item['folder'],
-                'variant': 'B (Branded Alt Caption)'
+                'variant': 'B (Branded, Alt Caption)'
             })
-            self.status.update(f"   📅 A/B Test añadido (sin RAW): 2 posts programados ({len(self.scheduled_posts)} total).")
+            msg = "imagen detectada, usando vídeo renderizado para B" if is_image else "sin vídeo original"
+            self.status.update(f"   📅 A/B Test añadido ({msg}): 2 posts programados.")
         
         self.approved_folders.append(item['folder'])
         self.next_item()
@@ -647,6 +658,9 @@ class PreAiCurationManager:
         
         tk.Button(self.btn_frame, text="🗑️ DESCARTAR", bg="#c0392b", fg="white", font=("Segoe UI Black", 11), width=15, command=self.discard).pack(side="left")
         
+        # New: Permanent Reject button
+        tk.Button(self.btn_frame, text="🚫 RECHAZAR SIEMPRE", bg="#555", fg="white", font=("Segoe UI Bold", 10), width=18, command=self.permanent_reject).pack(side="left", padx=10)
+
         # Mute Button
         self.btn_mute = tk.Button(self.btn_frame, text="🔊", bg="#555", fg="white", font=("Segoe UI", 11), width=3, command=self.toggle_mute)
         self.btn_mute.pack(side="left", padx=10)
@@ -791,14 +805,48 @@ class PreAiCurationManager:
             self.player.set_volume(0.0 if self.is_muted else 1.0)
         self.btn_mute.config(text="🔇" if self.is_muted else "🔊")
 
+    def discard(self):
+        # Just skip this one in the current list
+        self.current_idx += 1
+        self.load_tweet()
+
+    def permanent_reject(self):
+        # Mark as rejected and skip
+        item = self.raw_items[self.current_idx]
+        tweet_id = item.get('id')
+        if tweet_id:
+            from core.viral_scout import ViralScout
+            ViralScout().mark_as_rejected(tweet_id)
+            print(f"[REJECT] Permamently rejected tweet {tweet_id}")
+            
+            # Cloud sync if applicable
+            if isinstance(item, dict) and item.get('url'):
+                try:
+                    threading.Thread(target=lambda: requests.post(f"{CLOUD_SERVER_URL}/pending/{tweet_id}/mark-rejected"), daemon=True).start()
+                except: pass
+
+        self.current_idx += 1
+        self.load_tweet()
+
     def keep(self):
         item = self.raw_items[self.current_idx]
         item['skip_subtitles'] = self.skip_subtitles_var.get()
+        # Mark as processed only if approved for AI processing
+        tweet_id = item.get('id')
+        if tweet_id:
+            from core.viral_scout import ViralScout
+            ViralScout().mark_as_processed(tweet_id)
+            
+            # Cloud sync if applicable
+            if isinstance(item, dict) and item.get('url'):
+                try:
+                    threading.Thread(target=lambda: requests.post(f"{CLOUD_SERVER_URL}/pending/{tweet_id}/mark-processed"), daemon=True).start()
+                except: pass
+            
         self.kept_items.append(item)
         self.current_idx += 1
         self.load_tweet()
 
-    def discard(self):
         self.current_idx += 1
         self.load_tweet()
 
@@ -946,7 +994,8 @@ def batch_process(urls: list, status: StatusManager):
                 status.update(f"   📥 Descargando media para preview...")
                 # Use media_url if available, otherwise use thumbnail
                 download_url = data.get('media_url') or data.get('url')
-                success, media_path = download_media(url, thumbnail_url=data.get('thumbnail') or download_url)
+                is_vid = data.get('is_video', True)
+                success, media_path = download_media(url, thumbnail_url=data.get('thumbnail') or download_url, is_video=is_vid)
                 if success:
                     data['local_media_path'] = media_path
                     scraped_data.append(data)
@@ -1138,7 +1187,8 @@ def run_gui():
                 try:
                     download_url = tweet.get('media_url') or tweet.get('thumbnail')
                     if download_url:
-                        success, path = download_media(tweet.get('url', ''), thumbnail_url=download_url)
+                        is_video = tweet.get('is_video', True)
+                        success, path = download_media(tweet.get('url', ''), thumbnail_url=download_url, is_video=is_video)
                         if success:
                             tweet['local_media_path'] = path
                 except:
@@ -1148,20 +1198,31 @@ def run_gui():
         def cloud_task():
             try:
                 import requests
+                from core.viral_scout import ViralScout
+                scout = ViralScout()
+                
                 response = requests.get(f"{CLOUD_SERVER_URL}/pending", timeout=30)
                 data = response.json()
                 
                 def handle_cloud_data():
                     nonlocal viral_scout_cache
                     if data.get('tweets'):
-                        tweets = data['tweets']
+                        all_tweets = data['tweets']
+                        # Filter against local history to avoid duplicates
+                        tweets = [t for t in all_tweets if not scout.is_processed(t['id'])]
+                        
+                        if not tweets:
+                            status_var.set("☁️ Todos los tweets actuales en cloud ya han sido procesados.")
+                            btn_cloud.config(state="normal", text="☁️ Cloud")
+                            return
+                            
                         # Add to input
                         urls = "\n".join([t['url'] for t in tweets])
                         input_text.delete('1.0', tk.END)
                         input_text.insert(tk.END, urls + "\n")
                         # Cache the rich data
                         viral_scout_cache = tweets
-                        status_var.set(f"☁️ {len(tweets)} tweets cargados. Descargando previews...")
+                        status_var.set(f"☁️ {len(tweets)} nuevos tweets cargados. Descargando previews...")
                         # Start background pre-download
                         threading.Thread(target=background_predownload, args=(tweets,), daemon=True).start()
                     else:
@@ -1178,6 +1239,35 @@ def run_gui():
     btn_cloud = create_modern_button(btn_row, "☁️ Cloud", fetch_from_cloud, "#3498db")
     btn_cloud.pack(side="left", padx=5)
     
+    def clear_cloud():
+        """Clear all pending tweets from the Render server."""
+        if not messagebox.askyesno("Confirmar", "¿Vaciar toda la lista de la nube?", parent=root):
+            return
+            
+        btn_clear_cloud.config(state="disabled", text="⏳...")
+        status_var.set("Vaciando nube...")
+        
+        def task():
+            try:
+                import requests
+                response = requests.post(f"{CLOUD_SERVER_URL}/pending/clear", timeout=30)
+                if response.status_code == 200:
+                    nonlocal viral_scout_cache
+                    viral_scout_cache = None
+                    root.after(0, lambda: status_var.set("✅ Nube vaciada correctamente"))
+                    root.after(0, lambda: input_text.delete('1.0', tk.END))
+                else:
+                    root.after(0, lambda: status_var.set(f"⚠️ Error: {response.status_code}"))
+            except Exception as e:
+                root.after(0, lambda: status_var.set(f"❌ Error conexión: {str(e)[:40]}"))
+            finally:
+                root.after(0, lambda: btn_clear_cloud.config(state="normal", text="🗑️ Vaciar"))
+        
+        threading.Thread(target=task, daemon=True).start()
+
+    btn_clear_cloud = create_modern_button(btn_row, "🗑️ Vaciar", clear_cloud, "#e67e22")
+    btn_clear_cloud.pack(side="left", padx=(0, 5))
+
     def trigger_cloud_scan():
         """Trigger a manual viral scout scan on the Render server."""
         btn_scout.config(state="disabled", text="⏳ Scanning...")
@@ -1277,7 +1367,7 @@ def run_gui():
     root.after(500, refresh_scheduled)
     
     # NEW: Auto-sync from cloud on startup
-    root.after(1500, fetch_from_cloud)
+    # root.after(1500, fetch_from_cloud) # REMOVED: Autostart can be annoying
     
     # Status bar at bottom
     status_var = tk.StringVar(value="Listo para comenzar")
@@ -1314,8 +1404,7 @@ def run_gui():
                         input_text.insert(tk.END, (current_text + "\n" if current_text else "") + new_urls + "\n")
                         viral_scout_cache = hits
                         status_manager.update(f"✨ Encontrados {len(hits)} tweets virales!")
-                        for h in hits:
-                            scout.mark_as_processed(h['id'])
+                        # REMOVED: Immediate mark_as_processed. We only mark when kept or rejected.
                     else:
                         status_manager.update(f"🤷 Sin resultados en las últimas {hours}h.")
                         root.deiconify()
@@ -1371,12 +1460,13 @@ if __name__ == "__main__":
     import warnings
     warnings.simplefilter("ignore") # Suppress FutureWings for cleaner output
     
-    # Run automated cleanup on startup
+    # Run automated cleanup on startup (Quiet mode)
     try:
         cleanup_temp_files(os.path.dirname(os.path.abspath(__file__)))
-        cleanup_old_files(os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"), max_age_hours=7*24)
+        cleanup_old_files(os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"), max_age_hours=7*24, quiet=True)
     except Exception as e:
-        print(f"[CLEANUP] Startup cleanup failed: {e}")
+        # print(f"[CLEANUP] Startup cleanup failed: {e}")
+        pass
 
     if len(sys.argv) > 1:
         # CLI Mode

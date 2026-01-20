@@ -303,7 +303,7 @@ def schedule_batch(posts_to_schedule, server_url=None):
             response = requests.post(
                 f"{server_url.rstrip('/')}/schedule",
                 json={"posts": batch_payload},
-                timeout=30
+                timeout=60 # Increased timeout for larger batches
             )
             if response.status_code == 200:
                 result = response.json()
