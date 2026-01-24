@@ -13,6 +13,7 @@ COPY data/ data/
 COPY prompts/ prompts/
 COPY server.py .
 COPY requirements.txt .
+COPY utils/ utils/
 
 # Create directories for data persistence
 RUN mkdir -p /app/data

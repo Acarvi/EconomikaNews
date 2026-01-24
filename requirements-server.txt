@@ -13,5 +13,10 @@ Pillow>=10.0.0
 # AI Content Generation (Cloud-side)
 google-genai>=1.0.0
 
+# YouTube API & Supporting libs (needed for server imports)
+opencv-python-headless
+google-api-python-client
+google-auth-oauthlib
+
 # Note: moviepy, whisper, etc. NOT included - server only scrapes
 # Heavy processing (video rendering) happens on local client

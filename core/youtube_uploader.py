@@ -1,11 +1,21 @@
 import os
 import pickle
 import json
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-import cv2  # Added for video validation
+import json
+try:
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    HAS_YOUTUBE_LIBS = True
+except ImportError:
+    HAS_YOUTUBE_LIBS = False
+
+try:
+    import cv2  # Added for video validation
+    HAS_CV2 = True
+except ImportError:
+    HAS_CV2 = False
 import math
 
 # Scopes needed for uploading
@@ -15,6 +25,9 @@ CREDENTIALS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'you
 
 def get_authenticated_service():
     """Gets an authenticated YouTube service object."""
+    if not HAS_YOUTUBE_LIBS:
+        raise ImportError("YouTube dependencies (google-api-python-client, google-auth-oauthlib) not installed.")
+    
     credentials = None
     if os.path.exists(CREDENTIALS_FILE):
         print(f"[INFO] Loading credentials from {CREDENTIALS_FILE}")
@@ -80,31 +93,34 @@ def upload_short(video_path: str, title: str = "Economika Noticias", description
             body['status']['publishAt'] = publish_at
             
         # --- VALIDATION FOR SHORTS ---
-        try:
-            cap = cv2.VideoCapture(video_path)
-            if cap.isOpened():
-                width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-                height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-                fps = cap.get(cv2.CAP_PROP_FPS)
-                frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-                duration = frame_count / fps if fps > 0 else 0
-                cap.release()
-                
-                print(f"[INFO] Video Stats: {int(width)}x{int(height)}, {duration:.2f}s")
-                
-                # Check 1: Vertical or Square (Aspect Ratio <= 1.0)
-                if width > height:
-                    print(f"[WARNING] ⚠️ Video is horizontal ({int(width)}x{int(height)}). YouTube might NOT classify it as a Short.")
-                    # We continue but warn.
-                
-                # Check 2: Duration < 60s
-                if duration >= 60:
-                    print(f"[WARNING] ⚠️ Video is too long for Shorts ({duration:.2f}s). Trimming slightly suggested.")
-                    # Ideally we would reject or trim, but for now we warn.
-            else:
-                print(f"[WARNING] Could not validate video properties (CV2 failed open).")
-        except Exception as e:
-            print(f"[WARNING] Video validation failed: {e}")
+        if HAS_CV2:
+            try:
+                cap = cv2.VideoCapture(video_path)
+                if cap.isOpened():
+                    width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                    height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                    fps = cap.get(cv2.CAP_PROP_FPS)
+                    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+                    duration = frame_count / fps if fps > 0 else 0
+                    cap.release()
+                    
+                    print(f"[INFO] Video Stats: {int(width)}x{int(height)}, {duration:.2f}s")
+                    
+                    # Check 1: Vertical or Square (Aspect Ratio <= 1.0)
+                    if width > height:
+                        print(f"[WARNING] ⚠️ Video is horizontal ({int(width)}x{int(height)}). YouTube might NOT classify it as a Short.")
+                        # We continue but warn.
+                    
+                    # Check 2: Duration < 60s
+                    if duration >= 60:
+                        print(f"[WARNING] ⚠️ Video is too long for Shorts ({duration:.2f}s). Trimming slightly suggested.")
+                        # Ideally we would reject or trim, but for now we warn.
+                else:
+                    print(f"[WARNING] Could not validate video properties (CV2 failed open).")
+            except Exception as e:
+                print(f"[WARNING] Video validation failed: {e}")
+        else:
+            print("[INFO] Skipping video validation (cv2 not available)")
 
         # Ensure #Shorts tag is present in description or title for older clients
         if "#shorts" not in description.lower() and "#shorts" not in safe_title.lower():
