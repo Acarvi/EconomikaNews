@@ -16,6 +16,8 @@ from contextlib import asynccontextmanager
 
 # --- LIFESPAN ---
 
+scheduler = BackgroundScheduler()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Modern lifecycle management for FastAPI."""
