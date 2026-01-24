@@ -5,7 +5,10 @@ branded Economika overlays, and high-impact text.
 """
 import os
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
-from moviepy import VideoFileClip, ImageClip, CompositeVideoClip, TextClip
+try:
+    from moviepy import VideoFileClip, ImageClip, CompositeVideoClip, TextClip
+except ImportError:
+    from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip, TextClip
 from .subtitler import get_subtitles
 import numpy as np
 
@@ -266,7 +269,10 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
     audio_clip = None
     if os.path.exists(music_folder):
         import random
-        from moviepy import AudioFileClip, afx
+        try:
+            from moviepy import AudioFileClip, afx
+        except ImportError:
+            from moviepy.editor import AudioFileClip, afx
         
         music_files = [f for f in os.listdir(music_folder) if f.lower().endswith(('.mp3', '.wav'))]
         if music_files:
