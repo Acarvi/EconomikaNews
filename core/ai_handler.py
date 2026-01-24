@@ -58,13 +58,15 @@ def generate_content_rest(contents: list, model_name: str = "gemini-1.5-flash") 
             
     return ""
 
+def load_system_instruction():
+    """Load the editorial system instruction from an external file."""
     try:
         # Prompts is in root, go up one level from core/
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.path.join(base_dir, "prompts", "editorial_system.txt")
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
-                return f.read()
+                return f.read().strip()
     except Exception as e:
         print(f"⚠️ Error loading system instruction: {e}")
     
@@ -74,9 +76,9 @@ def generate_content_rest(contents: list, model_name: str = "gemini-1.5-flash") 
 def generate_content_ai(tweet_data: Dict, media_path: str = None, feedback: str = None) -> Tuple[str, str, str, str, str, str]:
     """
     Use Google Gemini to analyze tweet data and media for professional redaction.
-    Supports iterative feedback for refinement.
+    # Supports iterative feedback for refinement.
     
-    Returns: (headline, caption, slug, shorts_title, caption_b, source)
+    Returns: (headline, caption, slug, shorts_title, caption_b, source, suggested_location_query)
     """
     
     system_instruction = load_system_instruction()
@@ -172,12 +174,13 @@ def generate_content_ai(tweet_data: Dict, media_path: str = None, feedback: str 
                 data.get('slug', 'noticia'), 
                 data.get('shorts_title', 'Noticia Economika'),
                 data.get('caption_b', data.get('caption', '')),  # Fallback to caption if not provided
-                data.get('source', '')  # Empty string if not detected
+                data.get('source', ''),  # Empty string if not detected
+                data.get('suggested_location_query', '') # Inference for location search
             )
         except Exception:
             continue
     
-    return "ERROR DE CUOTA AI", "Se ha alcanzado el límite de la versión gratuita. Por favor, espera unos minutos o usa otra API Key.", "error", "error", "", ""
+    return "ERROR DE CUOTA AI", "Se ha alcanzado el límite de la versión gratuita. Por favor, espera unos minutos o usa otra API Key.", "error", "error", "", "", ""
 
 def format_caption_txt(headline: str, caption: str) -> str:
     """Format the content as a plain text file."""

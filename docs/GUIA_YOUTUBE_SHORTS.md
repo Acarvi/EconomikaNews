@@ -10,7 +10,20 @@ YouTube Shorts son vídeos verticales de menos de 60 segundos. Usaremos la **You
 
 ---
 
-## Paso 1: Crear Proyecto en Google Cloud
+## Paso 1: Preparar la Cuenta de YouTube
+
+Para que el canal sea independiente pero esté ligado a tu cuenta principal:
+
+1. Inicia sesión en YouTube con tu cuenta principal **"ECONÓMIKA"**.
+2. Ve a [Configuración de YouTube](https://www.youtube.com/account).
+3. Haz clic en **"Añadir o gestionar canales"**.
+4. Haz clic en **"Crear un canal"**.
+5. Ponle el nombre: **"ECONÓMIKA NOTICIAS"**. Esto crea una **Cuenta de Marca (Brand Account)**.
+   - *Nota: Esto permite que varias personas gestionen el canal sin compartir la contraseña de tu cuenta personal.*
+
+---
+
+## Paso 2: Crear Proyecto en Google Cloud
 
 1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
 2. Crea un nuevo proyecto (ej. `economika-shorts`).
@@ -19,7 +32,19 @@ YouTube Shorts son vídeos verticales de menos de 60 segundos. Usaremos la **You
 
 ---
 
-## Paso 2: Configurar Credenciales OAuth 2.0
+## Paso 3: Configurar Pantalla de Consentimiento (OAuth Consent Screen)
+
+1. Ve a **APIs & Services** → **OAuth consent screen**.
+2. Selecciona **External** y haz clic en **Create**.
+3. Rellena los datos básicos (App name: `Economika Noticias`, etc.).
+4. **IMPORTANTE (Testing Mode):** En la sección **Test users**, haz clic en **+ ADD USERS**.
+5. Añade el correo de tu cuenta de Google principal (el que usas para "ECONÓMIKA"). 
+   - *Sin esto, Google bloqueará el acceso con el Error 403: access_denied.*
+6. Guarda y continúa hasta el final.
+
+---
+
+## Paso 4: Configurar Credenciales OAuth 2.0
 
 1. Ve a **APIs & Services** → **Credentials**.
 2. Haz clic en **Create Credentials** → **OAuth client ID**.

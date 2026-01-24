@@ -12,12 +12,66 @@ import os
 import requests
 from datetime import datetime
 from typing import List, Dict, Optional
+from contextlib import asynccontextmanager
+
+# --- LIFESPAN ---
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Modern lifecycle management for FastAPI."""
+    # STARTUP
+    load_pending()
+    load_queue()
+    
+    # Run scan every hour
+    scheduler.add_job(
+        run_viral_scan,
+        trigger=IntervalTrigger(hours=1),
+        id="viral_scout_hourly",
+        replace_existing=True
+    )
+    
+    # Process publishing queue every minute
+    scheduler.add_job(
+        process_publishing_queue,
+        trigger=IntervalTrigger(minutes=1),
+        id="publishing_queue_processor",
+        replace_existing=True
+    )
+    
+    # Keep-alive ping every 10 minutes
+    scheduler.add_job(
+        self_ping,
+        trigger=IntervalTrigger(minutes=10),
+        id="keep_alive_ping",
+        replace_existing=True
+    )
+
+    # Run initial scan after 10 seconds of startup
+    from datetime import timedelta
+    scheduler.add_job(
+        run_viral_scan,
+        trigger='date',
+        run_date=datetime.now() + timedelta(seconds=10),
+        id="initial_scan",
+        misfire_grace_time=3600
+    )
+
+    scheduler.start()
+    print("🚀 [STARTUP] Scheduler started - Viral Scout (hourly) + Publishing Queue (every minute)", flush=True)
+    
+    yield
+    
+    # SHUTDOWN
+    print("🛑 [SHUTDOWN] Shutting down scheduler...")
+    scheduler.shutdown()
 
 # Initialize FastAPI
 app = FastAPI(
     title="Economika Viral Scout API",
     description="Backend for automated Twitter viral content scanning and scheduled publishing",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # CORS for local client access
@@ -197,7 +251,7 @@ def get_queue():
 def debug_queue():
     """Debug endpoint to inspect queue and credentials."""
     config = {
-        "has_access_token": bool(os.environ.get("IG_ACCESS_TOKEN") or os.environ.get("IG_ACCESS_TOKE")),
+        "has_access_token": bool(os.environ.get("IG_ACCESS_TOKEN")),
         "has_ig_user_id": bool(os.environ.get("IG_USER_ID")),
         "has_fb_page_id": bool(os.environ.get("FB_PAGE_ID")),
         "queue_length": len(publishing_queue),
@@ -390,7 +444,7 @@ def process_publishing_queue():
     
     # Load config from environment variables (set in Render)
     config = {
-        "access_token": os.environ.get("IG_ACCESS_TOKEN") or os.environ.get("IG_ACCESS_TOKE"),
+        "access_token": os.environ.get("IG_ACCESS_TOKEN"),
         "ig_user_id": os.environ.get("IG_USER_ID"),
         "fb_page_id": os.environ.get("FB_PAGE_ID")
     }
@@ -463,59 +517,6 @@ def process_publishing_queue():
         if p["status"] == "pending" or datetime.fromisoformat(p.get("added_at", now.isoformat())).timestamp() > threshold
     ]
     save_queue()
-
-# --- SCHEDULER ---
-
-scheduler = BackgroundScheduler()
-
-@app.on_event("startup")
-def start_scheduler():
-    """Start the background scheduler on app startup."""
-    # Load data
-    load_pending()
-    load_queue()
-    
-    # Run scan every hour
-    scheduler.add_job(
-        run_viral_scan,
-        trigger=IntervalTrigger(hours=1),
-        id="viral_scout_hourly",
-        replace_existing=True
-    )
-    
-    # Process publishing queue every minute
-    scheduler.add_job(
-        process_publishing_queue,
-        trigger=IntervalTrigger(minutes=1),
-        id="publishing_queue_processor",
-        replace_existing=True
-    )
-    
-    scheduler.start()
-    print("🚀 [STARTUP] Scheduler started - Viral Scout (hourly) + Publishing Queue (every minute)", flush=True)
-    
-    # Run initial scan after 10 seconds of startup
-    from datetime import timedelta
-    scheduler.add_job(
-        run_viral_scan,
-        trigger='date',
-        run_date=datetime.now() + timedelta(seconds=10),
-        id="initial_scan",
-        misfire_grace_time=3600
-    )
-
-    # Keep-alive ping every 10 minutes
-    scheduler.add_job(
-        self_ping,
-        trigger=IntervalTrigger(minutes=10),
-        id="keep_alive_ping",
-        replace_existing=True
-    )
-
-@app.on_event("shutdown")
-def shutdown_scheduler():
-    """Gracefully shutdown the scheduler."""
-    scheduler.shutdown()
 
 # --- RUN ---
 

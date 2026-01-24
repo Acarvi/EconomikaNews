@@ -60,6 +60,34 @@ def create_blurred_background(image: Image.Image) -> Image.Image:
     
     return darkened
 
+def conform_video_to_cfr(input_path: str) -> str:
+    """
+    Converts video to Constant Frame Rate (30fps) to avoid MoviePy desync/slowdown issues.
+    Saves a temporary file and returns its path.
+    """
+    import subprocess
+    output_path = input_path.rsplit('.', 1)[0] + "_cfr.mp4"
+    
+    # Check if already conformed to avoid redundant work
+    if "_cfr.mp4" in input_path:
+        return input_path
+
+    print(f"[GENERATOR] Conforming {os.path.basename(input_path)} to 30fps CFR...")
+    cmd = [
+        'ffmpeg', '-y', '-i', input_path,
+        '-filter:v', 'fps=fps=30',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+        '-c:a', 'copy',
+        output_path
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+        return output_path
+    except Exception as e:
+        print(f"[GENERATOR] CFR Conformation failed: {e}. Using original.")
+        return input_path
+
 # Zone Definitions
 # Ultra-tight layout
 ZONE_TOP_HEIGHT = 400
@@ -233,8 +261,35 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
     frame = np.array(composite)
     clip = ImageClip(frame).with_duration(REEL_DURATION)
     
+    # --- BACKGROUND MUSIC FOR IMAGES ---
+    music_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "music")
+    audio_clip = None
+    if os.path.exists(music_folder):
+        import random
+        from moviepy import AudioFileClip, afx
+        
+        music_files = [f for f in os.listdir(music_folder) if f.lower().endswith(('.mp3', '.wav'))]
+        if music_files:
+            try:
+                music_path = os.path.join(music_folder, random.choice(music_files))
+                print(f"[GENERATOR] Adding background music: {os.path.basename(music_path)}")
+                
+                audio_clip = AudioFileClip(music_path)
+                # Loop audio to match duration
+                audio_clip = audio_clip.with_duration(REEL_DURATION).with_effects([afx.AudioLoop(duration=REEL_DURATION)])
+                # Moderate volume
+                audio_clip = audio_clip.with_volume_scaled(0.4) 
+                clip = clip.with_audio(audio_clip)
+            except Exception as e:
+                print(f"[GENERATOR] Failed to add audio: {e}")
+
     output_path = os.path.join(OUTPUT_DIR, output_name)
-    clip.write_videofile(output_path, fps=30, codec='libx264', pixel_format='yuv420p', audio=False, logger=None)
+    print(f"[GENERATOR] Encoding image-reel to {output_name}...")
+    
+    clip.write_videofile(output_path, fps=30, codec='libx264', audio_codec='aac', 
+                        pixel_format='yuv420p', audio=True if audio_clip else False, logger=None)
+    
+    if audio_clip: audio_clip.close()
     clip.close()
     
     # Force delete the big numpy array to free memory
@@ -244,7 +299,11 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
 def process_video_for_reel(video_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", skip_subtitles: bool = False) -> str:
     """Process video with PRO-TIGHT zone management and duration capping."""
     print(f"[GENERATOR] Starting video processing: {os.path.basename(video_path)}")
-    clip = VideoFileClip(video_path)
+    
+    # PRE-PROCESS: Conform to CFR to avoid desync/slow-motion
+    conformed_path = conform_video_to_cfr(video_path)
+    
+    clip = VideoFileClip(conformed_path)
     
     # CAP DURATION to 60 seconds max to avoid infinite rendering hangs
     if clip.duration > 60:
@@ -284,7 +343,7 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         if not skip_subtitles:
             print("[GENERATOR] Transcribing audio for subtitles...")
             try:
-                segments = get_subtitles(video_path)
+                segments = get_subtitles(conformed_path)
                 
                 # --- PREMIUM "TRUMP-STYLE" SUBTITLE DESIGN ---
                 current_font = get_font("ariblk.ttf", 48) # Bold sans-serif
@@ -330,23 +389,46 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
                     box_w = min(max_box_width, tw + (padding_x * 2))
                     box_h = th + (padding_y * 2)
                     
+                    # --- NEW STEALTH ENGAGEMENT STYLE ---
+                    # No box, just high-contrast text with outline and shadow
+                    
                     # Create Alpha Image for the subtitle
                     sub_img = Image.new('RGBA', (REEL_WIDTH, REEL_HEIGHT), (0, 0, 0, 0))
                     sub_draw = ImageDraw.Draw(sub_img)
                     
-                    # Position: Lower-Middle
-                    box_x = (REEL_WIDTH - box_w) // 2
-                    box_y = fg_y + (resized_h * 0.7) - (box_h // 2) # Center inside video
+                    # Position: Lower-Middle (slightly below the center of the video)
+                    text_x = REEL_WIDTH // 2
+                    text_y = fg_y + (resized_h * 0.75)
                     
-                    # Draw Rounded Rect (Black with white border)
-                    sub_draw.rounded_rectangle(
-                        [box_x, box_y, box_x + box_w, box_y + box_h],
-                        radius=25, fill=(0, 0, 0, 230), outline=WHITE, width=4
+                    # Draw Outline/Stroke for readability (thick black outline)
+                    stroke_width = 4
+                    sub_draw.multiline_text(
+                        (text_x, text_y),
+                        wrapped_text,
+                        font=current_font,
+                        fill=BLACK,
+                        anchor="mm",
+                        align="center",
+                        spacing=10,
+                        stroke_width=stroke_width,
+                        stroke_fill=BLACK
                     )
                     
-                    # Draw Text
+                    # Draw Subtle Shadow
+                    shadow_offset = 5
                     sub_draw.multiline_text(
-                        (REEL_WIDTH // 2, box_y + (box_h // 2)),
+                        (text_x + shadow_offset, text_y + shadow_offset),
+                        wrapped_text,
+                        font=current_font,
+                        fill=(0, 0, 0, 150),
+                        anchor="mm",
+                        align="center",
+                        spacing=10
+                    )
+                    
+                    # Draw Main Text (White)
+                    sub_draw.multiline_text(
+                        (text_x, text_y),
                         wrapped_text,
                         font=current_font,
                         fill=WHITE,
@@ -377,19 +459,28 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         output_path = os.path.join(OUTPUT_DIR, output_name)
         print(f"[GENERATOR] Encoding video to {output_name}...")
         
-        # Performance Settings
-        # Try NVENC (NVIDIA) first, fallback to standard
+        # PERFORMANCE OPTIONS
+        # We set temp_audiofile and remove_temp to be explicit and avoid race conditions
+        # We also use a more stable 'p1' or 'p2' preset for NVENC
+        common_params = {
+            'fps': 30,
+            'audio_codec': 'aac',
+            'pixel_format': 'yuv420p',
+            'audio': True,
+            'logger': None,
+            'threads': 4, # Reduced from 8 to avoid memory contention
+        }
+
         try:
             print("[GENERATOR] Attempting NVIDIA NVENC Acceleration...")
-            final.write_videofile(output_path, fps=30, codec='h264_nvenc', audio_codec='aac', 
-                                 pixel_format='yuv420p', audio=True, logger=None, 
-                                 ffmpeg_params=['-preset', 'p1', '-rc', 'vbr', '-cq', '20'],
-                                 threads=8)
+            final.write_videofile(output_path, codec='h264_nvenc', 
+                                 ffmpeg_params=['-preset', 'p2', '-tune', 'hq', '-rc', 'vbr', '-cq', '24'],
+                                 **common_params)
         except Exception as e:
             print(f"[GENERATOR] NVENC failed or not available ({e}). Falling back to CPU...")
-            final.write_videofile(output_path, fps=30, codec='libx264', audio_codec='aac', 
-                                 pixel_format='yuv420p', audio=True, logger=None, 
-                                 preset='ultrafast', threads=8)
+            final.write_videofile(output_path, codec='libx264', 
+                                 preset='faster', # Better than ultrafast for final quality
+                                 **common_params)
         print(f"[GENERATOR] Encoding complete.")
         
         # Explicit cleanup
@@ -397,6 +488,10 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         bg_clip.close()
         overlay_clip.close()
         resized_clip.close()
+        
+        # DO NOT DELETE conformed_path here if it's the original, 
+        # but if it's the temp _cfr.mp4, we could. 
+        # However, for safety and traceability, we'll let existing cleanup handle it.
         
     finally:
         clip.close()

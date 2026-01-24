@@ -3,6 +3,7 @@ import time
 import os
 import json
 import re
+from core.youtube_uploader import upload_short
 
 # Configuration for API - in config/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -88,16 +89,38 @@ def get_facebook_page_id(access_token):
         print(f"[ERROR] Could not get FB Page ID: {data}")
         return None
 
-def upload_reel(video_url, caption, access_token, ig_user_id, scheduled_publish_time=None):
+def search_locations(query, access_token):
+    """Search for pages/locations by name to get a location_id."""
+    url = f"https://graph.facebook.com/v22.0/pages/search?q={query}&fields=id,name,location&access_token={access_token}"
+    try:
+        res = requests.get(url).json()
+        if "data" in res:
+            # Filter only those with valid location data
+            valid = [p for p in res["data"] if "location" in p]
+            return valid
+        return []
+    except Exception as e:
+        print(f"[ERROR] Location search failed: {e}")
+def get_page_access_token(user_access_token, page_id):
+    """Retrieves the Page Access Token for a specific Page."""
+    url = f"https://graph.facebook.com/v22.0/{page_id}?fields=access_token&access_token={user_access_token}"
+    try:
+        res = requests.get(url).json()
+        return res.get("access_token")
+    except Exception as e:
+        print(f"[ERROR] Failed to get Page Access Token: {e}")
+        return None
+
+def upload_reel(video_url, caption, access_token, ig_user_id, scheduled_publish_time=None, location_id=None):
     """Uploads a Reel to Instagram."""
-    return _upload_to_ig(video_url, caption, access_token, ig_user_id, "REELS", scheduled_publish_time)
+    return _upload_to_ig(video_url, caption, access_token, ig_user_id, "REELS", scheduled_publish_time, location_id)
 
 def upload_story(video_url, access_token, ig_user_id):
     """Uploads a Story to Instagram (Note: Story scheduling is limited via API)."""
     # Stories don't have captions in the same way Reels do via API
-    return _upload_to_ig(video_url, None, access_token, ig_user_id, "STORIES")
+    return _upload_to_ig(video_url, None, access_token, ig_user_id, "STORIES", location_id=location_id)
 
-def _upload_to_ig(video_url, caption, access_token, ig_user_id, media_type, scheduled_publish_time=None):
+def _upload_to_ig(video_url, caption, access_token, ig_user_id, media_type, scheduled_publish_time=None, location_id=None):
     """Internal helper for IG uploads (Reels/Stories)."""
     # Validation
     if access_token and access_token.startswith("IGAA"):
@@ -115,6 +138,10 @@ def _upload_to_ig(video_url, caption, access_token, ig_user_id, media_type, sche
     }
     if caption:
         payload["caption"] = caption
+    
+    if location_id:
+        payload["location_id"] = location_id
+        print(f"[INFO] Adding location tag: {location_id}")
     
     is_scheduled = scheduled_publish_time and media_type == "REELS"
     if is_scheduled:
@@ -165,33 +192,42 @@ def _upload_to_ig(video_url, caption, access_token, ig_user_id, media_type, sche
             print("[HINT]    Haz lo mismo para 'pages_show_list' y 'pages_read_engagement'.")
     return None
 
-def upload_facebook_reel(video_url, caption, access_token, page_id):
-    """Uploads a Reel to a Facebook Page."""
+def upload_facebook_reel(video_url, caption, user_access_token, page_id):
+    """Uploads a Reel to a Facebook Page using the Page Access Token."""
     print(f"[INFO] Initializing Facebook Reel upload for Page {page_id}...")
+    
+    # CRITICAL: We need a Page Access Token, not just a User Token
+    page_access_token = get_page_access_token(user_access_token, page_id)
+    if not page_access_token:
+        print("[ERROR] Could not obtain Page Access Token. Facebook upload aborted.")
+        return {"error": "Page Access Token Missing"}
+    
     # Step 1: Initialize upload
     url = f"https://graph.facebook.com/v22.0/{page_id}/video_reels"
     payload = {
         "upload_phase": "start",
-        "access_token": access_token
+        "access_token": page_access_token
     }
     res = requests.post(url, data=payload).json()
     
     if "video_id" in res:
         video_id = res["video_id"]
-        upload_url = res["upload_url"] # Usually not used this way for URL-based, but let's stick to simplest version
-        
-        # Facebook Page Video API for URL upload is simpler:
+        # Step 2: Actually upload via URL (Facebook Page Video API is more robust for this)
         fb_url = f"https://graph.facebook.com/v22.0/{page_id}/videos"
         fb_payload = {
             "file_url": video_url,
             "description": caption,
-            "access_token": access_token
+            "access_token": page_access_token
         }
         final_res = requests.post(fb_url, data=fb_payload).json()
         if "id" in final_res:
             print(f"[SUCCESS] Published to Facebook! ID: {final_res.get('id')}")
             return final_res
-    return None
+        else:
+             print(f"[ERROR] FB Publish failed: {final_res}")
+    else:
+        print(f"[ERROR] FB Init failed: {res}")
+    return res
 
 # --- SCHEDULING LOGIC FOR SPAIN AUDIENCE ---
 SCHEDULED_POSTS_FILE = os.path.join(BASE_DIR, "data", "scheduled_posts.json")
@@ -286,10 +322,21 @@ def schedule_batch(posts_to_schedule, server_url=None):
                 "video_url": temp_url,
                 "caption": post['caption'],
                 "target_time": target_time,
-                "platforms": ["instagram_reel", "instagram_story", "facebook_reel"]
+                "platforms": post.get('platforms', ["instagram_reel", "instagram_story", "facebook_reel"]),
+                "location_id": post.get('location_id')
             })
             
             print(f"[INFO] Post {i+1} queued for {next_slot.strftime('%H:%M')}")
+            
+            # --- YOUTUBE UPLOAD (Only if requested in platforms) ---
+            if "youtube_shorts" in post.get('platforms', []):
+                try:
+                    print(f"[INFO] Uploading to YouTube Shorts (Scheduled)...")
+                    shorts_title = post.get('shorts_title', 'Economika Noticias')
+                    upload_short(post['reel_path'], title=shorts_title, description=post['caption'], publish_at=target_time)
+                except Exception as e:
+                    print(f"[WARNING] YouTube upload failed: {e}")
+            # ----------------------
             
         except Exception as e:
             print(f"[ERROR] Failed to prepare post: {e}")

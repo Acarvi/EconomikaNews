@@ -15,10 +15,18 @@ def download_media(url: str, output_name: str = None, thumbnail_url: str = None,
     Download media (video or image) from a Twitter URL.
     Returns (success, file_path or error_message).
     """
+    # 0. Early Exit: If file already exists in DOWNLOADS_DIR, return it
+    from .scraper import extract_tweet_id
+    tid = extract_tweet_id(url)
+    if tid:
+        for ext in ['mp4', 'jpg', 'png', 'webp']:
+            test_path = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
+            if os.path.exists(test_path) and os.path.getsize(test_path) > 1024:
+                return True, test_path
+
     # Fast path: Skip yt-dlp entirely for known images
     if not is_video and thumbnail_url:
-        from .scraper import extract_tweet_id
-        tid = extract_tweet_id(url) or "media"
+        tid = tid or "media"
         ext = "jpg"
         if thumbnail_url and ".png" in thumbnail_url.lower(): ext = "png"
         dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
@@ -45,7 +53,8 @@ def download_media(url: str, output_name: str = None, thumbnail_url: str = None,
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 filename = ydl.prepare_filename(info)
-                if os.path.exists(filename):
+                filename = ydl.prepare_filename(info)
+                if os.path.exists(filename) and os.path.getsize(filename) > 1024:
                     return True, filename
                 
                 # Fallback for images inside yt-dlp info

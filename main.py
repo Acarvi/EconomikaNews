@@ -23,11 +23,12 @@ except ImportError:
     MediaPlayer = None
 
 import core.publisher as publisher # New automation module
+from core.youtube_uploader import upload_short
 from utils.cleanup import cleanup_old_files, cleanup_temp_files
 import requests # Added for cloud sync
 
 # --- CONFIG & HELPERS ---
-
+CLOUD_SERVER_URL = os.environ.get("ECONOMIKA_SERVER_URL", "https://economikanoticias.onrender.com").rstrip("/")
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
@@ -91,19 +92,22 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         success, media_path = download_media(tweet_url, thumbnail_url=tweet_data.get('thumbnail'), is_video=is_video)
         if not success: media_path = None
     
-    # 2. AI Gen - SKIP IF CLOUD ALREADY PROVIDED CONTENT
+    # 2. AI Gen - SKIP IF CONTENT ALREADY PROVIDED (e.g. reviewed in Stage 1 or from Cloud)
+    # Only regenerate if explicit feedback is passed to this function (Stage 4)
     if tweet_data.get('headline') and tweet_data.get('caption') and not feedback:
-        status.update("   ⚡ Using pre-generated cloud content...")
+        status.update("   ⚡ Using reviewed/pre-generated content...")
         headline = tweet_data['headline']
         caption = tweet_data['caption']
         slug = tweet_data.get('slug', 'noticia')
         shorts_title = tweet_data.get('shorts_title', headline[:100])
-        caption_b = tweet_data.get('caption_b', caption)  # Fallback to same caption
+        caption_b = tweet_data.get('caption_b', caption)
         source = tweet_data.get('source', '')
     else:
         status.update("   Generating AI content...")
         from core.ai_handler import generate_content_ai
-        headline, caption, slug, shorts_title, caption_b, source = generate_content_ai(tweet_data, media_path, feedback)
+        # Prioritize feedback passed in function arg (regen) over initial feedback
+        ai_feedback = feedback if feedback else tweet_data.get('initial_feedback')
+        headline, caption, slug, shorts_title, caption_b, source = generate_content_ai(tweet_data, media_path, ai_feedback)
 
     # 3. Folder Setup
     clean_slug = re.sub(r'[^a-z0-9_]', '', slug.lower().replace(" ", "_").replace("-", "_"))
@@ -133,10 +137,13 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         if ext.endswith(('.jpg', '.jpeg', '.png', '.webp')):
             actual_is_video = False
     
+    # Use the edited/detected source for rendering if available, fallback to uploader_id
+    render_source = source if source else uploader_id
+
     if actual_is_video and media_path:
-        temp_reel_path = process_video_for_reel(media_path, headline, uploader_id, output_name, skip_subtitles=skip_subtitles)
+        temp_reel_path = process_video_for_reel(media_path, headline, render_source, output_name, skip_subtitles=skip_subtitles)
     else:
-        temp_reel_path = generate_reel_from_image(media_path, headline, uploader_id, output_name)
+        temp_reel_path = generate_reel_from_image(media_path, headline, render_source, output_name)
     
     final_reel_path = os.path.join(item_folder_path, output_name)
     if temp_reel_path and os.path.exists(temp_reel_path) and temp_reel_path != final_reel_path:
@@ -201,6 +208,21 @@ class PostAiCurationManager:
         self.feedback_text = tk.Text(self.info_frame, height=3, width=45, bg="#2c3e50", fg="white", font=("Segoe UI Italic", 10), borderwidth=0, padx=10, pady=10)
         self.feedback_text.pack(fill="x")
         self.feedback_text.insert(tk.END, "Ej: Hazlo más dramático, menciona el impacto en el ahorro...")
+
+        # Location Search
+        tk.Label(self.info_frame, text="Ubicación (Facebook Page ID):", font=("Segoe UI Bold", 10), fg="#888", bg="#121212").pack(anchor="w", pady=(10, 5))
+        self.loc_frame = tk.Frame(self.info_frame, bg="#121212")
+        self.loc_frame.pack(fill="x")
+        
+        self.loc_entry = tk.Entry(self.loc_frame, bg="#1e1e1e", fg="white", font=("Segoe UI", 10), borderwidth=0)
+        self.loc_entry.pack(side="left", fill="x", expand=True, padx=(10, 5), ipady=5)
+        
+        self.btn_search_loc = tk.Button(self.loc_frame, text="🔍", bg="#444", fg="white", command=self.search_location_ui, borderwidth=0)
+        self.btn_search_loc.pack(side="left", padx=(0, 10))
+        
+        self.loc_id_var = tk.StringVar() # Stores the actual ID
+        self.loc_label = tk.Label(self.info_frame, textvariable=self.loc_id_var, font=("Segoe UI", 8), fg="#27ae60", bg="#121212", anchor="w")
+        self.loc_label.pack(fill="x", padx=10)
 
         self.btn_sub_frame = tk.Frame(self.info_frame, bg="#121212")
         self.btn_sub_frame.pack(fill="x", pady=20)
@@ -377,6 +399,7 @@ class PostAiCurationManager:
             
         caption = self.caption_text.get('1.0', tk.END).strip()
         video_path = item['reel_path']
+        location_id = self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None
         
         self.btn_publish.config(state="disabled", text="⏳ SUBIENDO...")
         self.status.update(f"   🚀 Iniciando publicación en Instagram para '{os.path.basename(video_path)}'...")
@@ -390,10 +413,39 @@ class PostAiCurationManager:
                     return
                 
                 # 2. Upload to Instagram
-                res = publisher.upload_reel(temp_url, caption, config['access_token'], config['ig_user_id'])
+                res = publisher.upload_reel(temp_url, caption, config['access_token'], config['ig_user_id'], location_id=location_id)
                 
                 if res and "id" in res:
-                    self.root.after(0, lambda: messagebox.showinfo("Éxito", f"¡Vídeo publicado con éxito!\nID: {res['id']}"))
+                    self.root.after(0, lambda: self.status.update(f"   ✅ Publicado en Instagram: {res['id']}"))
+                    
+                    # --- FACEBOOK REELS UPLOAD ---
+                    try:
+                        fb_page_id = publisher.get_facebook_page_id(config['access_token'])
+                        if fb_page_id:
+                            self.status.update(f"   🚀 Subiendo a Facebook Reels (Página {fb_page_id})...")
+                            fb_res = publisher.upload_facebook_reel(temp_url, caption, config['access_token'], fb_page_id)
+                            if fb_res and "id" in fb_res:
+                                self.root.after(0, lambda: self.status.update(f"   ✅ Publicado en Facebook Reels: {fb_res['id']}"))
+                            else:
+                                self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló Facebook Reels: {fb_res}"))
+                        else:
+                             self.root.after(0, lambda: self.status.update(f"   ⚠️ No se encontró ID de Página de Facebook."))
+                    except Exception as e:
+                        self.root.after(0, lambda: self.status.update(f"   ⚠️ Error Facebook: {e}"))
+                    # -----------------------------
+
+                    # --- YOUTUBE UPLOAD (Simultaneous) ---
+                    try:
+                        self.status.update(f"   🚀 Subiendo a YouTube Shorts...")
+                        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
+                        yt_id = upload_short(video_path, title=shorts_title, description=caption)
+                        if yt_id:
+                            self.root.after(0, lambda: self.status.update(f"   ✅ Publicado en YouTube Shorts: {yt_id}"))
+                    except Exception as e:
+                        self.status.update(f"   ⚠️ Falló YouTube: {e}")
+                    # -------------------------------------
+                    
+                    self.root.after(0, lambda: messagebox.showinfo("Éxito", "¡Vídeo publicado con éxito en las plataformas configuradas!"))
                     self.root.after(0, self.keep) # Move to next and save locally
                 else:
                     self.root.after(0, lambda: messagebox.showerror("Error", f"Fallo en la publicación de Instagram: {res}"))
@@ -421,17 +473,40 @@ class PostAiCurationManager:
             messagebox.showwarning("Feedback necesario", "Por favor escribe qué quieres cambiar en el campo de feedback.")
             return
 
-        self.btn_regen.config(state="disabled", text="⏳ REGENERANDO...")
+        # 1. Feedback UI
+        self.status.update(f"⏳ Regenerando IA en segundo plano para: {item.get('headline', '...')}")
         
+        # 2. Move item to END of the list for later review
+        self.items.pop(self.current_idx)
+        self.items.append(item)
+        # Note: We don't increment current_idx because the NEXT item has now shifted into this slot.
+        # But we must ensure idx is valid.
+        if self.current_idx >= len(self.items):
+             self.current_idx = 0 
+        
+        # 3. Load next item immediately (UI doesn't block)
+        self.load_item()
+
+        # 4. Start Background Task
         def regen_task():
             try:
                 new_item = self.process_callback(item, feedback)
-                self.root.after(0, lambda: self._finish_regen(new_item))
+                self.root.after(0, lambda: self._update_item_in_list(item, new_item))
             except Exception as e:
-                self.root.after(0, lambda: self.status.update(f"   ❌ Error regenerando: {e}"))
-                self.root.after(0, lambda: self.btn_regen.config(state="normal", text="🔄 REGENERAR IA"))
+                self.root.after(0, lambda: self.status.update(f"❌ Error regenerando (Background): {e}"))
         
         threading.Thread(target=regen_task, daemon=True).start()
+
+    def _update_item_in_list(self, old_item, new_item):
+        """Update the item in the list once background processing is done."""
+        try:
+            # We must find the object reference because it might have moved
+            idx = self.items.index(old_item)
+            self.items[idx] = new_item
+            head = new_item.get('headline', '...')
+            self.status.update(f"✨ Regeneración completada: '{head}'. Movid@ al final de la cola.")
+        except ValueError:
+            pass # Item might have been discarded in the meantime
     
     def _finish_regen(self, new_item):
         self.items[self.current_idx] = new_item
@@ -464,6 +539,32 @@ class PostAiCurationManager:
         self.status.update(f"   ✅ Vídeo re-renderizado sin subtítulos.")
         self.load_item()
 
+        self.status.update(f"   ✅ Vídeo re-renderizado sin subtítulos.")
+        self.load_item()
+
+    def search_location_ui(self):
+        query = self.loc_entry.get().strip()
+        if not query: return
+        
+        config = publisher.load_config()
+        if not config or 'access_token' not in config:
+            messagebox.showerror("Error", "No Access Token configured")
+            return
+            
+        self.status.update(f"🔍 Buscando ubicación: {query}...")
+        results = publisher.search_locations(query, config['access_token'])
+        
+        if results:
+            # Simple dropdown or just pick first for now, user can refine query
+            # For better UX, let's just pick the first one and show name
+            first = results[0]
+            self.loc_id_var.set(f"{first['id']} | {first['name']}")
+            self.loc_entry.delete(0, tk.END)
+            self.loc_entry.insert(0, first['name'])
+            self.status.update(f"📍 Ubicación seleccionada: {first['name']}")
+        else:
+            messagebox.showinfo("Sin resultados", f"No se encontraron ubicaciones para '{query}'")
+
     def next_item(self):
         self.current_idx += 1
         self.load_item()
@@ -485,7 +586,9 @@ class PostAiCurationManager:
             'reel_path': item['reel_path'],
             'caption': caption_a,
             'folder': item['folder'],
-            'variant': 'A (Branded)'
+            'variant': 'A (Branded)',
+            'platforms': ['instagram_reel', 'instagram_story', 'facebook_reel', 'youtube_shorts'],
+            'location_id': self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None
         })
         
         # A/B Testing: Schedule raw version with caption B
@@ -501,7 +604,8 @@ class PostAiCurationManager:
                 'reel_path': raw_video_path,
                 'caption': caption_b,
                 'folder': item['folder'],
-                'variant': 'B (Raw Video)'
+                'variant': 'B (Raw Video)',
+                'platforms': ['instagram_reel', 'facebook_reel'] # No YouTube for B
             })
             self.status.update(f"   📅 A/B Test añadido: 2 vídeos programados ({len(self.scheduled_posts)} total).")
         else:
@@ -510,7 +614,8 @@ class PostAiCurationManager:
                 'reel_path': item['reel_path'],
                 'caption': caption_b,
                 'folder': item['folder'],
-                'variant': 'B (Branded, Alt Caption)'
+                'variant': 'B (Branded, Alt Caption)',
+                'platforms': ['instagram_reel', 'facebook_reel'] # No YouTube for B
             })
             msg = "imagen detectada, usando vídeo renderizado para B" if is_image else "sin vídeo original"
             self.status.update(f"   📅 A/B Test añadido ({msg}): 2 posts programados.")
@@ -551,7 +656,22 @@ class PostAiCurationManager:
                 res = publisher.upload_reel(temp_url, caption, config['access_token'], config['ig_user_id'])
                 
                 if res and "id" in res:
-                    self.root.after(0, lambda: messagebox.showinfo("Éxito", f"¡Vídeo RAW publicado!\\nID: {res['id']}"))
+                    self.root.after(0, lambda: self.status.update(f"   ✅ Publicado RAW en Instagram: {res['id']}"))
+                    
+                    
+                    # --- YOUTUBE UPLOAD (Raw) ---
+                    # DISABLED PER USER REQUEST: Only branded videos go to YouTube
+                    # try:
+                    #     self.status.update(f"   🚀 Subiendo RAW a YouTube Shorts...")
+                    #     shorts_title = self.shorts_text.get('1.0', tk.END).strip()
+                    #     yt_id = upload_short(raw_video_path, title=shorts_title, description=caption)
+                    #     if yt_id:
+                    #         self.root.after(0, lambda: self.status.update(f"   ✅ Publicado RAW en YouTube Shorts: {yt_id}"))
+                    # except Exception as e:
+                    #     self.status.update(f"   ⚠️ Falló YouTube RAW: {e}")
+                    # -----------------------------------------
+                    
+                    self.root.after(0, lambda: messagebox.showinfo("Éxito", "¡Vídeo RAW publicado con éxito!"))
                     self.root.after(0, self.keep)
                 else:
                     self.root.after(0, lambda: messagebox.showerror("Error", f"Fallo: {res}"))
@@ -621,15 +741,16 @@ class PostAiCurationManager:
 
 class PreAiCurationManager:
     """Stage 1: Filter original tweets before using Gemini AI."""
-    def __init__(self, parent, raw_items, on_complete):
+    def __init__(self, parent, raw_items, status_manager, on_complete):
         self.root = tk.Toplevel(parent)
         self.root.title(f"Filtro Pre-IA ({len(raw_items)} Tweets)")
-        self.root.geometry("1000x650")
+        self.root.geometry("1400x900") # Wider to fit everything
         self.root.configure(bg="#1a1a1a")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
         self.raw_items = raw_items
         self.current_idx = 0
+        self.status = status_manager
         self.on_complete = on_complete
         self.kept_items = []
         
@@ -648,28 +769,65 @@ class PreAiCurationManager:
         self.right_frame.pack(side="right", fill="both", expand=True)
 
         self.header = tk.Label(self.right_frame, text="", font=("Segoe UI Bold", 14), fg="#E31E24", bg="#1a1a1a")
-        self.header.pack(pady=(10, 20), anchor="w")
+        self.header.pack(pady=(5, 10), anchor="w")
         
-        self.content_text = tk.Text(self.right_frame, height=15, bg="#252525", fg="white", font=("Segoe UI", 11), borderwidth=0, padx=10, pady=10)
+        # Split right frame into tweet content and AI suggestions
+        self.details_frame = tk.Frame(self.right_frame, bg="#1a1a1a")
+        self.details_frame.pack(fill="both", expand=True)
+
+        self.tweet_frame = tk.LabelFrame(self.details_frame, text="ORIGINAL", bg="#1a1a1a", fg="#888", font=("Segoe UI", 9))
+        self.tweet_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        self.content_text = tk.Text(self.tweet_frame, height=10, width=40, bg="#252525", fg="#bbb", font=("Segoe UI", 10), borderwidth=0, padx=10, pady=10)
         self.content_text.pack(fill="both", expand=True)
+
+        self.ai_frame = tk.LabelFrame(self.details_frame, text="PROPUESTA IA", bg="#1a1a1a", fg="#E31E24", font=("Segoe UI Bold", 9))
+        self.ai_frame.pack(side="right", fill="both", expand=True)
+
+        tk.Label(self.ai_frame, text="Headline:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(5,0))
+        self.headline_entry = tk.Entry(self.ai_frame, bg="#252525", fg="white", font=("Segoe UI Black", 11), borderwidth=0)
+        self.headline_entry.pack(fill="x", padx=10, pady=5)
+
+        tk.Label(self.ai_frame, text="Shorts Title:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(5,0))
+        self.shorts_entry = tk.Entry(self.ai_frame, bg="#252525", fg="white", font=("Segoe UI", 10), borderwidth=0)
+        self.shorts_entry.pack(fill="x", padx=10, pady=5)
+
+        tk.Label(self.ai_frame, text="Caption:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(5,0))
+        self.caption_text = tk.Text(self.ai_frame, height=8, bg="#252525", fg="white", font=("Segoe UI", 10), borderwidth=0, padx=5, pady=5)
+        self.caption_text.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Source Section
+        self.source_subframe = tk.Frame(self.ai_frame, bg="#1a1a1a")
+        self.source_subframe.pack(fill="x", padx=10, pady=5)
+        tk.Label(self.source_subframe, text="Fuente Detectada:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(side="left")
+        self.source_entry = tk.Entry(self.source_subframe, bg="#252525", fg="#27ae60", font=("Segoe UI Bold", 10), borderwidth=0, width=30, insertbackground="white")
+        self.source_entry.pack(side="left", padx=10)
+        self.source_entry.bind("<KeyRelease>", lambda e: self.source_entry.config(fg="#27ae60" if self.source_entry.get().strip() else "#888"))
+
+        # Feedback Section
+        self.feedback_frame = tk.Frame(self.right_frame, bg="#1a1a1a")
+        self.feedback_frame.pack(fill="x", pady=(10, 0))
+        tk.Label(self.feedback_frame, text="Petición Extra IA:", font=("Segoe UI Bold", 9), fg="#f1c40f", bg="#1a1a1a").pack(side="left")
+        self.feedback_text = tk.Entry(self.feedback_frame, bg="#333", fg="white", font=("Segoe UI Italic", 10), borderwidth=0)
+        self.feedback_text.pack(side="left", fill="x", expand=True, padx=10)
         
         self.btn_frame = tk.Frame(self.right_frame, bg="#1a1a1a")
         self.btn_frame.pack(fill="x", pady=20)
         
         tk.Button(self.btn_frame, text="🗑️ DESCARTAR", bg="#c0392b", fg="white", font=("Segoe UI Black", 11), width=15, command=self.discard).pack(side="left")
         
-        # New: Permanent Reject button
-        tk.Button(self.btn_frame, text="🚫 RECHAZAR SIEMPRE", bg="#555", fg="white", font=("Segoe UI Bold", 10), width=18, command=self.permanent_reject).pack(side="left", padx=10)
+        tk.Button(self.btn_frame, text="🚫 RECHAZAR", bg="#555", fg="white", font=("Segoe UI Bold", 10), width=15, command=self.permanent_reject).pack(side="left", padx=10)
+
+        tk.Button(self.btn_frame, text="🔄 RE-GENERAR", bg="#f39c12", fg="#1a1a1a", font=("Segoe UI Bold", 10), width=15, command=self.run_ai_suggestion).pack(side="left")
 
         # Mute Button
         self.btn_mute = tk.Button(self.btn_frame, text="🔊", bg="#555", fg="white", font=("Segoe UI", 11), width=3, command=self.toggle_mute)
         self.btn_mute.pack(side="left", padx=10)
         
-        # Skip Subtitles Checkbox
         self.skip_subtitles_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(self.btn_frame, text="Sin Subs", variable=self.skip_subtitles_var, bg="#1a1a1a", fg="white", selectcolor="#333", font=("Segoe UI", 10), activebackground="#1a1a1a", activeforeground="white").pack(side="left", padx=5)
+        tk.Checkbutton(self.btn_frame, text="Sin Subs", variable=self.skip_subtitles_var, bg="#1a1a1a", fg="white", selectcolor="#333", font=("Segoe UI", 9)).pack(side="left", padx=5)
         
-        tk.Button(self.btn_frame, text="✅ PROCESAR CON IA", bg="#27ae60", fg="white", font=("Segoe UI Black", 11), width=18, command=self.keep).pack(side="right")
+        tk.Button(self.btn_frame, text="✅ APROBAR Y RENDERIZAR", bg="#27ae60", fg="white", font=("Segoe UI Black", 11), width=25, command=self.keep).pack(side="right")
         
         self.cap = None
         self.player = None
@@ -720,6 +878,9 @@ class PreAiCurationManager:
         self.content_text.tag_bind("link", "<Enter>", lambda e: self.content_text.config(cursor="hand2"))
         self.content_text.tag_bind("link", "<Leave>", lambda e: self.content_text.config(cursor=""))
 
+        # Clear feedback entry
+        self.feedback_text.delete(0, tk.END)
+
         if self.cap: self.cap.release()
         if hasattr(self, 'player') and self.player:
             self.player.close_player()
@@ -727,24 +888,48 @@ class PreAiCurationManager:
         self.cap = None
         self.player = None
         self.canvas.delete("all")
+
+        # Clear AI fields
+        self.headline_entry.delete(0, tk.END)
+        self.shorts_entry.delete(0, tk.END)
+        self.caption_text.delete('1.0', tk.END)
+        self.source_entry.delete(0, tk.END)
+        self.source_entry.config(fg="#888") # Default gray
+
+        # If item already has AI content (e.g. from Cloud), show it
+        if tweet.get('headline'):
+            self.display_ai_content(tweet)
+        else:
+            # Trigger background AI generation
+            self.run_ai_suggestion()
         
         media_path = tweet.get('local_media_path')
         if media_path and os.path.exists(media_path):
+            print(f"[DEBUG] Loading media: {media_path} (Video: {tweet.get('is_video')})")
             try:
                 if tweet.get('is_video'):
                     self.cap = cv2.VideoCapture(media_path)
+                    print(f"[DEBUG] VideoCapture opened: {self.cap.isOpened()}")
+                    if not self.cap.isOpened():
+                         self.canvas.create_text(170, 250, text="ERROR OPENING VIDEO", fill="red")
+
                     if MediaPlayer:
-                        # Sync with 30fps roughly
                         self.player = MediaPlayer(media_path)
                 else:
-                    # Still image
+                    print(f"[DEBUG] Loading image...")
                     img = Image.open(media_path).convert("RGB")
                     img = self.resize_contain(img, 340, 500)
                     self.tk_img = ImageTk.PhotoImage(img)
                     self.canvas.create_image(170, 250, anchor="center", image=self.tk_img)
+                    print(f"[DEBUG] Image loaded successfully")
             except Exception as e:
                 print(f"[UI ERROR] Failed to load media {media_path}: {e}")
                 self.canvas.create_text(170, 250, text=f"⚠️ ERROR MEDIA\n{str(e)[:40]}", fill="red", font=("Segoe UI Bold", 10), justify="center")
+        else:
+            msg = "⌛ Descargando..." if not media_path else "⚠️ ARCHIVO ELIMINADO"
+            self.canvas.create_text(170, 250, text=msg, fill="#555", font=("Segoe UI Bold", 12))
+            if media_path:
+                self.status.update(f"   ⚠️ Media not found at: {media_path}")
 
     def update_frame(self):
         if not self.root.winfo_exists() or self.current_idx >= len(self.raw_items): return
@@ -752,6 +937,9 @@ class PreAiCurationManager:
         ret, frame = False, None
         
         if self.cap and self.cap.isOpened():
+            # IMPORTANT: Delete old image objects to avoid memory/layer leak
+            self.canvas.delete("video_frame")
+            
             if hasattr(self, 'player') and self.player:
                 audio_frame, val = self.player.get_frame()
                 if val == 'eof':
@@ -767,6 +955,7 @@ class PreAiCurationManager:
                 ret, frame = self.cap.read()
 
             if not ret:
+                # print("[DEBUG] Failed to read frame (EOF or Error), looping...") # Too noisy
                 # Handle end of video if val=='eof' missed it
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 if hasattr(self, 'player') and self.player:
@@ -788,7 +977,7 @@ class PreAiCurationManager:
                 background.paste(img, ((340 - new_w) // 2, (500 - new_h) // 2))
                 
                 self.tk_img = ImageTk.PhotoImage(background)
-                self.canvas.create_image(170, 250, anchor="center", image=self.tk_img)
+                self.canvas.create_image(170, 250, anchor="center", image=self.tk_img, tags="video_frame")
         
         self.root.after(30, self.update_frame)
 
@@ -806,9 +995,9 @@ class PreAiCurationManager:
         self.btn_mute.config(text="🔇" if self.is_muted else "🔊")
 
     def discard(self):
-        # Just skip this one in the current list
-        self.current_idx += 1
-        self.load_tweet()
+        """Skip this item and mark it as rejected so it doesn't appear again."""
+        self.status.update(f"   🗑️ Descartando y marcando como rechazado...")
+        self.permanent_reject()
 
     def permanent_reject(self):
         # Mark as rejected and skip
@@ -822,15 +1011,90 @@ class PreAiCurationManager:
             # Cloud sync if applicable
             if isinstance(item, dict) and item.get('url'):
                 try:
-                    threading.Thread(target=lambda: requests.post(f"{CLOUD_SERVER_URL}/pending/{tweet_id}/mark-rejected"), daemon=True).start()
+                    threading.Thread(target=lambda url=CLOUD_SERVER_URL, tid=tweet_id: requests.post(f"{url}/pending/{tid}/mark-rejected"), daemon=True).start()
                 except: pass
 
         self.current_idx += 1
         self.load_tweet()
 
+    def display_ai_content(self, data):
+        """Populate the AI suggestion fields."""
+        self.headline_entry.delete(0, tk.END)
+        self.headline_entry.insert(0, data.get('headline', ''))
+        
+        self.shorts_entry.delete(0, tk.END)
+        self.shorts_entry.insert(0, data.get('shorts_title', ''))
+        
+        self.caption_text.delete('1.0', tk.END)
+        self.caption_text.insert(tk.END, data.get('caption', ''))
+
+        source = data.get('source', '')
+        self.source_entry.delete(0, tk.END)
+        self.source_entry.insert(0, source)
+        if source:
+            self.source_entry.config(fg="#27ae60") # Green if detected
+        else:
+            self.source_entry.config(fg="#888")
+
+        # Auto-fill location search if suggested
+        loc_suggestion = data.get('suggested_location_query', '')
+        if loc_suggestion:
+             self.loc_entry.delete(0, tk.END)
+             self.loc_entry.insert(0, loc_suggestion)
+             # Optional: Auto-trigger search?
+             # self.search_location_ui() # Maybe too aggressive, let user decide
+
+    def run_ai_suggestion(self):
+        """Run AI generation in background and update UI."""
+        item = self.raw_items[self.current_idx]
+        feedback = self.feedback_text.get().strip()
+        
+        self.headline_entry.delete(0, tk.END)
+        self.headline_entry.insert(0, "⌛ Generando propuesta...")
+        
+        def ai_task():
+            try:
+                # Use media path if available for multi-modal if supported, but here it's text-based mostly
+                media_path = item.get('local_media_path')
+                # Use generate_content_ai which handles the Gemini call
+                from core.ai_handler import generate_content_ai
+                h, c, s, st, cb, src, loc = generate_content_ai(item, media_path, feedback)
+                
+                result = {
+                    'headline': h,
+                    'caption': c,
+                    'slug': s,
+                    'shorts_title': st,
+                    'caption_b': cb,
+                    'source': src,
+                    'suggested_location_query': loc
+                }
+                
+                def update_ui():
+                    # Only update if we're still on the same item
+                    if self.current_idx < len(self.raw_items) and self.raw_items[self.current_idx] == item:
+                        item.update(result)
+                        self.display_ai_content(result)
+                
+                self.root.after(0, update_ui)
+            except Exception as e:
+                self.root.after(0, lambda: self.headline_entry.delete(0, tk.END))
+                self.root.after(0, lambda: self.headline_entry.insert(0, f"❌ Error: {str(e)[:30]}"))
+
+        threading.Thread(target=ai_task, daemon=True).start()
+
     def keep(self):
         item = self.raw_items[self.current_idx]
+        
+        # Capture edited values
+        item['headline'] = self.headline_entry.get().strip()
+        item['shorts_title'] = self.shorts_entry.get().strip()
+        item['caption'] = self.caption_text.get('1.0', tk.END).strip()
+        item['source'] = self.source_entry.get().strip()
+        
         item['skip_subtitles'] = self.skip_subtitles_var.get()
+        item['initial_feedback'] = self.feedback_text.get().strip() # Capture feedback
+        
         # Mark as processed only if approved for AI processing
         tweet_id = item.get('id')
         if tweet_id:
@@ -840,13 +1104,10 @@ class PreAiCurationManager:
             # Cloud sync if applicable
             if isinstance(item, dict) and item.get('url'):
                 try:
-                    threading.Thread(target=lambda: requests.post(f"{CLOUD_SERVER_URL}/pending/{tweet_id}/mark-processed"), daemon=True).start()
+                    threading.Thread(target=lambda url=CLOUD_SERVER_URL, tid=tweet_id: requests.post(f"{url}/pending/{tid}/mark-processed"), daemon=True).start()
                 except: pass
             
         self.kept_items.append(item)
-        self.current_idx += 1
-        self.load_tweet()
-
         self.current_idx += 1
         self.load_tweet()
 
@@ -957,8 +1218,8 @@ def generate_mobile_html(output_path, headline, shorts_title, caption):
 
 def batch_process(urls: list, status: StatusManager):
     """Refactored 2-Stage Process: Scrape -> Filter -> Process -> Curate."""
-    cleanup_old_files(DOWNLOADS_DIR)
-    cleanup_old_files(OUTPUT_DIR)
+    cleanup_old_files(DOWNLOADS_DIR, quiet=True)
+    cleanup_old_files(OUTPUT_DIR, quiet=True)
     
     total = len(urls)
     status.update(f"🚀 Iniciando Batch Process ({total} items)")
@@ -1020,7 +1281,7 @@ def batch_process(urls: list, status: StatusManager):
         kept_after_filter = kept
         filter_event.set()
 
-    root.after(0, lambda: PreAiCurationManager(root, scraped_data, on_filter_complete))
+    root.after(0, lambda: PreAiCurationManager(root, scraped_data, status, on_filter_complete))
     
     # Wait for UI to finish Stage 1
     while not filter_event.is_set():
@@ -1424,8 +1685,8 @@ def run_gui():
             
         threading.Thread(target=scout_task, daemon=True).start()
     
-    btn_scout.config(command=run_viral_scout)
-    
+    # Viral Scout function
+
     def run_process():
         nonlocal viral_scout_cache
         raw_text = input_text.get('1.0', tk.END).strip()
@@ -1435,23 +1696,53 @@ def run_gui():
         
         text_urls = [line.strip() for line in raw_text.split('\n') if line.strip()]
         
-        if viral_scout_cache:
-            cache_map = {h['url']: h for h in viral_scout_cache}
-            items = [cache_map.get(url, url) for url in text_urls]
-        else:
-            items = text_urls
+        # --- NEW: Immediate History Filter ---
+        from core.viral_scout import ViralScout
+        scout = ViralScout()
         
+        final_items = []
+        skipped_count = 0
+        
+        for url in text_urls:
+            from core.scraper import extract_tweet_id
+            tweet_id = extract_tweet_id(url)
+            if tweet_id and scout.is_processed(tweet_id):
+                skipped_count += 1
+                continue
+            
+            # Map rich data if available
+            if viral_scout_cache:
+                cache_map = {h['url']: h for h in viral_scout_cache}
+                final_items.append(cache_map.get(url, url))
+            else:
+                final_items.append(url)
+        
+        if not final_items and skipped_count > 0:
+            messagebox.showinfo("Procesado", f"Se omitieron {skipped_count} tweets porque ya han sido procesados anteriormente.")
+            return
+            
+        if not final_items:
+            messagebox.showwarning("Aviso", "No hay tweets válidos para procesar.")
+            return
+
         btn_run.config(state="disabled", text="⏳ PROCESANDO...")
         status_manager = StatusManager(status_var, log_widget)
         
+        if skipped_count > 0:
+            status_manager.update(f"⚠️ Omitidos {skipped_count} tweets ya procesados.")
+            # Update input text to show only what's being processed
+            input_text.delete('1.0', tk.END)
+            input_text.insert(tk.END, "\n".join([i['url'] if isinstance(i, dict) else i for i in final_items]) + "\n")
+
         def task():
-            batch_process(items, status_manager)
+            batch_process(final_items, status_manager)
             root.after(0, lambda: btn_run.config(state="normal", text="▶ INICIAR PROCESO"))
             root.after(0, lambda: status_var.set("✅ Proceso Finalizado"))
             root.after(0, refresh_scheduled)
             
         threading.Thread(target=task, daemon=True).start()
 
+    btn_scout.config(command=run_viral_scout)
     btn_run.config(command=run_process)
 
     root.mainloop()

@@ -1,5 +1,6 @@
 yt-dlp
-google-genai
+google-genaigoogle-api-python-client
+google-auth-oauthlib
 requests
 moviepy
 Pillow

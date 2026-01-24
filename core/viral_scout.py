@@ -36,8 +36,10 @@ class ViralScout:
         if not os.path.exists(ACCOUNTS_FILE):
             default = {
                 "wallstwolverine": 800000,
-                "unusual_whales": 1500000,
-                "zerohedge": 1800000
+                "juanrallo": 1000000,
+                "dlacalle": 950000,
+                "elblogsalmon": 200000,
+                "Santander_es": 300000
             }
             with open(ACCOUNTS_FILE, 'w') as f:
                 json.dump(default, f, indent=4)
@@ -65,7 +67,7 @@ class ViralScout:
             print(f"Error saving history to {filepath}: {e}")
 
     def is_processed(self, tweet_id):
-        return tweet_id in self.history or tweet_id in self.rejected
+        return str(tweet_id) in [str(x) for x in self.history] or str(tweet_id) in [str(x) for x in self.rejected]
 
     def mark_as_processed(self, tweet_id):
         if tweet_id not in self.history:
@@ -83,6 +85,11 @@ class ViralScout:
         Formula: (RTs * 4 + Likes) / (sqrt(Followers) * 2)
         Viral Threshold: > 2.0 (Endurecido de 1.0 a 2.0)
         """
+        # CRITICAL: Reload history to ensure we have the latest processed items
+        if not ignore_history:
+            self.history = self.load_history(HISTORY_FILE)
+            self.rejected = self.load_history(REJECTED_FILE)
+
         viral_urls = []
         
         # Use get_cookies which handles both env var (cloud) and file (local)
