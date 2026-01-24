@@ -1,10 +1,11 @@
 yt-dlp
-google-genaigoogle-api-python-client
+google-genai
+google-api-python-client
 google-auth-oauthlib
 requests
 moviepy
 Pillow
 twikit
-opencv-python
+opencv-python-headless
 numpy
 ffpyplayer
