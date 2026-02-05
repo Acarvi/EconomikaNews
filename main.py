@@ -89,7 +89,8 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         status.update(f"   Using pre-downloaded media for {uploader_id}...")
     else:
         status.update(f"   Downloading media for {uploader_id}...")
-        success, media_path = download_media(tweet_url, thumbnail_url=tweet_data.get('thumbnail'), is_video=is_video)
+        # Pass direct_url if available to bypass yt-dlp
+        success, media_path = download_media(tweet_url, thumbnail_url=tweet_data.get('thumbnail'), is_video=is_video, direct_url=tweet_data.get('media_url'))
         if not success: media_path = None
     
     # 2. AI Gen - SKIP IF CONTENT ALREADY PROVIDED (e.g. reviewed in Stage 1 or from Cloud)
@@ -103,27 +104,30 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         caption_b = tweet_data.get('caption_b', caption)
         source = tweet_data.get('source', '')
     else:
-        status.update("   Generating AI content...")
+        status.update("   Generando redacción final (Gemini 2.0)...")
         from core.ai_handler import generate_content_ai
-        # Prioritize feedback passed in function arg (regen) over initial feedback
-        ai_feedback = feedback if feedback else tweet_data.get('initial_feedback')
-        headline, caption, slug, shorts_title, caption_b, source = generate_content_ai(tweet_data, media_path, ai_feedback)
+        # Prioritize feedback/instructions from Stage 1
+        user_instr = tweet_data.get('user_instructions', '')
+        ai_feedback = feedback if feedback else user_instr
+        h, c, s, st, cb, src, loc = generate_content_ai(tweet_data, media_path, ai_feedback, quality="pro")
+        headline, caption, slug, shorts_title, caption_b, source = h, c, s, st, cb, src
 
-    # 3. Folder Setup
-    clean_slug = re.sub(r'[^a-z0-9_]', '', slug.lower().replace(" ", "_").replace("-", "_"))
-    item_folder_name = f"{date_str}_{clean_slug}"
+    # 3. Folder Setup - Unique naming with ID to avoid [WinError 32]
+    clean_slug = re.sub(r'[^a-z0-9_]', '', slug.lower().replace(" ", "_").replace("-", "_"))[:20]
+    tweet_id = str(tweet_data.get('id', 'item'))
+    item_folder_name = f"{date_str}_{tweet_id}_{clean_slug}"
     item_folder_path = os.path.join(OUTPUT_DIR, item_folder_name)
     os.makedirs(item_folder_path, exist_ok=True)
     base_name = f"economika_{item_folder_name}"
 
-    # 4. Save artifacts
-    caption_path = os.path.join(item_folder_path, f"{base_name}.md")
-    with open(caption_path, 'w', encoding='utf-8') as f:
-        f.write(f"# {headline}\n\n### 📹 SHORTS\n{shorts_title}\n\n### 📝 CAPTION (A)\n{caption}\n\n### 📝 CAPTION (B)\n{caption_b}\n")
+    # 4. Save artifacts - REMOVED .md and .html per user request
+    # caption_path = os.path.join(item_folder_path, f"{base_name}.md")
+    # with open(caption_path, 'w', encoding='utf-8') as f:
+    #     f.write(f"# {headline}\n\n### 📹 SHORTS\n{shorts_title}\n\n### 📝 CAPTION (A)\n{caption}\n\n### 📝 CAPTION (B)\n{caption_b}\n")
     
-    html_path = os.path.join(item_folder_path, "copiar_movil.html")
-    from main import generate_mobile_html
-    generate_mobile_html(html_path, headline, shorts_title, caption)
+    # html_path = os.path.join(item_folder_path, "copiar_movil.html")
+    # from main import generate_mobile_html
+    # generate_mobile_html(html_path, headline, shorts_title, caption)
 
     # 5. Render Reel
     status.update("   Rendering Video...")
@@ -242,12 +246,12 @@ class PostAiCurationManager:
                                     padx=20, pady=15, borderwidth=0, command=self.discard)
         self.btn_discard.pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        self.btn_publish = tk.Button(self.action_btn_frame, text="📸 PUBLICAR EN INSTAGRAM", bg="#3498db", fg="white", font=("Segoe UI Black", 12), 
+        self.btn_publish = tk.Button(self.action_btn_frame, text="📸 PUBLICAR AHORA", bg="#3498db", fg="white", font=("Segoe UI Black", 12), 
                                     padx=20, pady=15, borderwidth=0, command=self.publish_ig)
         self.btn_publish.pack(side="left", fill="x", expand=True, padx=(5, 5))
 
-        self.btn_keep = tk.Button(self.action_btn_frame, text="APROBAR ➡", bg="#27ae60", fg="white", font=("Segoe UI Black", 12), 
-                                 padx=20, pady=15, borderwidth=0, command=self.keep)
+        self.btn_keep = tk.Button(self.action_btn_frame, text="📅 PROGRAMAR SOLO REEL", bg="#27ae60", fg="white", font=("Segoe UI Black", 10), 
+                                 padx=20, pady=15, borderwidth=0, command=self.add_single_to_batch)
         self.btn_keep.pack(side="right", fill="x", expand=True, padx=(10, 0))
         
         # Second row for mute and batch
@@ -257,7 +261,7 @@ class PostAiCurationManager:
         self.btn_mute = tk.Button(self.action_btn_frame2, text="🔊", bg="#555", fg="white", font=("Segoe UI", 12), width=4, command=self.toggle_mute)
         self.btn_mute.pack(side="left", padx=(0, 10))
         
-        self.btn_batch = tk.Button(self.action_btn_frame2, text="📅 A/B TEST", bg="#9b59b6", fg="white", font=("Segoe UI Black", 10),
+        self.btn_batch = tk.Button(self.action_btn_frame2, text="📅 PROGRAMAR A/B", bg="#9b59b6", fg="white", font=("Segoe UI Black", 10),
                                    padx=10, pady=6, borderwidth=0, command=self.add_to_batch)
         self.btn_batch.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
@@ -289,6 +293,34 @@ class PostAiCurationManager:
             return
             
         item = self.items[self.current_idx]
+        
+        # --- REGENERATION LOADING SCREEN ---
+        if item.get('is_regenerating', False):
+            self.header_label.config(text=f"REVISIÓN {self.current_idx + 1}/{len(self.items)}")
+            
+            # Clear Inputs
+            self.shorts_text.delete('1.0', tk.END)
+            self.caption_text.delete('1.0', tk.END)
+            
+            # Show Loading State in Preview Canvas
+            self.canvas.delete("all")
+            w = self.canvas.winfo_width()
+            h = self.canvas.winfo_height()
+            self.canvas.create_rectangle(0, 0, w, h, fill="#2c3e50")
+            self.canvas.create_text(w/2, h/2 - 20, text="⏳", font=("Segoe UI", 40), fill="white")
+            self.canvas.create_text(w/2, h/2 + 20, text="REGENERANDO IA...", font=("Segoe UI Bold", 16), fill="white")
+            self.canvas.create_text(w/2, h/2 + 50, text="Por favor espera.", font=("Segoe UI", 12), fill="#bdc3c7")
+            
+            # Disable Buttons
+            self._set_buttons_state("disabled")
+            
+            # Poll status every 1s
+            self.root.after(1000, self.load_item)
+            return
+        else:
+            self._set_buttons_state("normal")
+
+        # Standard Load Logic
         self.header_label.config(text=f"REVISIÓN {self.current_idx + 1}/{len(self.items)}")
         
         self.shorts_text.delete('1.0', tk.END)
@@ -311,45 +343,75 @@ class PostAiCurationManager:
         try:
             self.cap = cv2.VideoCapture(item['reel_path'])
             if MediaPlayer:
-                self.player = MediaPlayer(item['reel_path'])
+                self.player = MediaPlayer(item['reel_path'], ff_opts={'pix_fmt': 'rgb24'})
             
             if not self.cap.isOpened():
                 self.status.update(f"   ⚠️ Error al abrir vídeo para preview: {item['reel_path']}")
         except Exception as e:
             print(f"[UI ERROR] Failed to load reel preview: {e}")
             self.status.update(f"   ⚠️ Error de preview: {str(e)[:40]}")
+            
+    def _set_buttons_state(self, state):
+        """Helper to toggle buttons during regeneration wait."""
+        btns = [self.btn_regen, self.btn_discard, self.btn_publish, self.btn_keep, 
+                self.btn_batch, self.btn_remove_subs, self.btn_raw]
+        for btn in btns:
+            try: btn.config(state=state)
+            except: pass
 
     def update_frame(self):
         if not self.root.winfo_exists() or self.current_idx >= len(self.items): return
         
-        ret, frame = False, None
+        # Skip frame update if regenerating
+        item = self.items[self.current_idx]
+        if item.get('is_regenerating', False):
+             self.root.after(500, self.update_frame)
+             return
         
-        if self.cap and self.cap.isOpened():
-            # Sync with ffpyplayer if available
-            if self.player:
-                audio_frame, val = self.player.get_frame()
-                if val == 'eof':
-                    self.player.seek(0, relative=False)
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    ret, frame = self.cap.read()
-                elif val != 'toggle' and audio_frame is not None:
-                    # audio_frame is (img, pts)
-                    img_data, pts = audio_frame
-                    # We still use cv2 for the main frame to keep alpha blending logic simple
-                    ret, frame = self.cap.read()
+        if self.player:
+            frame, val = self.player.get_frame()
+            if val == 'eof':
+                self.player.seek(0, relative=False)
+            elif val == 'toggle':
+                pass
+            elif frame is not None:
+                img, pts = frame
+                w, h = img.get_size()
+                img_data = img.to_bytearray()[0]
+                
+                # Convert to numpy array for CV2 and overlay processing
+                # PIL -> Numpy is fast
+                pil_img = Image.frombytes("RGB", (w, h), img_data)
+                frame_np = np.array(pil_img)
+                
+                # Resize according to canvas current size or fixed 400x711 (Shorts format)
+                if w != 400 or h != 711:
+                    frame_np = cv2.resize(frame_np, (400, 711))
+                
+                if self.overlay_np is not None:
+                    fg = self.overlay_np[:, :, :3]
+                    alpha = self.overlay_np[:, :, 3:4]
+                    bg = frame_np.astype(float) / 255.0
+                    blended = (fg * alpha + bg * (1 - alpha)) * 255.0
+                    final_frame = blended.astype(np.uint8)
+                    img = Image.fromarray(final_frame)
                 else:
-                    # Just keep showing
-                    ret, frame = self.cap.read()
-            else:
-                ret, frame = self.cap.read()
+                    img = Image.fromarray(frame_np)
+                
+                self.tk_img = ImageTk.PhotoImage(img)
+                self.canvas.create_image(0, 0, anchor="nw", image=self.tk_img)
+            
+            self.root.after(15, self.update_frame)
+            return
 
+        # Fallback to OpenCV
+        if self.cap and self.cap.isOpened():
+            ret, frame = self.cap.read()
             if not ret:
-                if self.cap: self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                if self.player: self.player.seek(0, relative=False)
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 ret, frame = self.cap.read()
                 
             if ret and frame is not None:
-                # Resize according to canvas current size or fixed 400x711
                 frame = cv2.resize(frame, (400, 711))
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
@@ -371,23 +433,9 @@ class PostAiCurationManager:
     def keep(self):
         item = self.items[self.current_idx]
         folder = item['folder']
-        new_shorts = self.shorts_text.get('1.0', tk.END).strip()
-        new_caption = self.caption_text.get('1.0', tk.END).strip()
-        
-        try:
-            base_name = os.path.basename(item['reel_path']).replace(".mp4", "")
-            md_path = os.path.join(folder, f"{base_name}.md")
-            with open(md_path, 'w', encoding='utf-8') as f:
-                f.write(f"# {item.get('headline', 'NOTICIA')}\n\n### 📹 SHORTS\n{new_shorts}\n\n### 📝 CAPTION\n{new_caption}\n")
-            
-            html_path = os.path.join(folder, "copiar_movil.html")
-            generate_mobile_html(html_path, item.get('headline', 'NOTICIA'), new_shorts, new_caption)
-            self.approved_folders.append(folder)
-            self.status.update(f"   ⭐ Reel '{os.path.basename(folder)}' aprobado.")
-        except Exception as e:
-            self.status.update(f"   ⚠️ Error actualizando archivos: {e}")
-            self.approved_folders.append(folder)
-            
+        # Removed updates to .md and .html files
+        self.approved_folders.append(folder)
+        self.status.update(f"   ⭐ Reel '{os.path.basename(folder)}' aprobado.")
         self.next_item()
 
     def publish_ig(self):
@@ -405,50 +453,94 @@ class PostAiCurationManager:
         self.status.update(f"   🚀 Iniciando publicación en Instagram para '{os.path.basename(video_path)}'...")
         
         def run_publish():
+            # Check for A/B Testing (if caption_b exists and is different)
+            caption_a = self.caption_text.get('1.0', tk.END).strip()
+            caption_b = item.get('caption_b', '').strip()
+            
+            # Use Shorts title A/B if available (not stored in item but maybe we should?)
+            # For now, we reuse the same shorts title but append " #2" for B to avoid duplicate title blocks
+            shorts_title_a = self.shorts_text.get('1.0', tk.END).strip()
+            
+            variants = [("A", caption_a, shorts_title_a)]
+            
+            if caption_b and caption_b != caption_a:
+                print(f"[INFO] A/B Testing detected. Preparing Variant B.")
+                variants.append(("B", caption_b, shorts_title_a + " #2")) # Append marker to YT title
+            
+            self.root.after(0, lambda: self.status.update(f"   🚀 Iniciando publicación ({len(variants)} variantes)..."))
+
             try:
-                # 1. Upload to temp host
+                # 1. Upload to temp host ONCE (re-use URL for both variants to save time/bandwidth)
                 temp_url = publisher.upload_to_temporary_host(video_path)
                 if not temp_url:
                     self.root.after(0, lambda: messagebox.showerror("Error", "No se pudo generar una URL pública para el vídeo."))
                     return
                 
-                # 2. Upload to Instagram
-                res = publisher.upload_reel(temp_url, caption, config['access_token'], config['ig_user_id'], location_id=location_id)
+                success_count = 0
                 
-                if res and "id" in res:
-                    self.root.after(0, lambda: self.status.update(f"   ✅ Publicado en Instagram: {res['id']}"))
+                for label, cap_text, yt_title in variants:
+                    self.root.after(0, lambda: self.status.update(f"   📡 Publicando VARIANTE {label}..."))
+                    print(f"   --- PROCESSING VARIANT {label} ---")
                     
-                    # --- FACEBOOK REELS UPLOAD ---
+                    # 2. Upload to Instagram (Always ONLY Variant A to avoid spamming the same account)
+                    # Unless user explicitly wants duplicate reels on IG, which is usually bad practice.
+                    # We stick to A only for IG.
+                    if label == "A":
+                        res = publisher.upload_reel(temp_url, cap_text, config['access_token'], config['ig_user_id'], location_id=location_id)
+                        
+                        if res and "id" in res:
+                            self.root.after(0, lambda: self.status.update(f"   ✅ IG ({label}): {res['id']}"))
+                        else:
+                            # If IG fails, we might still want to try FB/YT but let's warn
+                            self.root.after(0, lambda: messagebox.showerror("Error", f"Fallo en la publicación de Instagram: {res}"))
+                            # We continue to FB/YT though?
+                    
+                    # --- FACEBOOK REELS UPLOAD (A and B) ---
                     try:
-                        fb_page_id = publisher.get_facebook_page_id(config['access_token'])
+                        # FIX: Prioritize ID from config, fallback to dynamic fetch
+                        fb_page_id = config.get('fb_page_id')
+                        if not fb_page_id:
+                            print("[WARN] No fb_page_id in config, fetching first available...")
+                            fb_page_id = publisher.get_facebook_page_id(config['access_token'])
+                        
                         if fb_page_id:
-                            self.status.update(f"   🚀 Subiendo a Facebook Reels (Página {fb_page_id})...")
-                            fb_res = publisher.upload_facebook_reel(temp_url, caption, config['access_token'], fb_page_id)
+                            self.root.after(0, lambda: self.status.update(f"   🚀 FB ({label}): Subiendo..."))
+                            if label == "B": time.sleep(5) # Small delay for B
+                            
+                            fb_res = publisher.upload_facebook_reel(temp_url, cap_text, config['access_token'], fb_page_id)
+                            
                             if fb_res and "id" in fb_res:
-                                self.root.after(0, lambda: self.status.update(f"   ✅ Publicado en Facebook Reels: {fb_res['id']}"))
+                                self.root.after(0, lambda: self.status.update(f"   ✅ FB ({label}): {fb_res['id']}"))
+                                success_count += 1
                             else:
-                                self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló Facebook Reels: {fb_res}"))
+                                err_msg = fb_res.get('error', {}).get('message', str(fb_res))
+                                self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló FB ({label}): {err_msg}"))
                         else:
                              self.root.after(0, lambda: self.status.update(f"   ⚠️ No se encontró ID de Página de Facebook."))
                     except Exception as e:
                         self.root.after(0, lambda: self.status.update(f"   ⚠️ Error Facebook: {e}"))
                     # -----------------------------
 
-                    # --- YOUTUBE UPLOAD (Simultaneous) ---
+                    # --- YOUTUBE UPLOAD (A and B) ---
                     try:
-                        self.status.update(f"   🚀 Subiendo a YouTube Shorts...")
-                        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
-                        yt_id = upload_short(video_path, title=shorts_title, description=caption)
+                        self.root.after(0, lambda: self.status.update(f"   🚀 YT ({label}): Subiendo..."))
+                        if label == "B": time.sleep(2)
+                        
+                        yt_id = upload_short(video_path, title=yt_title, description=cap_text)
                         if yt_id:
-                            self.root.after(0, lambda: self.status.update(f"   ✅ Publicado en YouTube Shorts: {yt_id}"))
+                            self.root.after(0, lambda: self.status.update(f"   ✅ YT ({label}): {yt_id}"))
+                            success_count += 1
                     except Exception as e:
-                        self.status.update(f"   ⚠️ Falló YouTube: {e}")
+                        self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló YouTube: {e}"))
                     # -------------------------------------
                     
-                    self.root.after(0, lambda: messagebox.showinfo("Éxito", "¡Vídeo publicado con éxito en las plataformas configuradas!"))
-                    self.root.after(0, self.keep) # Move to next and save locally
-                else:
-                    self.root.after(0, lambda: messagebox.showerror("Error", f"Fallo en la publicación de Instagram: {res}"))
+                    # Wait between variants
+                    if len(variants) > 1 and label == "A":
+                        time.sleep(3)
+                    
+                self.root.after(0, lambda: messagebox.showinfo("Éxito", f"Publicación finalizada. Éxitos en plataformas: {success_count}"))
+                self.root.after(0, self.keep) # Move to next and save locally
+                
             except Exception as e:
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Error inesperado: {str(e)}"))
             finally:
@@ -476,6 +568,9 @@ class PostAiCurationManager:
         # 1. Feedback UI
         self.status.update(f"⏳ Regenerando IA en segundo plano para: {item.get('headline', '...')}")
         
+        # Mark as regenerating
+        item['is_regenerating'] = True
+        
         # 2. Move item to END of the list for later review
         self.items.pop(self.current_idx)
         self.items.append(item)
@@ -494,6 +589,7 @@ class PostAiCurationManager:
                 self.root.after(0, lambda: self._update_item_in_list(item, new_item))
             except Exception as e:
                 self.root.after(0, lambda: self.status.update(f"❌ Error regenerando (Background): {e}"))
+                item['is_regenerating'] = False # Reset flag on error
         
         threading.Thread(target=regen_task, daemon=True).start()
 
@@ -501,10 +597,17 @@ class PostAiCurationManager:
         """Update the item in the list once background processing is done."""
         try:
             # We must find the object reference because it might have moved
+            # The 'old_item' is the same object as in list (reference)
             idx = self.items.index(old_item)
+            
+            # Update attributes of the existing object ref DO NOT REPLACE
+            # If we replace, we lose position if we don't know idx sure.
+            # Actually, safe to replace at idx.
+            new_item['is_regenerating'] = False
             self.items[idx] = new_item
+            
             head = new_item.get('headline', '...')
-            self.status.update(f"✨ Regeneración completada: '{head}'. Movid@ al final de la cola.")
+            self.status.update(f"✨ Regeneración completada: '{head}'.")
         except ValueError:
             pass # Item might have been discarded in the meantime
     
@@ -575,19 +678,41 @@ class PostAiCurationManager:
             self.player.set_volume(0.0 if self.is_muted else 1.0)
         self.btn_mute.config(text="🔇" if self.is_muted else "🔊")
 
+    def add_single_to_batch(self):
+        """Add current item to batch: schedules ONLY ONE BRANDED post (Instagram, Facebook, YouTube)."""
+        item = self.items[self.current_idx]
+        caption = self.caption_text.get('1.0', tk.END).strip()
+        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
+        
+        self.scheduled_posts.append({
+            'reel_path': item['reel_path'],
+            'caption': caption,
+            'shorts_title': shorts_title,
+            'folder': item['folder'],
+            'variant': 'Branded',
+            'platforms': ['instagram_reel', 'instagram_story', 'facebook_reel', 'youtube_shorts'],
+            'location_id': self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None,
+            'tweet_data': item.get('tweet_data')
+        })
+        self.status.update(f"   📅 Post programado: '{os.path.basename(item['folder'])}' ({len(self.scheduled_posts)} total).")
+        self.keep()
+
     def add_to_batch(self):
         """Add current item to A/B testing batch: schedules TWO posts (branded A + raw B)."""
         item = self.items[self.current_idx]
         caption_a = self.caption_text.get('1.0', tk.END).strip()
+        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
         caption_b = item.get('caption_b', caption_a)  # Use AI-generated B or fallback to A
         
         # A/B Testing: Schedule branded version with caption A
         self.scheduled_posts.append({
             'reel_path': item['reel_path'],
             'caption': caption_a,
+            'shorts_title': shorts_title,
             'folder': item['folder'],
             'variant': 'A (Branded)',
             'platforms': ['instagram_reel', 'instagram_story', 'facebook_reel', 'youtube_shorts'],
+            'tweet_data': item.get('tweet_data'),
             'location_id': self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None
         })
         
@@ -620,8 +745,7 @@ class PostAiCurationManager:
             msg = "imagen detectada, usando vídeo renderizado para B" if is_image else "sin vídeo original"
             self.status.update(f"   📅 A/B Test añadido ({msg}): 2 posts programados.")
         
-        self.approved_folders.append(item['folder'])
-        self.next_item()
+        self.keep()
 
     def publish_raw(self):
         """Publish the original/raw video without Economika branding."""
@@ -781,20 +905,16 @@ class PreAiCurationManager:
         self.content_text = tk.Text(self.tweet_frame, height=10, width=40, bg="#252525", fg="#bbb", font=("Segoe UI", 10), borderwidth=0, padx=10, pady=10)
         self.content_text.pack(fill="both", expand=True)
 
-        self.ai_frame = tk.LabelFrame(self.details_frame, text="PROPUESTA IA", bg="#1a1a1a", fg="#E31E24", font=("Segoe UI Bold", 9))
+        # Merged Instructions Frame
+        self.ai_frame = tk.LabelFrame(self.details_frame, text="INSTRUCCIONES PARA LA IA", bg="#1a1a1a", fg="#E31E24", font=("Segoe UI Bold", 9))
         self.ai_frame.pack(side="right", fill="both", expand=True)
 
-        tk.Label(self.ai_frame, text="Headline:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(5,0))
-        self.headline_entry = tk.Entry(self.ai_frame, bg="#252525", fg="white", font=("Segoe UI Black", 11), borderwidth=0)
-        self.headline_entry.pack(fill="x", padx=10, pady=5)
+        self.headline_entry = tk.Entry(self.root) # Hidden storage
+        self.shorts_entry = tk.Entry(self.root)   # Hidden storage
 
-        tk.Label(self.ai_frame, text="Shorts Title:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(5,0))
-        self.shorts_entry = tk.Entry(self.ai_frame, bg="#252525", fg="white", font=("Segoe UI", 10), borderwidth=0)
-        self.shorts_entry.pack(fill="x", padx=10, pady=5)
-
-        tk.Label(self.ai_frame, text="Caption:", font=("Segoe UI Bold", 9), fg="#888", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(5,0))
-        self.caption_text = tk.Text(self.ai_frame, height=8, bg="#252525", fg="white", font=("Segoe UI", 10), borderwidth=0, padx=5, pady=5)
-        self.caption_text.pack(fill="both", expand=True, padx=10, pady=5)
+        tk.Label(self.ai_frame, text="Instrucciones de Redacción / Contexto:", font=("Segoe UI Bold", 10), fg="#f1c40f", bg="#1a1a1a").pack(anchor="w", padx=10, pady=(10,0))
+        self.caption_text = tk.Text(self.ai_frame, height=18, bg="#252525", fg="white", font=("Segoe UI", 11), borderwidth=0, padx=10, pady=10)
+        self.caption_text.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Source Section
         self.source_subframe = tk.Frame(self.ai_frame, bg="#1a1a1a")
@@ -804,12 +924,12 @@ class PreAiCurationManager:
         self.source_entry.pack(side="left", padx=10)
         self.source_entry.bind("<KeyRelease>", lambda e: self.source_entry.config(fg="#27ae60" if self.source_entry.get().strip() else "#888"))
 
-        # Feedback Section
-        self.feedback_frame = tk.Frame(self.right_frame, bg="#1a1a1a")
-        self.feedback_frame.pack(fill="x", pady=(10, 0))
-        tk.Label(self.feedback_frame, text="Petición Extra IA:", font=("Segoe UI Bold", 9), fg="#f1c40f", bg="#1a1a1a").pack(side="left")
-        self.feedback_text = tk.Entry(self.feedback_frame, bg="#333", fg="white", font=("Segoe UI Italic", 10), borderwidth=0)
-        self.feedback_text.pack(side="left", fill="x", expand=True, padx=10)
+        # Hidden Location Entry (used for AI suggestion storage)
+        self.loc_entry = tk.Entry(self.root) # Hidden, just for storage to avoid AttributeError
+
+
+        # Merged with caption_text above
+        self.feedback_text = tk.Entry(self.root) # Hidden storage
         
         self.btn_frame = tk.Frame(self.right_frame, bg="#1a1a1a")
         self.btn_frame.pack(fill="x", pady=20)
@@ -818,7 +938,7 @@ class PreAiCurationManager:
         
         tk.Button(self.btn_frame, text="🚫 RECHAZAR", bg="#555", fg="white", font=("Segoe UI Bold", 10), width=15, command=self.permanent_reject).pack(side="left", padx=10)
 
-        tk.Button(self.btn_frame, text="🔄 RE-GENERAR", bg="#f39c12", fg="#1a1a1a", font=("Segoe UI Bold", 10), width=15, command=self.run_ai_suggestion).pack(side="left")
+        # Removed RE-GENERAR button as IA is no longer used in Stage 1
 
         # Mute Button
         self.btn_mute = tk.Button(self.btn_frame, text="🔊", bg="#555", fg="white", font=("Segoe UI", 11), width=3, command=self.toggle_mute)
@@ -896,12 +1016,7 @@ class PreAiCurationManager:
         self.source_entry.delete(0, tk.END)
         self.source_entry.config(fg="#888") # Default gray
 
-        # If item already has AI content (e.g. from Cloud), show it
-        if tweet.get('headline'):
-            self.display_ai_content(tweet)
-        else:
-            # Trigger background AI generation
-            self.run_ai_suggestion()
+        # Stage 1 is now manual only - no AI generation per user request
         
         media_path = tweet.get('local_media_path')
         if media_path and os.path.exists(media_path):
@@ -914,7 +1029,8 @@ class PreAiCurationManager:
                          self.canvas.create_text(170, 250, text="ERROR OPENING VIDEO", fill="red")
 
                     if MediaPlayer:
-                        self.player = MediaPlayer(media_path)
+                        # Request RGB24 for easy conversion to PIL
+                        self.player = MediaPlayer(media_path, ff_opts={'pix_fmt': 'rgb24'})
                 else:
                     print(f"[DEBUG] Loading image...")
                     img = Image.open(media_path).convert("RGB")
@@ -934,32 +1050,42 @@ class PreAiCurationManager:
     def update_frame(self):
         if not self.root.winfo_exists() or self.current_idx >= len(self.raw_items): return
         
-        ret, frame = False, None
-        
-        if self.cap and self.cap.isOpened():
+        if self.player:
             # IMPORTANT: Delete old image objects to avoid memory/layer leak
             self.canvas.delete("video_frame")
             
-            if hasattr(self, 'player') and self.player:
-                audio_frame, val = self.player.get_frame()
-                if val == 'eof':
-                    self.player.seek(0, relative=False)
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    ret, frame = self.cap.read()
-                elif val != 'toggle' and audio_frame is not None:
-                    ret, frame = self.cap.read()
-                else:
-                    # If no audio frame yet, still read video to keep it moving
-                    ret, frame = self.cap.read()
-            else:
-                ret, frame = self.cap.read()
+            frame, val = self.player.get_frame()
+            if val == 'eof':
+                self.player.seek(0, relative=False)
+            elif val == 'toggle':
+                pass
+            elif frame is not None:
+                img, pts = frame
+                # img is an ffpyplayer.pic.Image
+                w, h = img.get_size()
+                img_data = img.to_bytearray()[0]
+                
+                # Create PIL image from raw RGB bytes
+                pil_img = Image.frombytes("RGB", (w, h), img_data)
+                
+                # Resize and center using existing helper
+                background = self.resize_contain(pil_img, 340, 500)
+                
+                self.tk_img = ImageTk.PhotoImage(background)
+                self.canvas.create_image(170, 250, anchor="center", image=self.tk_img, tags="video_frame")
+            
+            # Continue reading frames quickly (approx 60fps target for smooth UI)
+            self.root.after(15, self.update_frame)
+            return
 
+        # Fallback to OpenCV if player is not available (e.g. static image or no ffpyplayer)
+        if self.cap and self.cap.isOpened():
+            self.canvas.delete("video_frame")
+            
+            ret, frame = self.cap.read()
             if not ret:
-                # print("[DEBUG] Failed to read frame (EOF or Error), looping...") # Too noisy
-                # Handle end of video if val=='eof' missed it
+                # Handle end of video / looping
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                if hasattr(self, 'player') and self.player:
-                    self.player.seek(0, relative=False)
                 ret, frame = self.cap.read()
                 
             if ret and frame is not None:
@@ -978,7 +1104,7 @@ class PreAiCurationManager:
                 
                 self.tk_img = ImageTk.PhotoImage(background)
                 self.canvas.create_image(170, 250, anchor="center", image=self.tk_img, tags="video_frame")
-        
+
         self.root.after(30, self.update_frame)
 
     def on_close(self):
@@ -996,8 +1122,15 @@ class PreAiCurationManager:
 
     def discard(self):
         """Skip this item and mark it as rejected so it doesn't appear again."""
-        self.status.update(f"   🗑️ Descartando y marcando como rechazado...")
-        self.permanent_reject()
+        try:
+            self.status.update(f"   🗑️ Descartando y marcando como rechazado...")
+            self.permanent_reject()
+        except Exception as e:
+            print(f"[DISCARD ERROR] {e}")
+            import traceback
+            traceback.print_exc()
+            self.current_idx += 1
+            self.load_tweet()
 
     def permanent_reject(self):
         # Mark as rejected and skip
@@ -1009,21 +1142,17 @@ class PreAiCurationManager:
             print(f"[REJECT] Permamently rejected tweet {tweet_id}")
             
             # Cloud sync if applicable
-            if isinstance(item, dict) and item.get('url'):
-                try:
-                    threading.Thread(target=lambda url=CLOUD_SERVER_URL, tid=tweet_id: requests.post(f"{url}/pending/{tid}/mark-rejected"), daemon=True).start()
-                except: pass
+            # if isinstance(item, dict) and item.get('url'):
+            #     try:
+            #         threading.Thread(target=lambda url=CLOUD_SERVER_URL, tid=tweet_id: requests.post(f"{url}/pending/{tid}/mark-rejected"), daemon=True).start()
+            #     except: pass
 
         self.current_idx += 1
         self.load_tweet()
 
     def display_ai_content(self, data):
         """Populate the AI suggestion fields."""
-        self.headline_entry.delete(0, tk.END)
-        self.headline_entry.insert(0, data.get('headline', ''))
-        
-        self.shorts_entry.delete(0, tk.END)
-        self.shorts_entry.insert(0, data.get('shorts_title', ''))
+        # Note: self.headline_entry and self.shorts_entry are now hidden
         
         self.caption_text.delete('1.0', tk.END)
         self.caption_text.insert(tk.END, data.get('caption', ''))
@@ -1049,16 +1178,16 @@ class PreAiCurationManager:
         item = self.raw_items[self.current_idx]
         feedback = self.feedback_text.get().strip()
         
-        self.headline_entry.delete(0, tk.END)
-        self.headline_entry.insert(0, "⌛ Generando propuesta...")
+        # No overwriting entries immediately to avoid UI jitter. 
+        # The status bar and presence of content in 'ORIGINAL' frame should suffice.
         
         def ai_task():
             try:
                 # Use media path if available for multi-modal if supported, but here it's text-based mostly
                 media_path = item.get('local_media_path')
-                # Use generate_content_ai which handles the Gemini call
+                # Use generate_content_ai which handles the Gemini call (CHEAP mode for preview)
                 from core.ai_handler import generate_content_ai
-                h, c, s, st, cb, src, loc = generate_content_ai(item, media_path, feedback)
+                h, c, s, st, cb, src, loc = generate_content_ai(item, media_path, feedback, quality="cheap")
                 
                 result = {
                     'headline': h,
@@ -1071,25 +1200,30 @@ class PreAiCurationManager:
                 }
                 
                 def update_ui():
-                    # Only update if we're still on the same item
-                    if self.current_idx < len(self.raw_items) and self.raw_items[self.current_idx] == item:
-                        item.update(result)
-                        self.display_ai_content(result)
+                    try:
+                        # Only update if we're still on the same item and root exists
+                        if self.root.winfo_exists() and self.current_idx < len(self.raw_items) and self.raw_items[self.current_idx] == item:
+                            item.update(result)
+                            self.display_ai_content(result)
+                    except: pass
                 
-                self.root.after(0, update_ui)
+                if self.root.winfo_exists():
+                    self.root.after(0, update_ui)
             except Exception as e:
-                self.root.after(0, lambda: self.headline_entry.delete(0, tk.END))
-                self.root.after(0, lambda: self.headline_entry.insert(0, f"❌ Error: {str(e)[:30]}"))
+                import traceback
+                print(f"[AI TASK ERROR] {e}")
+                traceback.print_exc()
+                if self.root.winfo_exists():
+                    self.root.after(0, lambda: self.headline_entry.delete(0, tk.END))
+                    self.root.after(0, lambda: self.headline_entry.insert(0, f"❌ Error IA: {str(e)[:30]}"))
 
         threading.Thread(target=ai_task, daemon=True).start()
 
     def keep(self):
         item = self.raw_items[self.current_idx]
         
-        # Capture edited values
-        item['headline'] = self.headline_entry.get().strip()
-        item['shorts_title'] = self.shorts_entry.get().strip()
-        item['caption'] = self.caption_text.get('1.0', tk.END).strip()
+        # Capture unified instructions
+        item['user_instructions'] = self.caption_text.get('1.0', tk.END).strip()
         item['source'] = self.source_entry.get().strip()
         
         item['skip_subtitles'] = self.skip_subtitles_var.get()
@@ -1102,117 +1236,26 @@ class PreAiCurationManager:
             ViralScout().mark_as_processed(tweet_id)
             
             # Cloud sync if applicable
-            if isinstance(item, dict) and item.get('url'):
-                try:
-                    threading.Thread(target=lambda url=CLOUD_SERVER_URL, tid=tweet_id: requests.post(f"{url}/pending/{tid}/mark-processed"), daemon=True).start()
-                except: pass
+            # if isinstance(item, dict) and item.get('url'):
+            #     try:
+            #         threading.Thread(target=lambda url=CLOUD_SERVER_URL, tid=tweet_id: requests.post(f"{url}/pending/{tid}/mark-processed"), daemon=True).start()
+            #     except: pass
+            
+            
+        # We DON'T set headline/caption here because render_item_assets checks for them to skip.
+        # Let's clear them so render_item_assets DOES regenerate with pro (Kimi).
+        item['headline'] = None
+        item['caption'] = None
             
         self.kept_items.append(item)
         self.current_idx += 1
         self.load_tweet()
 
 
-def generate_mobile_html(output_path, headline, shorts_title, caption):
-    """Creates a mobile-friendly HTML with reliable copy functionality."""
-    html_content = f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Copy Tool - Economika</title>
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #121212; color: #fff; padding: 15px; }}
-        .header {{ text-align: center; border-bottom: 2px solid #E31E24; padding-bottom: 10px; margin-bottom: 20px; }}
-        h1 {{ color: #E31E24; margin: 0; font-size: 22px; }}
-        .card {{ background: #1e1e1e; padding: 15px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #333; }}
-        .label {{ font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold; }}
-        
-        /* Textarea for reliable copying */
-        textarea.copy-source {{
-            width: 100%;
-            background: #252525;
-            color: #ddd;
-            border: 1px solid #444;
-            border-radius: 6px;
-            padding: 10px;
-            font-size: 14px;
-            resize: none;
-            height: 120px;
-            box-sizing: border-box;
-            font-family: inherit;
-        }}
-        textarea.short {{ height: 60px; }}
 
-        .btn {{ 
-            display: block; width: 100%; background: #E31E24; color: white; border: none; 
-            padding: 14px; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer;
-            font-size: 16px; user-select: none; -webkit-user-select: none;
-        }}
-        .btn:active {{ transform: scale(0.98); background: #c01a20; }}
-        .success {{ background: #27ae60 !important; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>ECONÓMIKA TOOLS</h1>
-    </div>
+# REMOVED: generate_mobile_html is no longer needed.
 
-    <div class="card">
-        <div class="label">YouTube Shorts Title</div>
-        <textarea id="shorts" class="copy-source short" readonly onclick="this.select()">{shorts_title}</textarea>
-        <button class="btn" onclick="copyToClipboard('shorts', this)">COPIAR TÍTULO</button>
-    </div>
 
-    <div class="card">
-        <div class="label">Instagram Caption</div>
-        <textarea id="caption" class="copy-source" readonly onclick="this.select()">{caption}</textarea>
-        <button class="btn" onclick="copyToClipboard('caption', this)">COPIAR CAPTION</button>
-    </div>
-
-    <script>
-        function copyToClipboard(elementId, btn) {{
-            const textarea = document.getElementById(elementId);
-            
-            // Method 1: Select and ExecCommand (Better for mobile webviews)
-            textarea.select();
-            textarea.setSelectionRange(0, 99999); // For mobile devices
-            
-            try {{
-                const successful = document.execCommand('copy');
-                if(successful) {{
-                    showSuccess(btn);
-                }} else {{
-                    // Method 2: Navigator Clipboard API
-                    navigator.clipboard.writeText(textarea.value).then(() => {{
-                        showSuccess(btn);
-                    }}).catch(err => {{
-                        btn.innerText = "COPIA MANUALMENTE (Selecciona el texto arriba)";
-                        btn.style.background = "#555";
-                    }});
-                }}
-            }} catch (err) {{
-                btn.innerText = "ERROR - Usa copiado manual";
-            }}
-        }}
-
-        function showSuccess(btn) {{
-            const originalText = "COPIAR";
-            btn.innerText = "¡COPIADO!";
-            btn.classList.add('success');
-            setTimeout(() => {{
-                if (btn.innerText === "¡COPIADO!") {{
-                    btn.classList.remove('success');
-                    // Restaurar texto original basado en el contexto si fuera dinámico, pero aquí es simple button
-                    // Simplemente quitamos la clase, el texto puede quedarse o volver
-                    btn.style.background = "#E31E24";
-                }}
-            }}, 2000);
-        }}
-    </script>
-</body>
-</html>"""
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(html_content)
 
 # --- CORE LOGIC ---
 
@@ -1250,13 +1293,13 @@ def batch_process(urls: list, status: StatusManager):
                 data = scrape_tweet(url)
             
             if data: 
-                data['url'] = url
+                data['url'] = url # Keep 'url' as the tweet URL for compatibility
                 # PRE-DOWNLOAD for filter preview
                 status.update(f"   📥 Descargando media para preview...")
                 # Use media_url if available, otherwise use thumbnail
-                download_url = data.get('media_url') or data.get('url')
+                media_url = data.get('media_url')
                 is_vid = data.get('is_video', True)
-                success, media_path = download_media(url, thumbnail_url=data.get('thumbnail') or download_url, is_video=is_vid)
+                success, media_path = download_media(url, thumbnail_url=data.get('thumbnail') or media_url, is_video=is_vid, direct_url=media_url)
                 if success:
                     data['local_media_path'] = media_path
                     scraped_data.append(data)
@@ -1430,6 +1473,25 @@ def run_gui():
     
     btn_clear = create_modern_button(btn_row, "🗑️", lambda: input_text.delete('1.0', tk.END), "#444")
     btn_clear.pack(side="left", padx=5)
+
+    # Force Process Checkbox
+    force_process_var = tk.BooleanVar(value=False)
+    chk_force = tk.Checkbutton(btn_row, text="⚡ Reprocesar", variable=force_process_var, 
+                               bg=COLORS['bg_card'], fg="#f39c12", selectcolor=COLORS['bg_card'],
+                               activebackground=COLORS['bg_card'], activeforeground="#f39c12", 
+                               font=("Segoe UI Bold", 9))
+    chk_force.pack(side="left", padx=10)
+
+    # Sensitivity Scale
+    tk.Label(btn_row, text="Sens:", font=("Segoe UI Bold", 9), 
+             fg=COLORS['text_muted'], bg=COLORS['bg_card']).pack(side="left", padx=(5, 0))
+    sensitivity_var = tk.DoubleVar(value=1.2)
+    scale_sens = tk.Scale(btn_row, from_=0.1, to=5.0, resolution=0.1, orient="horizontal",
+                          variable=sensitivity_var, bg=COLORS['bg_card'], fg=COLORS['text_muted'],
+                          highlightthickness=0, borderwidth=0, length=80, showvalue=True,
+                          troughcolor=COLORS['bg_input'], activebackground=COLORS['accent'],
+                          font=("Segoe UI", 8))
+    scale_sens.pack(side="left", padx=(0, 10))
     
     # Cloud server URL
     CLOUD_SERVER_URL = "https://economikanoticias.onrender.com"
@@ -1537,7 +1599,12 @@ def run_gui():
         def scout_task():
             try:
                 import requests
-                response = requests.post(f"{CLOUD_SERVER_URL}/scan", timeout=60)
+                # Send current sensitivity and default 24h (or make it configurable later if needed)
+                payload = {
+                    "min_ratio": sensitivity_var.get(),
+                    "hours_back": 24
+                }
+                response = requests.post(f"{CLOUD_SERVER_URL}/scan", json=payload, timeout=60)
                 if response.status_code == 200:
                     root.after(0, lambda: status_var.set("✅ Escaneo cloud completado. Pulsa 'Cloud' para cargar."))
                 else:
@@ -1651,8 +1718,8 @@ def run_gui():
         def scout_task():
             try:
                 scout = ViralScout()
-                status_manager.update(f"🚀 Iniciando Viral Scout ({hours}h)...")
-                hits = scout.scan(hours_back=hours, ignore_history=ignore_history, 
+                status_manager.update(f"🚀 Iniciando Viral Scout ({hours}h, Sens: {sensitivity_var.get()})...")
+                hits = scout.scan(hours_back=hours, min_ratio=sensitivity_var.get(), ignore_history=ignore_history, 
                                  must_have_media=must_have_media, progress_callback=status_manager.update)
                 
                 def handle_results():
@@ -1702,13 +1769,17 @@ def run_gui():
         
         final_items = []
         skipped_count = 0
+        force_process = force_process_var.get()
         
         for url in text_urls:
             from core.scraper import extract_tweet_id
             tweet_id = extract_tweet_id(url)
-            if tweet_id and scout.is_processed(tweet_id):
-                skipped_count += 1
-                continue
+            
+            # Skip check if force process is ON
+            if not force_process:
+                if tweet_id and scout.is_processed(tweet_id):
+                    skipped_count += 1
+                    continue
             
             # Map rich data if available
             if viral_scout_cache:
@@ -1718,7 +1789,7 @@ def run_gui():
                 final_items.append(url)
         
         if not final_items and skipped_count > 0:
-            messagebox.showinfo("Procesado", f"Se omitieron {skipped_count} tweets porque ya han sido procesados anteriormente.")
+            messagebox.showinfo("Procesado", f"Se omitieron {skipped_count} tweets porque ya han sido procesados anteriormente.\nUsa '⚡ Reprocesar' para forzar.")
             return
             
         if not final_items:

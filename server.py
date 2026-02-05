@@ -208,160 +208,33 @@ def clear_all_pending():
     save_pending()
     return {"success": True, "cleared": count}
 
+class ScanRequest(BaseModel):
+    hours_back: int = 24
+    min_ratio: float = 2.0
+
 @app.post("/scan")
-def trigger_scan():
+def trigger_scan(request: ScanRequest = ScanRequest()):
     """Manually trigger a viral scout scan."""
-    print(f"[{datetime.now()}] 🔍 Manual scan triggered via API")
-    run_viral_scan()
+    print(f"[{datetime.now()}] 🔍 Manual scan triggered via API (Hours: {request.hours_back}, Ratio: {request.min_ratio})")
+    run_viral_scan(hours_back=request.hours_back, min_ratio=request.min_ratio)
     return {"success": True, "pending_count": len(pending_tweets)}
 
-# --- PUBLISHING QUEUE ---
+# ... (omitted sections)
 
-class ScheduledPost(BaseModel):
-    video_url: str
-    caption: str
-    target_time: str  # ISO format datetime
-    platforms: List[str] = ["instagram_reel", "instagram_story", "facebook_reel"]
-
-class ScheduleBatchRequest(BaseModel):
-    posts: List[ScheduledPost]
-
-@app.post("/schedule")
-def schedule_batch(request: ScheduleBatchRequest):
-    """Add a batch of posts to the publishing queue."""
-    global publishing_queue
-    
-    for post in request.posts:
-        publishing_queue.append({
-            "video_url": post.video_url,
-            "caption": post.caption,
-            "target_time": post.target_time,
-            "platforms": post.platforms,
-            "status": "pending",
-            "added_at": datetime.now().isoformat()
-        })
-    
-    save_queue()
-    return {"success": True, "queued": len(request.posts), "total_in_queue": len(publishing_queue)}
-
-@app.get("/queue")
-def get_queue():
-    """Get current publishing queue."""
-    return {"queue": publishing_queue, "count": len(publishing_queue)}
-
-@app.get("/debug/queue")
-def debug_queue():
-    """Debug endpoint to inspect queue and credentials."""
-    config = {
-        "has_access_token": bool(os.environ.get("IG_ACCESS_TOKEN")),
-        "has_ig_user_id": bool(os.environ.get("IG_USER_ID")),
-        "has_fb_page_id": bool(os.environ.get("FB_PAGE_ID")),
-        "queue_length": len(publishing_queue),
-        "pending_count": sum(1 for p in publishing_queue if p.get("status") == "pending"),
-        "current_time": datetime.now().isoformat()
-    }
-    return config
-
-@app.delete("/queue")
-def clear_queue():
-    """Clear the publishing queue."""
-    global publishing_queue
-    publishing_queue = []
-    save_queue()
-    return {"success": True}
-
-# --- SCHEDULED VIRAL SCOUT ---
-
-# AI Content Generation (Cloud-side)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
-def load_system_instruction():
-    """Load the editorial system instruction from an external file for easy editing."""
-    prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "editorial_system.txt")
-    if os.path.exists(prompt_path):
-        try:
-            with open(prompt_path, 'r', encoding='utf-8') as f:
-                return f.read().strip()
-        except Exception as e:
-            print(f"  ⚠️  Error reading prompt file: {e}")
-    
-    # Fallback if file missing
-    return "Eres el Redactor Jefe de Economika Noticias. Genera contenido viral para Reels."
-
-SYSTEM_INSTRUCTION = load_system_instruction()
-
-def generate_ai_content(tweet_text: str) -> dict:
-    """Generate headline, caption, shorts_title using Gemini API."""
-    if not GEMINI_API_KEY:
-        print("  ⚠️  GEMINI_API_KEY not set, skipping AI generation")
-        return {}
-    
-    # 2026 Standard: Gemini Flash Lite is the cheapest/best for this task
-    model_names = [
-        "gemini-flash-lite-latest",
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash-8b", # Legacy fallback
-    ]
-    
-    for model_name in model_names:
-        try:
-            from google import genai
-            from google.genai import types
-            
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            
-            prompt = f"{SYSTEM_INSTRUCTION}\n\nTUIT:\n\"{tweet_text}\""
-            
-            response = client.models.generate_content(
-                model=model_name,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                )
-            )
-            
-            text = response.text
-            # Parse JSON
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif "{" in text:
-                text = text[text.find("{"):text.rfind("}")+1]
-            
-            data = json.loads(text)
-            print(f"  ✅ AI content generated with {model_name}", flush=True)
-            return {
-                'headline': data.get('headline', ''),
-                'caption': data.get('caption', ''),
-                'caption_b': data.get('caption_b', data.get('caption', '')),  # A/B testing
-                'shorts_title': data.get('shorts_title', ''),
-                'slug': data.get('slug', ''),
-                'source': data.get('source', '')  # Source detection
-            }
-        except Exception as e:
-            if "404" in str(e):
-                print(f"  ℹ️  Model {model_name} is not available (404)", flush=True)
-            else:
-                print(f"  ⚠️  Model {model_name} failed: {str(e)[:80]}", flush=True)
-            continue
-    
-    print("  ❌ No Gemini 1.5 models available. Skipping AI generation as requested.", flush=True)
-    return {}
-
-def run_viral_scan():
+def run_viral_scan(hours_back: int = 24, min_ratio: float = 2.0):
     """Run the viral scout and add new tweets to pending (with AI content generation)."""
     global pending_tweets, last_scan
     
     now = datetime.now().isoformat()
-    print(f"[{now}] 🔍 [SCAN] Starting scheduled Viral Scout scan...", flush=True)
+    print(f"[{now}] 🔍 [SCAN] Starting scheduled Viral Scout scan (Hours: {hours_back}, Ratio: {min_ratio})...", flush=True)
     
     try:
         from core.viral_scout import ViralScout
         scout = ViralScout()
         
         hits = scout.scan(
-            hours_back=24,
-            min_ratio=2.0, # Increased to match high quality standard
+            hours_back=hours_back,
+            min_ratio=min_ratio, 
             ignore_history=False,
             must_have_media=True,
             progress_callback=lambda msg: print(f"  [SCOUT] {msg}", flush=True)
