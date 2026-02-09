@@ -9,3 +9,4 @@ twikit
 opencv-python-headless
 numpy
 ffpyplayer
+openai

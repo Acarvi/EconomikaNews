@@ -6,9 +6,9 @@ branded Economika overlays, and high-impact text.
 import os
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 try:
-    from moviepy import VideoFileClip, ImageClip, CompositeVideoClip, TextClip
+    from moviepy import VideoFileClip, ImageClip, CompositeVideoClip, TextClip, concatenate_videoclips
 except ImportError:
-    from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip, TextClip
+    from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip, TextClip, concatenate_videoclips
 from .subtitler import get_subtitles
 import numpy as np
 
@@ -150,12 +150,36 @@ def draw_branding(draw: ImageDraw.Draw):
     hw = bh[2] - bh[0]
     draw.text(((REEL_WIDTH - hw)//2, box_y + box_h + 15), handle_text, font=font_handle, fill=(200, 200, 200, 180))
 
-def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, handle: str = ""):
+    # SOURCE ATTRIBUTION (New)
+    # Passed via global or argument? We need to pass it to draw_branding or handle it in add_premium_overlay
+    # Since draw_branding is a helper, we'll strip this if we move it to add_premium_overlay
+    # But for now, let's leave handle here and add source in add_premium_overlay
+
+
+def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, handle: str = "", source: str = ""):
     """Add branding and the new 'Characteristic' Headline Card."""
     draw = ImageDraw.Draw(image, 'RGBA')
     
     # 1. Draw TOP Branding
     draw_branding(draw)
+
+    # 1.5 Draw Source (if available) - Below Handle or somewhere visible
+    if source:
+        # We'll put it at the very bottom of the screen or just below branding
+        # Below branding seems crowded by handle. Let's put it top-left or top-right?
+        # Or better: Bottom Center, small, semi-transparent.
+        font_source = get_font("arial.ttf", 30)
+        source_text = f"Fuente: {source}"
+        sh = draw.textbbox((0, 0), source_text, font=font_source)
+        sw = sh[2] - sh[0]
+        
+    # 1.5 Draw Source (if available) - Moved to TOP LEFT for visibility
+    if source:
+        font_source = get_font("arial.ttf", 26) # Slightly smaller
+        source_text = f"Fuente: {source}"
+        # Position: Top Left, below the red branding bar (Bar ends ~140px?)
+        # Let's say x=40, y=160
+        draw.text((40, 160), source_text, font=font_source, fill=(200, 200, 200, 180))
     
     # 2. Draw 'Characteristic' Headline Card
     base_font_size = 34
@@ -171,7 +195,7 @@ def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, 
         if f.getname() == "Arial":
              f = get_font("calibrib.ttf", font_size)
              
-        words = text.split()
+        words = str(text).split()
         lines = []
         curr = []
         for word in words:
@@ -237,7 +261,7 @@ def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, 
     
     return card_y
 
-def generate_reel_from_image(image_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4") -> str:
+def generate_reel_from_image(image_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", source: str = "") -> str:
     """Generate a vertical Reel. Handles missing images gracefully with a branded background."""
     
     if image_path and os.path.exists(image_path):
@@ -259,10 +283,10 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
         media_bottom = 400 # Theoretical bottom of empty media space
     
     # Static overlays
-    card_y = add_premium_overlay(composite, headline, media_bottom, handle)
+    card_y = add_premium_overlay(composite, headline, media_bottom, handle, source=source)
     
     frame = np.array(composite)
-    clip = ImageClip(frame).with_duration(REEL_DURATION)
+    clip = ImageClip(frame).set_duration(REEL_DURATION)
     
     # --- BACKGROUND MUSIC FOR IMAGES ---
     music_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "music")
@@ -282,10 +306,10 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
                 
                 audio_clip = AudioFileClip(music_path)
                 # Loop audio to match duration
-                audio_clip = audio_clip.with_duration(REEL_DURATION).with_effects([afx.AudioLoop(duration=REEL_DURATION)])
+                audio_clip = audio_clip.set_duration(REEL_DURATION).fx(afx.audio_loop, duration=REEL_DURATION)
                 # Moderate volume
-                audio_clip = audio_clip.with_volume_scaled(0.4) 
-                clip = clip.with_audio(audio_clip)
+                audio_clip = audio_clip.volumex(0.4) 
+                clip = clip.set_audio(audio_clip)
             except Exception as e:
                 print(f"[GENERATOR] Failed to add audio: {e}")
 
@@ -293,7 +317,7 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
     print(f"[GENERATOR] Encoding image-reel to {output_name}...")
     
     clip.write_videofile(output_path, fps=30, codec='libx264', audio_codec='aac', 
-                        pixel_format='yuv420p', audio=True if audio_clip else False, logger=None)
+                        ffmpeg_params=['-pix_fmt', 'yuv420p'], audio=True if audio_clip else False, logger=None)
     
     if audio_clip: audio_clip.close()
     clip.close()
@@ -302,7 +326,18 @@ def generate_reel_from_image(image_path: str, headline: str, handle: str = "", o
     del frame
     return output_path
 
-def process_video_for_reel(video_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", skip_subtitles: bool = False) -> str:
+def time_str_to_seconds(time_str: str) -> float:
+    """Converts MM:SS or integer string to seconds. Returns 0 if invalid."""
+    try:
+        if not time_str or time_str == "0" or time_str == "00:00": return 0.0
+        parts = time_str.split(':')
+        if len(parts) == 2:
+            return float(parts[0]) * 60 + float(parts[1])
+        return float(time_str)
+    except:
+        return 0.0
+
+def process_video_for_reel(video_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", skip_subtitles: bool = False, source: str = "", start_time_str: str = "00:00", end_time_str: str = "END", cover_path: str = None) -> str:
     """Process video with PRO-TIGHT zone management and duration capping."""
     print(f"[GENERATOR] Starting video processing: {os.path.basename(video_path)}")
     
@@ -311,13 +346,45 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
     
     clip = VideoFileClip(conformed_path)
     
-    # CAP DURATION to 60 seconds max to avoid infinite rendering hangs
-    if clip.duration > 60:
-        print(f"[GENERATOR] Video exceeds 60s ({clip.duration:.1f}s), capping...")
-        clip = clip.subclipped(0, 60)
+    # SMART TRIMMING LOGIC
+    clip = VideoFileClip(conformed_path)
+    total_duration = clip.duration
+    
+    start_sec = time_str_to_seconds(start_time_str)
+    
+    if end_time_str and end_time_str != "END":
+        end_sec = time_str_to_seconds(end_time_str)
+        if end_sec > 0 and end_sec < total_duration and end_sec > start_sec:
+            print(f"[GENERATOR] Smart Trimming: {start_sec}s to {end_sec}s")
+            clip = clip.subclip(start_sec, end_sec)
+        else:
+             # Fallback if AI gave bad End time
+             if start_sec > 0: clip = clip.subclip(start_sec)
+    elif start_sec > 0:
+        print(f"[GENERATOR] Smart Trimming Start: {start_sec}s")
+        clip = clip.subclip(start_sec)
+
+    # CAP DURATION to 90 seconds (Shorts/Reels max is usually 60-90)
+    MAX_DURATION = 90
+    if clip.duration > MAX_DURATION:
+        print(f"[GENERATOR] Video exceeds {MAX_DURATION}s ({clip.duration:.1f}s), capping...")
+        clip = clip.subclip(0, MAX_DURATION)
     
     duration = clip.duration
     print(f"[GENERATOR] Duration: {duration:.1f}s | Resolution: {clip.w}x{clip.h}")
+    
+    # PREPEND COVER?
+    prepend_clip = None
+    if cover_path and os.path.exists(cover_path):
+        print(f"[GENERATOR] Prepending Cover Image ({cover_path})...")
+        try:
+            # Create a 0.1-second clip of the cover (Imperceptible but selectable as thumbnail)
+            # We must adhere to the same dimensions as the REEL (1080x1920)
+            # The cover generator presumably makes 1080x1920
+            cover_img = Image.open(cover_path).convert('RGB').resize((REEL_WIDTH, REEL_HEIGHT))
+            prepend_clip = ImageClip(np.array(cover_img)).set_duration(0.1) # 0.1 second frame
+        except Exception as e:
+            print(f"[GENERATOR] Failed to load cover: {e}")
     
     try:
         # Background
@@ -328,7 +395,7 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         
         # Foreground Video Positioning
         scale = min(1080 / clip.w, 950 / clip.h)
-        resized_clip = clip.resized(scale)
+        resized_clip = clip.resize(scale)
         resized_h = resized_clip.h
         
         # Position Lowered
@@ -337,12 +404,12 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         # Common Overlay
         print("[GENERATOR] Creating branding overlay...")
         overlay_img = Image.new('RGBA', (REEL_WIDTH, REEL_HEIGHT), (0, 0, 0, 0))
-        card_y = add_premium_overlay(overlay_img, headline, fg_y + resized_h, handle)
+        card_y = add_premium_overlay(overlay_img, headline, fg_y + resized_h, handle, source=source)
         overlay_array = np.array(overlay_img)
-        overlay_clip = ImageClip(overlay_array).with_duration(duration)
+        overlay_clip = ImageClip(overlay_array).set_duration(duration)
         
         bg_array = np.array(background)
-        bg_clip = ImageClip(bg_array).with_duration(duration)
+        bg_clip = ImageClip(bg_array).set_duration(duration)
         
         # Subtitles Integration (only if not skipped)
         subtitle_clips = []
@@ -351,8 +418,10 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
             try:
                 segments = get_subtitles(conformed_path)
                 
-                # --- PREMIUM "TRUMP-STYLE" SUBTITLE DESIGN ---
-                current_font = get_font("ariblk.ttf", 48) # Bold sans-serif
+                # --- PREMIUM "ECONOMIKA" SUBTITLE DESIGN ---
+                # Reduced font size from 72 to 55 per user request
+                current_font = get_font("ariblk.ttf", 55) # Bold sans-serif
+                YELLOW = (255, 255, 0)
                 
                 for seg in segments:
                     text_content = seg['text'].strip().upper() 
@@ -362,10 +431,6 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
                     end = min(seg['end'], duration)
                     if start >= duration: continue
                     
-                    # Create Subtitle Box using PIL for perfect control
-                    box_margin = 100
-                    max_box_width = REEL_WIDTH - (box_margin * 2)
-                    
                     # Wrap text manually
                     words = text_content.split()
                     lines = []
@@ -373,78 +438,60 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
                     
                     # Temp image for measuring
                     temp_draw = ImageDraw.Draw(Image.new('RGBA', (1,1)))
+                    max_box_width = REEL_WIDTH * 0.8
                     
                     for word in words:
+                        # Fixed spacing for measuring
                         test_line = " ".join(curr_line + [word])
                         bbox = temp_draw.textbbox((0, 0), test_line, font=current_font)
-                        if (bbox[2] - bbox[0]) < (max_box_width - 60): # 30px padding
+                        if (bbox[2] - bbox[0]) < (max_box_width - 80): 
                             curr_line.append(word)
                         else:
                             if curr_line: lines.append(" ".join(curr_line))
                             curr_line = [word]
                     if curr_line: lines.append(" ".join(curr_line))
-                    
                     wrapped_text = "\n".join(lines)
                     
                     # Calculate final box size
-                    t_bbox = temp_draw.multiline_textbbox((0, 0), wrapped_text, font=current_font, spacing=10)
+                    t_bbox = temp_draw.multiline_textbbox((0, 0), wrapped_text, font=current_font, spacing=15)
                     tw = t_bbox[2] - t_bbox[0]
                     th = t_bbox[3] - t_bbox[1]
                     
-                    padding_x, padding_y = 40, 25
-                    box_w = min(max_box_width, tw + (padding_x * 2))
+                    # Reduced padding from 60/30 to 45/20 for neater look
+                    padding_x, padding_y = 45, 20
+                    box_w = tw + (padding_x * 2)
                     box_h = th + (padding_y * 2)
-                    
-                    # --- NEW STEALTH ENGAGEMENT STYLE ---
-                    # No box, just high-contrast text with outline and shadow
                     
                     # Create Alpha Image for the subtitle
                     sub_img = Image.new('RGBA', (REEL_WIDTH, REEL_HEIGHT), (0, 0, 0, 0))
                     sub_draw = ImageDraw.Draw(sub_img)
                     
-                    # Position: Lower-Middle (slightly below the center of the video)
+                    # Position: Lower-Middle
                     text_x = REEL_WIDTH // 2
-                    text_y = fg_y + (resized_h * 0.75)
+                    text_y = fg_y + (resized_h * 0.8) # 80% down the video area
                     
-                    # Draw Outline/Stroke for readability (thick black outline)
-                    stroke_width = 4
+                    # Draw Rounded Background (Capsule)
+                    bg_box = [
+                        text_x - (box_w // 2),
+                        text_y - (box_h // 2),
+                        text_x + (box_w // 2),
+                        text_y + (box_h // 2)
+                    ]
+                    sub_draw.rounded_rectangle(bg_box, radius=box_h//2, fill=(0, 0, 0, 180)) # Semi-transparent black
+                    
+                    # Draw Main Text (Yellow for impact)
                     sub_draw.multiline_text(
                         (text_x, text_y),
                         wrapped_text,
                         font=current_font,
-                        fill=BLACK,
+                        fill=YELLOW,
                         anchor="mm",
                         align="center",
-                        spacing=10,
-                        stroke_width=stroke_width,
-                        stroke_fill=BLACK
-                    )
-                    
-                    # Draw Subtle Shadow
-                    shadow_offset = 5
-                    sub_draw.multiline_text(
-                        (text_x + shadow_offset, text_y + shadow_offset),
-                        wrapped_text,
-                        font=current_font,
-                        fill=(0, 0, 0, 150),
-                        anchor="mm",
-                        align="center",
-                        spacing=10
-                    )
-                    
-                    # Draw Main Text (White)
-                    sub_draw.multiline_text(
-                        (text_x, text_y),
-                        wrapped_text,
-                        font=current_font,
-                        fill=WHITE,
-                        anchor="mm",
-                        align="center",
-                        spacing=10
+                        spacing=15
                     )
                     
                     sub_array = np.array(sub_img)
-                    sub_clip = ImageClip(sub_array).with_start(start).with_end(end)
+                    sub_clip = ImageClip(sub_array).set_start(start).set_end(end)
                     subtitle_clips.append(sub_clip)
                     
             except Exception as e:
@@ -456,34 +503,47 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         # added to the FINAL composite, not the center video segment
         center_video_segment = resized_clip
 
-        final = CompositeVideoClip([
+        final_body = CompositeVideoClip([
             bg_clip, 
-            center_video_segment.with_position(('center', fg_y)), 
+            center_video_segment.set_position(('center', fg_y)), 
             overlay_clip
-        ] + subtitle_clips, size=(REEL_WIDTH, REEL_HEIGHT)).with_duration(duration)
+        ] + subtitle_clips, size=(REEL_WIDTH, REEL_HEIGHT)).set_duration(duration)
         
+        # Concatenate if cover exists
+        if prepend_clip:
+            from moviepy import concatenate_videoclips
+            final = concatenate_videoclips([prepend_clip, final_body], method="compose")
+        else:
+            final = final_body
+            
         output_path = os.path.join(OUTPUT_DIR, output_name)
         print(f"[GENERATOR] Encoding video to {output_name}...")
         
         # PERFORMANCE OPTIONS
         # We set temp_audiofile and remove_temp to be explicit and avoid race conditions
         # We also use a more stable 'p1' or 'p2' preset for NVENC
+        import time, uuid
+        unique_id = str(uuid.uuid4())[:8]
+        temp_audio = os.path.join(OUTPUT_DIR, f"temp_audio_{unique_id}.m4a")
+
         common_params = {
             'fps': 30,
             'audio_codec': 'aac',
-            'pixel_format': 'yuv420p',
             'audio': True,
             'logger': None,
-            'threads': 4, # Reduced from 8 to avoid memory contention
+            'threads': 4,
+            'temp_audiofile': temp_audio,
+            'remove_temp': True
         }
 
         try:
             print("[GENERATOR] Attempting NVIDIA NVENC Acceleration...")
             final.write_videofile(output_path, codec='h264_nvenc', 
-                                 ffmpeg_params=['-preset', 'p2', '-tune', 'hq', '-rc', 'vbr', '-cq', '24'],
+                                 ffmpeg_params=['-preset', 'p2', '-tune', 'hq', '-rc', 'vbr', '-cq', '24', '-pix_fmt', 'yuv420p'],
                                  **common_params)
         except Exception as e:
             print(f"[GENERATOR] NVENC failed or not available ({e}). Falling back to CPU...")
+            time.sleep(1) # Small breather for OS to release files
             final.write_videofile(output_path, codec='libx264', 
                                  preset='faster', # Better than ultrafast for final quality
                                  **common_params)

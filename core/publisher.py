@@ -10,32 +10,39 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(BASE_DIR, "config", "config_api.json")
 
 def upload_to_temporary_host(file_path):
-    """Uploads a file to catbox.moe to get a PERMANENT (or long-term) public URL."""
+    """Uploads a file to catbox.moe to get a PERMANENT (or long-term) public URL. Retries 3 times."""
     print(f"[INFO] Uploading {os.path.basename(file_path)} to catbox.moe...")
-    try:
-        # Catbox API: https://catbox.moe/faq.php
-        # No login required for guest uploads
-        url = "https://catbox.moe/user/api.php"
-        with open(file_path, 'rb') as f:
-            files = {
-                'fileToUpload': f
-            }
-            data = {
-                'reqtype': 'fileupload'
-            }
-            response = requests.post(url, files=files, data=data, timeout=60)
-            
-            if response.status_code == 200:
-                direct_url = response.text.strip()
-                if direct_url.startswith("http"):
-                    print(f"[SUCCESS] Direct Catbox URL: {direct_url}")
-                    return direct_url
+    
+    url = "https://catbox.moe/user/api.php"
+    parsed_proxy = None # Add proxy support if needed later
+    
+    for attempt in range(1, 4):
+        try:
+            with open(file_path, 'rb') as f:
+                files = {'fileToUpload': f}
+                data = {'reqtype': 'fileupload'}
+                
+                # Use a longer timeout for video files
+                response = requests.post(url, files=files, data=data, timeout=300)
+                
+                if response.status_code == 200:
+                    direct_url = response.text.strip()
+                    if direct_url.startswith("http"):
+                        print(f"[SUCCESS] Direct Catbox URL: {direct_url}")
+                        return direct_url
+                    else:
+                        print(f"[WARN] Catbox response invalid (Attempt {attempt}): {direct_url}")
                 else:
-                    print(f"[ERROR] Catbox returned unexpected response: {direct_url}")
-            else:
-                print(f"[ERROR] Catbox upload failed with status {response.status_code}: {response.text}")
-    except Exception as e:
-        print(f"[ERROR] Catbox upload failed: {e}")
+                    print(f"[WARN] Catbox upload failed (Attempt {attempt}) with status {response.status_code}")
+                    
+        except Exception as e:
+            print(f"[WARN] Catbox upload error (Attempt {attempt}): {e}")
+        
+        if attempt < 3:
+            print(f"   ⏳ Retrying upload in 5 seconds...")
+            time.sleep(5)
+            
+    print(f"[ERROR] Catbox upload failed after 3 attempts.")
     return None
 
 def save_config(app_id=None, app_secret=None, access_token=None, ig_user_id=None, **kwargs):
@@ -192,8 +199,11 @@ def _upload_to_ig(video_url, caption, access_token, ig_user_id, media_type, sche
             print("[HINT]    Haz lo mismo para 'pages_show_list' y 'pages_read_engagement'.")
     return None
 
-def upload_facebook_reel(video_url, caption, user_access_token, page_id):
-    """Uploads a Reel to a Facebook Page using the Page Access Token."""
+def upload_facebook_reel(video_path_or_url, caption, user_access_token, page_id):
+    """
+    Uploads a Reel to a Facebook Page.
+    Supports both URL (legacy) and Local Path (Binary Upload - Preferred).
+    """
     print(f"[INFO] Initializing Facebook Reel upload for Page {page_id}...")
     
     # CRITICAL: We need a Page Access Token, not just a User Token
@@ -202,32 +212,85 @@ def upload_facebook_reel(video_url, caption, user_access_token, page_id):
         print("[ERROR] Could not obtain Page Access Token. Facebook upload aborted.")
         return {"error": "Page Access Token Missing"}
     
-    # Step 1: Initialize upload
-    url = f"https://graph.facebook.com/v22.0/{page_id}/video_reels"
-    payload = {
-        "upload_phase": "start",
-        "access_token": page_access_token
-    }
-    res = requests.post(url, data=payload).json()
+    is_local_file = os.path.exists(video_path_or_url)
     
-    if "video_id" in res:
-        video_id = res["video_id"]
-        # Step 2: Actually upload via URL (Facebook Page Video API is more robust for this)
-        fb_url = f"https://graph.facebook.com/v22.0/{page_id}/videos"
-        fb_payload = {
-            "file_url": video_url,
-            "description": caption,
+    if is_local_file:
+        # --- BINARY UPLOAD (More Robust) ---
+        # Use graph-video.facebook.com for uploads
+        url = f"https://graph-video.facebook.com/v22.0/{page_id}/videos"
+        
+        try:
+            file_size = os.path.getsize(video_path_or_url)
+            print(f"[DEBUG] FB Upload: Page ID={page_id}")
+            print(f"[DEBUG] FB Upload: File Path={video_path_or_url}")
+            print(f"[DEBUG] FB Upload: File Size={file_size/1024/1024:.2f} MB")
+            print(f"[DEBUG] FB Upload: Token Length={len(page_access_token) if page_access_token else 0}")
+            
+            print(f"[INFO] Uploading binary to Facebook (Size: {file_size/1024/1024:.2f} MB)...")
+            with open(video_path_or_url, 'rb') as f:
+                files = {
+                    'source': (os.path.basename(video_path_or_url), f, 'video/mp4')
+                }
+                payload = {
+                    'description': caption,
+                    'access_token': page_access_token,
+                    'published': 'true' 
+                }
+                # Increase timeout for large files
+                response = requests.post(url, data=payload, files=files, timeout=600)
+                
+                print(f"[DEBUG] FB API Status Code: {response.status_code}")
+                try:
+                    res = response.json()
+                    print(f"[DEBUG] FB API Response: {json.dumps(res)}")
+                except:
+                    print(f"[DEBUG] FB API Raw Response: {response.text}")
+                    res = {"error": "Invalid JSON response"}
+                
+                if "id" in res:
+                    print(f"[SUCCESS] Published to Facebook! ID: {res.get('id')}")
+                    return res
+                else:
+                    print(f"[ERROR] FB Binary Upload failed: {res}")
+                    return res
+        except Exception as e:
+            print(f"[ERROR] FB Binary Upload Exception: {e}")
+            return {"error": str(e)}
+            
+    else:
+        # --- URL UPLOAD (Legacy/Fallback) ---
+        print(f"[INFO] Uploading via URL to Facebook...")
+        # Step 1: Initialize upload (Reels API)
+        url = f"https://graph.facebook.com/v22.0/{page_id}/video_reels"
+        payload = {
+            "upload_phase": "start",
             "access_token": page_access_token
         }
-        final_res = requests.post(fb_url, data=fb_payload).json()
-        if "id" in final_res:
-            print(f"[SUCCESS] Published to Facebook! ID: {final_res.get('id')}")
-            return final_res
-        else:
-             print(f"[ERROR] FB Publish failed: {final_res}")
-    else:
-        print(f"[ERROR] FB Init failed: {res}")
-    return res
+        try:
+            res = requests.post(url, data=payload).json()
+            
+            if "video_id" in res:
+                video_id = res["video_id"]
+                # Step 2: Actually upload via URL
+                fb_url = f"https://graph.facebook.com/v22.0/{page_id}/videos"
+                fb_payload = {
+                    "file_url": video_path_or_url,
+                    "description": caption,
+                    "access_token": page_access_token
+                }
+                final_res = requests.post(fb_url, data=fb_payload).json()
+                if "id" in final_res:
+                    print(f"[SUCCESS] Published to Facebook! ID: {final_res.get('id')}")
+                    return final_res
+                else:
+                     print(f"[ERROR] FB Publish failed: {final_res}")
+                     return final_res
+            else:
+                print(f"[ERROR] FB Init failed: {res}")
+                return res
+        except Exception as e:
+            print(f"[ERROR] FB URL Upload Exception: {e}")
+            return {"error": str(e)}
 
 # --- SCHEDULING LOGIC FOR SPAIN AUDIENCE ---
 SCHEDULED_POSTS_FILE = os.path.join(BASE_DIR, "data", "scheduled_posts.json")

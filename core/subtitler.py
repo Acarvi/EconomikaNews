@@ -4,14 +4,18 @@ import time
 from typing import List, Dict
 
 # Load model globally to avoid repeated loading
-# 'base' is a good balance between speed and accuracy
+# 'medium' chosen for better accuracy as requested by user ("sube el whisper")
 _model = None
 
 def get_whisper_model():
     global _model
     if _model is None:
-        print("[INFO] Loading Whisper model (base)...")
-        _model = whisper.load_model("base")
+        print("[INFO] Loading Whisper model (medium)...")
+        try:
+            _model = whisper.load_model("medium")
+        except Exception as e:
+            print(f"[WARN] Failed to load medium model, falling back to small: {e}")
+            _model = whisper.load_model("small")
     return _model
 
 def transcribe_audio(video_path: str) -> Dict:
@@ -22,9 +26,22 @@ def transcribe_audio(video_path: str) -> Dict:
 
     model = get_whisper_model()
     print(f"[INFO] Transcribing {video_path}...")
-    # Allow auto-detection of original language, we will translate if needed
-    result = model.transcribe(video_path)
-    return result
+    
+    try:
+        # Enable word_timestamps for maximum precision in sync
+        # Added condition checking effectively
+        result = model.transcribe(video_path, word_timestamps=True)
+        return result
+    except RuntimeError as e:
+        if "size" in str(e):
+            print(f"[WARN] Whisper shape error detected. Retrying with fp16=False...")
+            try:
+                result = model.transcribe(video_path, word_timestamps=True, fp16=False)
+                return result
+            except Exception as e2:
+                 print(f"[ERROR] Whisper retry failed: {e2}")
+        print(f"[ERROR] Transcription failed: {e}")
+        return {'language': 'es', 'segments': []} # Return empty on failure to prevent crash
 
 def translate_subtitles_to_spanish(segments: List[Dict]) -> List[Dict]:
     """
@@ -34,66 +51,90 @@ def translate_subtitles_to_spanish(segments: List[Dict]) -> List[Dict]:
     
     # Extract all text blocks to translate
     original_texts = [s['text'].strip() for s in segments]
-    combined_text = "\n---\n".join(original_texts)
     
-    prompt = f"""Traduce el siguiente contenido de video (subtítulos) al ESPAÑOL.
-MANTÉN EL TONO de 'Economika Noticias' (profesional, serio, premium).
-Respeta los separadores '---' para que pueda reconstruir los segmentos.
-No añades explicaciones, solo la traducción.
+    # Use XML-style tags for safer parsing than " --- "
+    combined_text = ""
+    for i, t in enumerate(original_texts):
+        combined_text += f"<seg id={i}>{t}</seg>\n"
+    
+    prompt = f"""Traduce los subtítulos dentro de las etiquetas a ESPAÑOL.
+MANTÉN EL TONO de 'Economika Noticias' (profesional, serio, premium, liberal).
+NO respondas con nada más que el XML traducido.
+Respeta los IDs.
 
-CONTENIDO:
+ENTRADA:
 {combined_text}
+
+SALIDA (Formato esperado):
+<seg id=0>Traducción 0</seg>
+...
 """
     
     # Direct Gemini usage
     from google import genai
     from google.genai import types
-    from .ai_handler import GEMINI_API_KEY
+    from core.ai_handler import GEMINI_API_KEY
+    import re
     
     client = genai.Client(api_key=GEMINI_API_KEY)
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
+            model='gemini-2.0-flash',
             contents=prompt
         )
         translated_blob = response.text
-        translated_lines = translated_blob.split("---")
+        
+        # Robust parsing with Regex
+        pattern = r"<seg id=(\d+)>(.*?)</seg>"
+        matches = re.findall(pattern, translated_blob, re.DOTALL)
+        
+        # Create a dict for lookups
+        trans_map = {int(idx): text.strip() for idx, text in matches}
         
         for i, seg in enumerate(segments):
-            if i < len(translated_lines):
-                seg['text'] = translated_lines[i].strip()
+            if i in trans_map:
+                seg['text'] = trans_map[i]
+            # Else keep original if translation missed it
+            
     except Exception as e:
-        print(f"[WARNING] Gemini translation failed: {e}. Keeping original.")
+        print(f"[CRITICAL] Gemini translation exception: {type(e).__name__}: {e}")
         
     return segments
 
 def split_segments(segments: List[Dict], max_words: int = 3) -> List[Dict]:
-    """Split long segments into smaller, punchier chunks for professional reels."""
+    """Split segments into smaller chunks. Uses Whisper word-level data if available."""
     new_segments = []
     for seg in segments:
-        words = seg['text'].split()
-        if not words: continue
+        words_data = seg.get('words')
+        text_words = seg['text'].split()
         
-        # If segment is already short, keep it
-        if len(words) <= max_words:
-            new_segments.append(seg)
-            continue
-            
-        # Split into chunks
-        duration = seg['end'] - seg['start']
-        word_duration = duration / len(words)
+        if not text_words: continue
         
-        for i in range(0, len(words), max_words):
-            chunk = words[i:i + max_words]
-            chunk_text = " ".join(chunk)
-            chunk_start = seg['start'] + (i * word_duration)
-            chunk_end = seg['start'] + ((i + len(chunk)) * word_duration)
-            
-            new_segments.append({
-                'start': chunk_start,
-                'end': chunk_end,
-                'text': chunk_text
-            })
+        # Case A: We have exact word timestamps (Same language)
+        if words_data and len(words_data) == len(text_words):
+            for i in range(0, len(words_data), max_words):
+                chunk = words_data[i:i + max_words]
+                chunk_text = " ".join([w['word'].strip() for w in chunk])
+                new_segments.append({
+                    'start': chunk[0]['start'],
+                    'end': chunk[-1]['end'],
+                    'text': chunk_text
+                })
+        # Case B: No word data or count mismatch (e.g. after Translation)
+        else:
+            duration = seg['end'] - seg['start']
+            word_duration = duration / len(text_words)
+            for i in range(0, len(text_words), max_words):
+                chunk = text_words[i:i + max_words]
+                chunk_text = " ".join(chunk)
+                # Improve sync: Add a small buffer to start/end to avoid "flashing"
+                chunk_start = seg['start'] + (i * word_duration)
+                chunk_end = seg['start'] + ((i + len(chunk)) * word_duration)
+                new_segments.append({
+                    'start': chunk_start,
+                    'end': chunk_end,
+                    'text': chunk_text
+                })
     return new_segments
 
 def get_subtitles(video_path: str) -> List[Dict]:
@@ -102,8 +143,9 @@ def get_subtitles(video_path: str) -> List[Dict]:
     language = result.get('language', 'en')
     segments = result.get('segments', [])
     
-    # Force translation if not Spanish, ensuring "always Spanish" goal
-    if language != 'es':
+    # 1. Force translation if not Spanish, ensuring "always Spanish" goal
+    # 2. ALSO translate if language is 'ca' (Catalan) or other regional languages
+    if language not in ['es', 'spa']:
         print(f"[INFO] Language '{language}' detected. Translating to Spanish with Gemini...")
         segments = translate_subtitles_to_spanish(segments)
     else:

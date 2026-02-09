@@ -10,29 +10,37 @@ from typing import Optional, Tuple
 DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
-def download_media(url: str, output_name: str = None, thumbnail_url: str = None, is_video: bool = True) -> Tuple[bool, str]:
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "x.com_cookies.txt")
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+def download_media(url: str, output_name: str = None, thumbnail_url: str = None, is_video: bool = True, direct_url: str = None) -> Tuple[bool, str]:
     """
     Download media (video or image) from a Twitter URL.
     Returns (success, file_path or error_message).
     """
-    # 0. Early Exit: If file already exists in DOWNLOADS_DIR, return it
     from .scraper import extract_tweet_id
-    tid = extract_tweet_id(url)
-    if tid:
-        for ext in ['mp4', 'jpg', 'png', 'webp']:
-            test_path = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
-            if os.path.exists(test_path) and os.path.getsize(test_path) > 1024:
-                return True, test_path
-
-    # Fast path: Skip yt-dlp entirely for known images
-    if not is_video and thumbnail_url:
-        tid = tid or "media"
-        ext = "jpg"
-        if thumbnail_url and ".png" in thumbnail_url.lower(): ext = "png"
-        dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
-        success, path = download_image(thumbnail_url, dest)
-        if success: return True, path
+    tid = extract_tweet_id(url) or "media"
     
+    # 0. Early Exit: If file already exists in DOWNLOADS_DIR, return it
+    for ext in ['mp4', 'jpg', 'png', 'webp']:
+        test_path = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
+        if os.path.exists(test_path) and os.path.getsize(test_path) > 1024:
+            return True, test_path
+
+    # 1. Fast path: Direct Download if direct_url is provided and looks valid
+    # This avoids expensive yt-dlp calls if we already have the MP4/JPG URL from the scraper
+    if direct_url and direct_url.startswith('http'):
+        ext = "mp4" if is_video else "jpg"
+        if not is_video:
+            if ".png" in direct_url.lower(): ext = "png"
+            elif ".webp" in direct_url.lower(): ext = "webp"
+        
+        dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
+        status, path = download_file(direct_url, dest)
+        if status:
+            return True, path
+
+    # 2. Fallback: yt-dlp Extraction
     # Silence yt-dlp completely
     import sys
     import io
@@ -44,9 +52,13 @@ def download_media(url: str, output_name: str = None, thumbnail_url: str = None,
         'no_warnings': True,
         'no_progress': True,
         'logger': type('QuietLogger', (), {'debug': lambda *a: None, 'warning': lambda *a: None, 'error': lambda *a: None})(),
-        'outtmpl': os.path.join(DOWNLOADS_DIR, output_name or '%(id)s.%(ext)s'),
+        'outtmpl': os.path.join(DOWNLOADS_DIR, output_name or f'{tid}.%(ext)s'),
         'format': 'best[ext=mp4]/best',
+        'http_headers': {'User-Agent': USER_AGENT},
     }
+    
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts['cookiefile'] = COOKIES_FILE
 
     try:
         try:
@@ -70,7 +82,7 @@ def download_media(url: str, output_name: str = None, thumbnail_url: str = None,
                     ext = "jpg"
                     if thumbnail_url and ".png" in thumbnail_url.lower(): ext = "png"
                     dest = os.path.join(DOWNLOADS_DIR, f"{tid}.{ext}")
-                    success, path = download_image(thumbnail_url, dest)
+                    success, path = download_file(thumbnail_url, dest)
                     if success: return True, path
                         
         except Exception as e:
@@ -87,7 +99,7 @@ def download_media(url: str, output_name: str = None, thumbnail_url: str = None,
                     output_name = f"{tid}.{ext}"
                 
                 dest = os.path.join(DOWNLOADS_DIR, output_name)
-                success, path = download_image(thumbnail_url, dest)
+                success, path = download_file(thumbnail_url, dest)
                 if success:
                     return True, path
                     
@@ -97,19 +109,20 @@ def download_media(url: str, output_name: str = None, thumbnail_url: str = None,
 
     return False, "Failed to download media"
 
-def download_image(url: str, output_path: str) -> Tuple[bool, str]:
-    """Download a direct image URL with verification."""
+def download_file(url: str, output_path: str) -> Tuple[bool, str]:
+    """Download any file URL with verification and custom UA."""
     if not url or not isinstance(url, str) or not url.startswith('http'):
-        return False, "Invalid image URL"
+        return False, "Invalid URL"
         
     try:
-        response = requests.get(url, timeout=30)
+        headers = {'User-Agent': USER_AGENT}
+        response = requests.get(url, timeout=30, headers=headers)
         response.raise_for_status()
         
-        # Verify content type looks like an image
+        # Verify content type
         content_type = response.headers.get('Content-Type', '').lower()
-        if 'text/html' in content_type:
-            return False, "URL returned HTML instead of image"
+        if 'text/html' in content_type and 'video' not in content_type and 'image' not in content_type:
+            return False, "URL returned HTML instead of expected media"
             
         with open(output_path, 'wb') as f:
             f.write(response.content)

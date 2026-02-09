@@ -219,9 +219,39 @@ def trigger_scan(request: ScanRequest = ScanRequest()):
     run_viral_scan(hours_back=request.hours_back, min_ratio=request.min_ratio)
     return {"success": True, "pending_count": len(pending_tweets)}
 
+class ScheduleRequest(BaseModel):
+    posts: List[Dict]
+
+@app.post("/schedule")
+def schedule_posts_batch(request: ScheduleRequest):
+    """Receive a batch of posts to schedule."""
+    global publishing_queue
+    
+    new_posts = request.posts
+    if not new_posts:
+        return {"queued": 0}
+        
+    # Validation/Cleanup
+    valid_count = 0
+    for post in new_posts:
+        if not post.get('video_url') or not post.get('target_time'):
+            continue
+            
+        post['status'] = 'pending'
+        post['added_at'] = datetime.now().isoformat()
+        
+        # Avoid duplicates (by video_url)
+        if not any(p['video_url'] == post['video_url'] for p in publishing_queue):
+            publishing_queue.append(post)
+            valid_count += 1
+            
+    save_queue()
+    print(f"[{datetime.now()}] 📥 /schedule received {len(new_posts)} posts. Queued: {valid_count}. Total in queue: {len(publishing_queue)}")
+    return {"success": True, "queued": valid_count, "total_in_queue": len(publishing_queue)}
+    
 # ... (omitted sections)
 
-def run_viral_scan(hours_back: int = 24, min_ratio: float = 2.0):
+def run_viral_scan(hours_back: int = 24, min_ratio: float = 1.2):
     """Run the viral scout and add new tweets to pending (with AI content generation)."""
     global pending_tweets, last_scan
     
