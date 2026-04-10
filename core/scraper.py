@@ -7,6 +7,27 @@ import re
 import os
 import time
 from typing import Optional, Dict, Any
+import httpx
+
+# --- DEFINTIVE MONKEY PATCH FOR HTTPX COOKIE CONFLICT ---
+# This prevents the fatal 'Multiple cookies exist with name=twid' error.
+try:
+    _original_get = httpx.Cookies.get
+    def _patched_get(self, name, default=None, domain=None, path=None):
+        try:
+            return _original_get(self, name, default, domain, path)
+        except Exception as e:
+            if "Multiple cookies exist" in str(e):
+                # If a conflict occurs, return the first matching cookie instead of crashing
+                for cookie in self.jar:
+                    if cookie.name == name:
+                        if domain is None or cookie.domain == domain:
+                            if path is None or cookie.path == path:
+                                return cookie.value
+            return default
+    httpx.Cookies.get = _patched_get
+except Exception as e:
+    print(f"Warning: Failed to patch httpx cookies: {e}")
 
 def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
     """Robustly extract a stat from an object or dict."""
@@ -47,8 +68,19 @@ def scrape_tweet_with_browser(url: str) -> Optional[Dict[str, Any]]:
         cookie_file = os.path.join(base_dir, "config", "x.com_cookies.txt")
         
         if os.path.exists(cookie_file):
-            cookies = netscape_to_dict(cookie_file)
-            client.set_cookies(cookies)
+            from config.cookie_utils import netscape_to_json
+            import json
+            json_cookies = cookie_file.replace('.txt', '.json')
+            netscape_to_json(cookie_file, json_cookies)
+            
+            if hasattr(client, '_session') and hasattr(client._session, 'cookies'):
+                client._session.cookies.clear()
+                cookie_dict = json.load(open(json_cookies, encoding='utf-8'))
+                for k, v in cookie_dict.items():
+                    client._session.cookies.set(k, v, domain=".x.com")
+                print(f"✅ Scraper cookies injected manually with explicitly set domain.")
+            else:
+                client.load_cookies(json_cookies)
             
             import asyncio
             

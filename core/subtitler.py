@@ -10,12 +10,12 @@ _model = None
 def get_whisper_model():
     global _model
     if _model is None:
-        print("[INFO] Loading Whisper model (medium)...")
+        print("[INFO] Loading Whisper model (large-v3)...")
         try:
-            _model = whisper.load_model("medium")
+            _model = whisper.load_model("large-v3")
         except Exception as e:
-            print(f"[WARN] Failed to load medium model, falling back to small: {e}")
-            _model = whisper.load_model("small")
+            print(f"[WARN] Failed to load large-v3 model, falling back to medium: {e}")
+            _model = whisper.load_model("medium")
     return _model
 
 def transcribe_audio(video_path: str) -> Dict:
@@ -151,7 +151,7 @@ def get_subtitles(video_path: str) -> List[Dict]:
     else:
         print(f"[INFO] Language already Spanish. No translation needed.")
     
-    # Optimization: Split into short pieces for professional look
-    segments = split_segments(segments, max_words=3)
+    # Optimization: Split into short pieces (Hormozi style)
+    segments = split_segments(segments, max_words=2)
         
     return segments

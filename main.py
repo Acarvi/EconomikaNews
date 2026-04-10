@@ -26,6 +26,8 @@ import core.publisher as publisher # New automation module
 from core.youtube_uploader import upload_short
 from utils.cleanup import cleanup_old_files, cleanup_temp_files
 import requests # Added for cloud sync
+from utils.network import check_centralai_health
+from core.ai_handler import CENTRAL_AI_URL
 
 # --- CONFIG & HELPERS ---
 CLOUD_SERVER_URL = os.environ.get("ECONOMIKA_SERVER_URL", "https://economikanoticias.onrender.com").rstrip("/")
@@ -46,7 +48,17 @@ class StatusManager:
 
     def update(self, message: str):
         timestamp = datetime.now().strftime('%H:%M:%S')
-        print(f"[{timestamp}] {message}", flush=True)  # Added flush for real-time visibility
+        full_msg = f"[{timestamp}] {message}"
+        
+        # Robust terminal print (prevents crash on unsupported emojis)
+        try:
+            print(full_msg, flush=True)
+        except UnicodeEncodeError:
+            try:
+                # Fallback: Strip non-ascii for the terminal only
+                print(full_msg.encode('ascii', 'ignore').decode('ascii'), flush=True)
+            except:
+                pass # If terminal is truly broken, just continue to GUI/File logs
         
         # Write to file log
         if self.log_file:
@@ -64,8 +76,11 @@ class StatusManager:
                     if self.gui_status_var:
                         self.gui_status_var.set(message)
                     
+                    # BMP-only sanitization for Tkinter compatibility (Windows fix)
+                    safe_msg = "".join(c for c in message if ord(c) <= 0xFFFF)
+                    
                     self.gui_log_widget.configure(state='normal')
-                    self.gui_log_widget.insert(tk.END, f"[{timestamp}] {message}\n")
+                    self.gui_log_widget.insert(tk.END, f"[{timestamp}] {safe_msg}\n")
                     self.gui_log_widget.see(tk.END)
                     self.gui_log_widget.configure(state='disabled')
                 except: pass
@@ -75,7 +90,8 @@ class StatusManager:
             self.gui_status_var.set(message)
 
 
-def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = None) -> Dict:
+def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = None, 
+                       headline_pos: str = "bottom", subtitle_pos: str = "bottom") -> Dict:
     """Helper to generate AI content and render video for a single item."""
     tweet_url = tweet_data.get('url', 'unknown')
     date_str = datetime.now().strftime("%Y%m%d")
@@ -155,7 +171,9 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         temp_reel_path = process_video_for_reel(media_path, headline, render_source, output_name, 
                                                skip_subtitles=skip_subtitles, source=render_source, 
                                                start_time_str=start_t, end_time_str=end_t, 
-                                               cover_path=cover_path)
+                                               cover_path=cover_path,
+                                               headline_pos=headline_pos,
+                                               subtitle_pos=subtitle_pos)
     else:
         temp_reel_path = generate_reel_from_image(media_path, headline, render_source, output_name, source=render_source)
     
@@ -172,143 +190,152 @@ def render_item_assets(tweet_data: Dict, status: StatusManager, feedback: str = 
         'headline': headline,
         'shorts_title': shorts_title,
         'caption': caption,
-        'caption_b': caption_b,  # New: For A/B testing
-        'source': source,  # New: Detected source
-        'tweet_data': tweet_data
+        'caption_b': caption_b,
+        'source': source,
+        'tweet_data': tweet_data,
+        'headline_pos': headline_pos,
+        'subtitle_pos': subtitle_pos
     }
+
+def process_item_callback(item, feedback=None):
+    """Callback wrapper for PostAiCurationManager UI actions."""
+    # Dummy status for background re-render
+    status = StatusManager(enable_file_log=False)
+    
+    # Extract positions from item (updated by UI before calling this)
+    h_pos = item.get('headline_pos', 'bottom')
+    s_pos = item.get('subtitle_pos', 'bottom')
+    
+    return render_item_assets(item, status, feedback=feedback, 
+                              headline_pos=h_pos, subtitle_pos=s_pos)
 
 class PostAiCurationManager:
     # Existing code here for clarity in replacement
     def __init__(self, parent, items, status_manager, process_callback):
         self.root = tk.Toplevel(parent)
-        self.root.title(f"Revisión de Lote ({len(items)} Reels) - Economika")
-        self.root.geometry("1100x900")
-        self.root.configure(bg="#121212")
+        self.root.title(f"Economika Noticiero - Revisión de Lote ({len(items)} Reels)")
+        self.root.geometry("1400x950")
+        self.root.configure(bg="#0a0a0a")
         self.root.grab_set()
         
         self.items = items
         self.current_idx = 0
         self.status = status_manager
-        self.process_callback = process_callback # To call for regeneration
+        self.process_callback = process_callback
         self.approved_folders = []
         
         self.cap = None
         self.player = None
         self.is_muted = False
-        self.scheduled_posts = []  # For batch scheduling
+        self.overlay_np = None # Fix AttributeError in update_frame
         
-        # --- UI LAYOUT (Persistent) ---
-        self.preview_frame = tk.Frame(self.root, bg="#121212", width=400, height=711)
-        self.preview_frame.pack(side="left", padx=30, pady=30, fill="both", expand=True)
-        self.canvas = tk.Canvas(self.preview_frame, width=400, height=711, bg="black", highlightthickness=0)
-        self.canvas.pack(expand=True)
+        # Platform Selection Variables
+        self.use_yt = tk.BooleanVar(value=True)
+        self.use_fb = tk.BooleanVar(value=True)
+        self.use_ig = tk.BooleanVar(value=True)
+        self.use_ig_stories = tk.BooleanVar(value=False)
         
-        self.info_frame = tk.Frame(self.root, bg="#121212")
-        self.info_frame.pack(side="right", padx=30, pady=30, fill="both")
-        
-        self.header_label = tk.Label(self.info_frame, text="", font=("Segoe UI Black", 16), fg="#E31E24", bg="#121212")
-        self.header_label.pack(anchor="w")
-        
-        tk.Label(self.info_frame, text="YouTube Shorts Title:", font=("Segoe UI Bold", 10), fg="#888", bg="#121212").pack(anchor="w", pady=(20, 5))
-        self.shorts_text = tk.Text(self.info_frame, height=2, width=45, bg="#1e1e1e", fg="white", font=("Segoe UI", 11), borderwidth=0, padx=10, pady=10)
-        self.shorts_text.pack(fill="x")
-        
-        tk.Label(self.info_frame, text="Instagram Caption:", font=("Segoe UI Bold", 10), fg="#888", bg="#121212").pack(anchor="w", pady=(20, 5))
-        self.caption_text = tk.Text(self.info_frame, height=10, width=45, bg="#1e1e1e", fg="white", font=("Segoe UI", 11), borderwidth=0, padx=10, pady=10)
-        self.caption_text.pack(fill="x")
-        
-        # Feedback Section
-        tk.Label(self.info_frame, text="Instrucciones para la IA (Feedback):", font=("Segoe UI Bold", 10), fg="#f1c40f", bg="#121212").pack(anchor="w", pady=(20, 5))
-        self.feedback_text = tk.Text(self.info_frame, height=3, width=45, bg="#2c3e50", fg="white", font=("Segoe UI Italic", 10), borderwidth=0, padx=10, pady=10)
-        self.feedback_text.pack(fill="x")
-        self.feedback_text.insert(tk.END, "Ej: Hazlo más dramático, menciona el impacto en el ahorro...")
+        # Positioning Variables
+        self.headline_pos = tk.StringVar(value="bottom")
+        self.subtitle_pos = tk.StringVar(value="bottom")
 
-        # Location Search
-        tk.Label(self.info_frame, text="Ubicación (Facebook Page ID):", font=("Segoe UI Bold", 10), fg="#888", bg="#121212").pack(anchor="w", pady=(10, 5))
-        self.loc_frame = tk.Frame(self.info_frame, bg="#121212")
-        self.loc_frame.pack(fill="x")
+        # --- UI LAYOUT ---
+        # Left: Preview
+        self.preview_frame = tk.Frame(self.root, bg="#0a0a0a", width=500)
+        self.preview_frame.pack(side="left", padx=40, pady=40, fill="both", expand=True)
         
-        self.loc_entry = tk.Entry(self.loc_frame, bg="#1e1e1e", fg="white", font=("Segoe UI", 10), borderwidth=0)
-        self.loc_entry.pack(side="left", fill="x", expand=True, padx=(10, 5), ipady=5)
+        self.canvas = tk.Canvas(self.preview_frame, width=400, height=711, bg="black", highlightthickness=1, highlightbackground="#333")
+        self.canvas.pack(pady=10)
         
-        self.btn_search_loc = tk.Button(self.loc_frame, text="🔍", bg="#444", fg="white", command=self.search_location_ui, borderwidth=0)
-        self.btn_search_loc.pack(side="left", padx=(0, 10))
-        
-        self.loc_id_var = tk.StringVar() # Stores the actual ID
-        self.loc_label = tk.Label(self.info_frame, textvariable=self.loc_id_var, font=("Segoe UI", 8), fg="#27ae60", bg="#121212", anchor="w")
-        self.loc_label.pack(fill="x", padx=10)
+        self.btn_mute = tk.Button(self.preview_frame, text="🔊", bg="#222", fg="white", font=("Segoe UI", 12), width=4, command=self.toggle_mute, borderwidth=0)
+        self.btn_mute.pack(pady=5)
 
-        self.btn_sub_frame = tk.Frame(self.info_frame, bg="#121212")
-        self.btn_sub_frame.pack(fill="x", pady=20)
+        # Right: Editorial & Publishing Hub
+        self.info_frame = tk.Frame(self.root, bg="#0a0a0a", width=600)
+        self.info_frame.pack(side="right", padx=40, pady=40, fill="both")
         
-        self.btn_regen = tk.Button(self.btn_sub_frame, text="🔄 REGENERAR IA", bg="#f39c12", fg="#121212", font=("Segoe UI Black", 10), 
-                                  padx=8, pady=8, borderwidth=0, command=self.regenerate)
-        self.btn_regen.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        
-        self.btn_remove_subs = tk.Button(self.btn_sub_frame, text="🚫 QUITAR SUBS", bg="#e74c3c", fg="white", font=("Segoe UI Black", 10), 
-                                        padx=8, pady=8, borderwidth=0, command=self.remove_subtitles)
-        self.btn_remove_subs.pack(side="right", fill="x", expand=True, padx=(5, 0))
+        self.header_label = tk.Label(self.info_frame, text="EDITORIAL HUB", font=("Segoe UI Black", 24), fg="white", bg="#0a0a0a")
+        self.header_label.pack(anchor="w", pady=(0, 20))
 
-        # NEW: AI Cover Button
-        self.btn_cover = tk.Button(self.btn_sub_frame, text="🎨 COVER IA", bg="#8e44ad", fg="white", font=("Segoe UI Black", 10), 
-                                   padx=8, pady=8, borderwidth=0, command=self.generate_ai_cover)
-        self.btn_cover.pack(side="right", fill="x", expand=True, padx=(5, 5))
+        # Inputs
+        tk.Label(self.info_frame, text="TITULAR (HEADLINE)", font=("Segoe UI Bold", 10), fg="#888", bg="#0a0a0a").pack(anchor="w")
+        self.shorts_text = tk.Text(self.info_frame, height=2, width=55, bg="#111", fg="white", font=("Segoe UI", 13), insertbackground="white", padx=15, pady=15, borderwidth=0)
+        self.shorts_text.pack(fill="x", pady=(5, 20))
+        
+        tk.Label(self.info_frame, text="CAPCIÓN (EDITORIAL)", font=("Segoe UI Bold", 10), fg="#888", bg="#0a0a0a").pack(anchor="w")
+        self.caption_text = tk.Text(self.info_frame, height=8, width=55, bg="#111", fg="white", font=("Segoe UI", 12), insertbackground="white", padx=15, pady=15, borderwidth=0)
+        self.caption_text.pack(fill="x", pady=(5, 20))
 
-        self.btn_embed = tk.Button(self.btn_sub_frame, text="🎞️ INCRUSTAR", bg="#555", fg="white", font=("Segoe UI Black", 8), 
-                                   padx=4, pady=8, borderwidth=0, command=self.embed_cover, state="disabled")
-        self.btn_embed.pack(side="right", fill="x", expand=True, padx=(5, 0))
+        # Botonera 1: Platforms
+        self.plat_frame = tk.LabelFrame(self.info_frame, text=" PLATAFORMAS DE SALIDA ", fg="#555", bg="#0a0a0a", font=("Segoe UI Bold", 9), padx=15, pady=15)
+        self.plat_frame.pack(fill="x", pady=10)
+        
+        tk.Checkbutton(self.plat_frame, text="YouTube Shorts", variable=self.use_yt, bg="#0a0a0a", fg="#ff4444", activebackground="#0a0a0a", font=("Segoe UI Bold", 10)).pack(side="left", padx=10)
+        tk.Checkbutton(self.plat_frame, text="Facebook Reels", variable=self.use_fb, bg="#0a0a0a", fg="#4444ff", activebackground="#0a0a0a", font=("Segoe UI Bold", 10)).pack(side="left", padx=10)
+        tk.Checkbutton(self.plat_frame, text="Instagram Reels", variable=self.use_ig, bg="#0a0a0a", fg="#ff44ff", activebackground="#0a0a0a", font=("Segoe UI Bold", 10)).pack(side="left", padx=10)
+        tk.Checkbutton(self.plat_frame, text="IG Stories", variable=self.use_ig_stories, bg="#0a0a0a", fg="#ffff44", activebackground="#0a0a0a", font=("Segoe UI Bold", 10)).pack(side="left", padx=10)
 
-        self.action_btn_frame = tk.Frame(self.info_frame, bg="#121212")
-        self.action_btn_frame.pack(fill="x", pady=20)
+        # Botonera 2: Publishing Actions
+        self.act_frame = tk.Frame(self.info_frame, bg="#0a0a0a")
+        self.act_frame.pack(fill="x", pady=20)
         
-        self.btn_discard = tk.Button(self.action_btn_frame, text="⬅ DESCARTAR", bg="#c0392b", fg="white", font=("Segoe UI Black", 12), 
-                                    padx=20, pady=15, borderwidth=0, command=self.discard)
-        self.btn_discard.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.btn_pub_all = tk.Button(self.act_frame, text="⚡ PUBLICAR EN TODAS", bg="#E31E24", fg="white", font=("Segoe UI Black", 12), 
+                                    padx=20, pady=15, borderwidth=0, command=lambda: self.publish_action(all_platforms=True))
+        self.btn_pub_all.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
-        self.btn_publish = tk.Button(self.action_btn_frame, text="📸 PUBLICAR AHORA", bg="#3498db", fg="white", font=("Segoe UI Black", 12), 
-                                    padx=20, pady=15, borderwidth=0, command=self.publish_ig)
-        self.btn_publish.pack(side="left", fill="x", expand=True, padx=(5, 5))
+        self.btn_pub_sel = tk.Button(self.act_frame, text="🚀 PUBLICAR SELECCIONADAS", bg="#333", fg="white", font=("Segoe UI Black", 11), 
+                                    padx=20, pady=15, borderwidth=0, command=self.publish_action)
+        self.btn_pub_sel.pack(side="left", fill="x", expand=True, padx=(5, 0))
 
-        self.btn_keep = tk.Button(self.action_btn_frame, text="📅 PROGRAMAR SOLO REEL", bg="#27ae60", fg="white", font=("Segoe UI Black", 10), 
-                                 padx=20, pady=15, borderwidth=0, command=self.add_single_to_batch)
-        self.btn_keep.pack(side="right", fill="x", expand=True, padx=(10, 0))
+        # Botonera 3: Scheduling & Batch
+        self.batch_frame = tk.Frame(self.info_frame, bg="#0a0a0a")
+        self.batch_frame.pack(fill="x", pady=(0, 20))
         
-        # Second row for mute and batch
-        self.action_btn_frame2 = tk.Frame(self.info_frame, bg="#121212")
-        self.action_btn_frame2.pack(fill="x", pady=(0, 10))
+        self.btn_batch = tk.Button(self.batch_frame, text="📅 PROGRAMAR LOTE (GENERAL)", bg="#27ae60", fg="white", font=("Segoe UI Black", 11), 
+                                  padx=20, pady=15, borderwidth=0, command=self.add_to_batch)
+        self.btn_batch.pack(fill="x")
+
+        # Botonera 4: Utilities & Positioning
+        self.util_frame = tk.Frame(self.info_frame, bg="#0a0a0a")
+        self.util_frame.pack(fill="x")
         
-        self.btn_mute = tk.Button(self.action_btn_frame2, text="🔊", bg="#555", fg="white", font=("Segoe UI", 12), width=4, command=self.toggle_mute)
-        self.btn_mute.pack(side="left", padx=(0, 10))
+        # Regeneration & Discard
+        self.btn_regen_c = tk.Button(self.util_frame, text="🔄 Regenerar Caption", bg="#222", fg="#888", font=("Segoe UI Bold", 9), padx=10, pady=10, borderwidth=0, command=lambda: self.regenerate("caption"))
+        self.btn_regen_c.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
-        self.btn_batch = tk.Button(self.action_btn_frame2, text="📅 PROGRAMAR A/B", bg="#9b59b6", fg="white", font=("Segoe UI Black", 10),
-                                   padx=10, pady=6, borderwidth=0, command=self.add_to_batch)
-        self.btn_batch.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.btn_regen_h = tk.Button(self.util_frame, text="✍️ Regenerar Título", bg="#222", fg="#888", font=("Segoe UI Bold", 9), padx=10, pady=10, borderwidth=0, command=lambda: self.regenerate("headline"))
+        self.btn_regen_h.pack(side="left", fill="x", expand=True, padx=(5, 5))
         
-        self.btn_raw = tk.Button(self.action_btn_frame2, text="🎬 RAW", bg="#2c3e50", fg="white", font=("Segoe UI Black", 10),
-                                 padx=10, pady=6, borderwidth=0, command=self.publish_raw)
-        self.btn_raw.pack(side="right", fill="x", expand=True, padx=(5, 0))
+        self.btn_discard = tk.Button(self.util_frame, text="🗑️ Descartar", bg="#3a0a0a", fg="#f44", font=("Segoe UI Bold", 9), padx=10, pady=10, borderwidth=0, command=self.discard)
+        self.btn_discard.pack(side="left", fill="x", expand=True, padx=(5, 0))
         
-        # Third row: Source display
-        self.source_frame = tk.Frame(self.info_frame, bg="#121212")
-        self.source_frame.pack(fill="x", pady=(10, 0))
+        # Positioning (Pre-Render Level)
+        self.pos_frame = tk.Frame(self.info_frame, bg="#0a0a0a")
+        self.pos_frame.pack(fill="x", pady=20)
         
-        self.source_label = tk.Label(self.source_frame, text="", font=("Segoe UI", 10), fg="#3498db", bg="#121212")
-        self.source_label.pack(side="left")
+        tk.Label(self.pos_frame, text="Titular:", bg="#0a0a0a", fg="#555", font=("Segoe UI", 9)).grid(row=0, column=0, padx=5)
+        self.cb_headline = ttk.Combobox(self.pos_frame, textvariable=self.headline_pos, values=["top", "center", "bottom"], width=10)
+        self.cb_headline.grid(row=0, column=1, padx=5)
         
-        # Asset Loading
-        self.overlay_np = None
-        overlay_path = os.path.join(os.path.dirname(__file__), "assets", "instagram_mock.png")
-        if os.path.exists(overlay_path):
-            ov_img = Image.open(overlay_path).convert("RGBA").resize((400, 711))
-            self.overlay_np = np.array(ov_img).astype(float) / 255.0
-            
+        tk.Label(self.pos_frame, text="Subs:", bg="#0a0a0a", fg="#555", font=("Segoe UI", 9)).grid(row=0, column=2, padx=5)
+        self.cb_subtitle = ttk.Combobox(self.pos_frame, textvariable=self.subtitle_pos, values=["top", "center", "bottom"], width=10)
+        self.cb_subtitle.grid(row=0, column=3, padx=5)
+
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.load_item()
         self.update_frame()
 
     def load_item(self):
+        """Load data and preview for the current item in the batch."""
+        if not self.root.winfo_exists(): return
         if self.current_idx >= len(self.items):
-            self.on_finish()
+            if not self.approved_folders:
+                messagebox.showinfo("Fin", "No se aprobaron reels.")
+                self.root.destroy()
+                return
+            messagebox.showinfo("Lote Completado", f"Se han procesado {len(self.approved_folders)} reels.")
+            # Note: Final processing (batch publishing) happens here if needed
+            self.root.destroy()
             return
             
         item = self.items[self.current_idx]
@@ -316,24 +343,15 @@ class PostAiCurationManager:
         # --- REGENERATION LOADING SCREEN ---
         if item.get('is_regenerating', False):
             self.header_label.config(text=f"REVISIÓN {self.current_idx + 1}/{len(self.items)}")
-            
-            # Clear Inputs
             self.shorts_text.delete('1.0', tk.END)
             self.caption_text.delete('1.0', tk.END)
             
-            # Show Loading State in Preview Canvas
+            # Show Loading State
             self.canvas.delete("all")
-            w = self.canvas.winfo_width()
-            h = self.canvas.winfo_height()
-            self.canvas.create_rectangle(0, 0, w, h, fill="#2c3e50")
-            self.canvas.create_text(w/2, h/2 - 20, text="⏳", font=("Segoe UI", 40), fill="white")
-            self.canvas.create_text(w/2, h/2 + 20, text="REGENERANDO IA...", font=("Segoe UI Bold", 16), fill="white")
-            self.canvas.create_text(w/2, h/2 + 50, text="Por favor espera.", font=("Segoe UI", 12), fill="#bdc3c7")
+            self.canvas.create_rectangle(0, 0, 400, 711, fill="#0a0a0a")
+            self.canvas.create_text(200, 350, text="⏳ REGENERANDO...", font=("Segoe UI Bold", 16), fill="#E31E24")
             
-            # Disable Buttons
             self._set_buttons_state("disabled")
-            
-            # Poll status every 1s
             self.root.after(1000, self.load_item)
             return
         else:
@@ -348,40 +366,25 @@ class PostAiCurationManager:
         self.caption_text.delete('1.0', tk.END)
         self.caption_text.insert(tk.END, item.get('caption', ''))
         
-        self.feedback_text.delete('1.0', tk.END)
-        self.feedback_text.insert(tk.END, "") # Clear each time
-        
-        # Display detected source
-        source = item.get('source', '')
-        if source:
-            self.source_label.config(text=f"📰 Fuente detectada: {source}", fg="#27ae60")
-        else:
-            self.source_label.config(text="📰 Fuente: No detectada", fg="#888")
+        # Positioning Defaults
+        self.headline_pos.set(item.get('headline_pos', 'bottom'))
+        self.subtitle_pos.set(item.get('subtitle_pos', 'bottom'))
 
         if self.cap: self.cap.release()
         
-        # Reset "Quitar Subs" button based on current item state
-        skip_subtitles = item.get('tweet_data', {}).get('skip_subtitles', False)
-        if skip_subtitles:
-            self.btn_remove_subs.config(text="✅ PONER SUBS", command=self.restore_subtitles, bg="#27ae60")
-        else:
-            self.btn_remove_subs.config(text="🚫 QUITAR SUBS", command=self.remove_subtitles, bg="#e74c3c")
-            
         try:
             self.cap = cv2.VideoCapture(item['reel_path'])
             if MediaPlayer:
                 self.player = MediaPlayer(item['reel_path'], ff_opts={'pix_fmt': 'rgb24'})
-            
             if not self.cap.isOpened():
-                self.status.update(f"   ⚠️ Error al abrir vídeo para preview: {item['reel_path']}")
+                self.status.update(f"   ⚠️ Error de preview: {item['reel_path']}")
         except Exception as e:
-            print(f"[UI ERROR] Failed to load reel preview: {e}")
-            self.status.update(f"   ⚠️ Error de preview: {str(e)[:40]}")
+            self.status.update(f"   ⚠️ Preview error: {str(e)[:40]}")
             
     def _set_buttons_state(self, state):
         """Helper to toggle buttons during regeneration wait."""
-        btns = [self.btn_regen, self.btn_discard, self.btn_publish, self.btn_keep, 
-                self.btn_batch, self.btn_remove_subs, self.btn_raw, self.btn_cover, self.btn_embed]
+        btns = [self.btn_pub_all, self.btn_pub_sel, self.btn_batch, 
+                self.btn_regen_c, self.btn_regen_h, self.btn_discard]
         for btn in btns:
             try: btn.config(state=state)
             except: pass
@@ -460,337 +463,157 @@ class PostAiCurationManager:
     def keep(self):
         item = self.items[self.current_idx]
         folder = item['folder']
-        # Removed updates to .md and .html files
         self.approved_folders.append(folder)
-        self.status.update(f"   ⭐ Reel '{os.path.basename(folder)}' aprobado.")
+        self.status.update(f"   ⭐ Reel '{os.path.basename(folder)}' aprobado localmente.")
         self.next_item()
 
-    def publish_ig(self):
-        item = self.items[self.current_idx]
-        config = publisher.load_config()
-        if not config:
-            messagebox.showerror("Error de API", "No se encontró configuración de API. Asegura que el token sea correcto.")
-            return
-            
-        caption = self.caption_text.get('1.0', tk.END).strip()
-        video_path = item['reel_path']
-        location_id = self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None
-        
-        self.btn_publish.config(state="disabled", text="⏳ SUBIENDO...")
-        self.status.update(f"   🚀 Iniciando publicación en redes para '{os.path.basename(video_path)}'...")
-        
-        def run_publish():
-            # Check for A/B Testing (if caption_b exists and is different)
-            caption_a = self.caption_text.get('1.0', tk.END).strip()
-            caption_b = item.get('caption_b', '').strip()
-            
-            # Check if source is image/static to avoid A/B duplications if visual is identical
-            tweet_data = item.get('tweet_data', {})
-            raw_path = tweet_data.get('local_media_path', '')
-            is_static_source = False
-            if raw_path and raw_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
-                 is_static_source = True
-            
-            # Use Shorts title A/B if available (not stored in item but maybe we should?)
-            shorts_title_a = self.shorts_text.get('1.0', tk.END).strip()
-            
-            variants = [("A", caption_a, shorts_title_a)]
-            
-            if caption_b and caption_b != caption_a and not is_static_source:
-                print(f"[INFO] A/B Testing detected (Video). Preparing Variant B.")
-                variants.append(("B", caption_b, shorts_title_a + " #2"))
-            elif is_static_source and caption_b:
-                print(f"[INFO] Source is Image. Skipping Variant B to prevent visual duplicates.")
-            
-            self.root.after(0, lambda: self.status.update(f"   🚀 Iniciando publicación ({len(variants)} variantes)..."))
-
-            try:
-                # 1. Upload to temp host ONCE (only needed for IG)
-                temp_url = publisher.upload_to_temporary_host(video_path)
-                if not temp_url:
-                    self.root.after(0, lambda: self.status.update("   ⚠️ Catbox falló. IG será omitido, probando FB/YT..."))
-                
-                success_count = 0
-                
-                for label, cap_text, yt_title in variants:
-                    self.root.after(0, lambda: self.status.update(f"   📡 Publicando VARIANTE {label}..."))
-                    
-                    # 2. Upload to Instagram (Requires URL)
-                    # We stick to A only for IG.
-                    if label == "A":
-                        if temp_url:
-                            res = publisher.upload_reel(temp_url, cap_text, config['access_token'], config['ig_user_id'], location_id=location_id)
-                            if res and "id" in res:
-                                self.root.after(0, lambda: self.status.update(f"   ✅ IG ({label}): {res['id']}"))
-                            else:
-                                err = res.get('error', {}).get('message', 'Unknown') if res else 'Fail'
-                                self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló IG: {err}"))
-                        else:
-                            self.root.after(0, lambda: self.status.update(f"   ⏭️ Saltando IG (No URL Pública)"))
-                    
-                    # --- FACEBOOK REELS UPLOAD (Binary) ---
-                    try:
-                        fb_page_id = config.get('fb_page_id')
-                        if not fb_page_id:
-                            fb_page_id = publisher.get_facebook_page_id(config['access_token'])
-                        
-                        if fb_page_id:
-                            self.root.after(0, lambda: self.status.update(f"   🚀 FB ({label}): Subiendo binario..."))
-                            if label == "B": time.sleep(5)
-                            
-                            # Use VIDEO PATH directly (Binary Upload)
-                            fb_res = publisher.upload_facebook_reel(video_path, cap_text, config['access_token'], fb_page_id)
-                            
-                            if fb_res and "id" in fb_res:
-                                self.root.after(0, lambda: self.status.update(f"   ✅ FB ({label}): {fb_res['id']}"))
-                                success_count += 1
-                            else:
-                                err_msg = fb_res.get('error', {}).get('message', str(fb_res))
-                                self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló FB ({label}): {err_msg}"))
-                        else:
-                             self.root.after(0, lambda: self.status.update(f"   ⚠️ No se encontró ID de Página de Facebook."))
-                    except Exception as e:
-                        self.root.after(0, lambda: self.status.update(f"   ⚠️ Error Facebook: {e}"))
-
-                    # --- YOUTUBE UPLOAD (Binary) ---
-                    try:
-                        self.root.after(0, lambda: self.status.update(f"   🚀 YT ({label}): Subiendo..."))
-                        if label == "B": time.sleep(2)
-                        
-                        yt_id = upload_short(video_path, title=yt_title, description=cap_text)
-                        if yt_id:
-                            self.root.after(0, lambda: self.status.update(f"   ✅ YT ({label}): {yt_id}"))
-                            success_count += 1
-                    except Exception as e:
-                        self.root.after(0, lambda: self.status.update(f"   ⚠️ Falló YouTube: {e}"))
-                    
-                    if len(variants) > 1 and label == "A":
-                        time.sleep(3)
-                    
-                self.root.after(0, lambda: messagebox.showinfo("Éxito", f"Publicación finalizada. Éxitos: {success_count}"))
-                self.root.after(0, self.keep) # Move to next and save locally
-                
-            except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Error inesperado: {str(e)}"))
-            finally:
-                self.root.after(0, lambda: self.btn_publish.config(state="normal", text="📸 PUBLICAR EN INSTAGRAM"))
-
-        threading.Thread(target=run_publish, daemon=True).start()
-
     def discard(self):
+        """Discard current item and move to next."""
         item = self.items[self.current_idx]
-        self.status.update(f"   🗑️ Reel '{os.path.basename(item['folder'])}' descartado y marcado como rechazado.")
+        self.status.update(f"   🗑️ Reel descartado: {os.path.basename(item['folder'])}")
         try:
-            from core.viral_scout import ViralScout
-            ViralScout().mark_as_rejected(item.get('tweet_data', {}).get('id', ''))
             shutil.rmtree(item['folder'])
         except: pass
         self.next_item()
 
-    def regenerate(self):
+    def publish_action(self, all_platforms=False):
+        """Unified publishing action for all selected platforms."""
         item = self.items[self.current_idx]
-        feedback = self.feedback_text.get('1.0', tk.END).strip()
-        if not feedback or "Ej:" in feedback:
-            messagebox.showwarning("Feedback necesario", "Por favor escribe qué quieres cambiar en el campo de feedback.")
+        
+        # 1. Gather Content
+        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
+        caption = self.caption_text.get('1.0', tk.END).strip()
+        video_path = item['reel_path']
+        
+        # 2. Determine Platforms
+        platforms = []
+        if all_platforms:
+            platforms = ["youtube", "facebook", "instagram"]
+        else:
+            if self.use_yt.get(): platforms.append("youtube")
+            if self.use_fb.get(): platforms.append("facebook")
+            if self.use_ig.get(): platforms.append("instagram")
+            if self.use_ig_stories.get(): platforms.append("instagram_story")
+        
+        if not platforms:
+            messagebox.showwarning("Sin plataformas", "Selecciona al menos una plataforma.")
             return
 
-        # 1. Feedback UI
-        self.status.update(f"⏳ Regenerando IA en segundo plano para: {item.get('headline', '...')}")
+        # 3. Execution
+        self.btn_pub_all.config(state="disabled")
+        self.btn_pub_sel.config(state="disabled")
+        self.status.update(f"   🚀 Publicando en {', '.join(platforms).upper()}...")
         
-        # Mark as regenerating
+        def run_publish():
+            success = True
+            for plat in platforms:
+                self.root.after(0, lambda p=plat: self.status.update(f"   📡 Enviando a {p.upper()}..."))
+                try:
+                    # Delegate to publisher.py -> CentralPublishingHub
+                    res = publisher.publish_video(video_path, caption, platform=plat, title=shorts_title)
+                    if res and res.get('status') == 'success':
+                        self.root.after(0, lambda p=plat: self.status.update(f"   ✅ {p.upper()}: Éxito"))
+                    else:
+                        error = res.get('error', 'Error desconocido') if res else 'Sin respuesta'
+                        self.root.after(0, lambda p=plat, e=error: self.status.update(f"   ❌ {p.upper()}: {e}"))
+                        success = False
+                except Exception as e:
+                    self.root.after(0, lambda p=plat, ex=e: self.status.update(f"   ❌ {p.upper()} Error: {ex}"))
+                    success = False
+
+            if success:
+                self.root.after(0, lambda: messagebox.showinfo("Éxito", "Publicación completada en plataforma seleccionadas."))
+                self.root.after(0, self.keep)
+            else:
+                self.root.after(0, lambda: messagebox.showwarning("Atención", "Algunas plataformas fallaron. Revisa el log."))
+                self.root.after(0, lambda: self.btn_pub_all.config(state="normal"))
+                self.root.after(0, lambda: self.btn_pub_sel.config(state="normal"))
+
+        threading.Thread(target=run_publish, daemon=True).start()
+
+    def regenerate(self, target="all"):
+        """Regenerate AI content based on optional feedback or specific target."""
+        item = self.items[self.current_idx]
+        current_headline = self.shorts_text.get('1.0', tk.END).strip()
+        current_caption = self.caption_text.get('1.0', tk.END).strip()
+        
+        feedback = f"REGENERATE {target.upper()}. "
+        if target == "caption":
+            feedback += f"Mantén el título: {current_headline}. Cambia la descripción."
+        elif target == "headline":
+            feedback += f"Mantén la descripción: {current_caption}. Cambia el título."
+        
+        self.status.update(f"⏳ Regenerando {target.upper()} para: {item.get('headline', '...')}")
+        
         item['is_regenerating'] = True
-        
-        # 2. Move item to END of the list for later review
         self.items.pop(self.current_idx)
         self.items.append(item)
-        # Note: We don't increment current_idx because the NEXT item has now shifted into this slot.
-        # But we must ensure idx is valid.
-        if self.current_idx >= len(self.items):
-             self.current_idx = 0 
+        if self.current_idx >= len(self.items): self.current_idx = 0 
         
-        # 3. Load next item immediately (UI doesn't block)
         self.load_item()
 
-        # 4. Start Background Task
         def regen_task():
             try:
+                # Pre-apply positions to item for the renderer
+                item['headline_pos'] = self.headline_pos.get()
+                item['subtitle_pos'] = self.subtitle_pos.get()
+                
                 new_item = self.process_callback(item, feedback)
                 self.root.after(0, lambda: self._update_item_in_list(item, new_item))
             except Exception as e:
-                self.root.after(0, lambda: self.status.update(f"❌ Error regenerando (Background): {e}"))
-                item['is_regenerating'] = False # Reset flag on error
+                self.root.after(0, lambda: self.status.update(f"❌ Error regenerando: {e}"))
+                item['is_regenerating'] = False
         
         threading.Thread(target=regen_task, daemon=True).start()
 
     def _update_item_in_list(self, old_item, new_item):
         """Update the item in the list once background processing is done."""
         try:
-            # We must find the object reference because it might have moved
-            # The 'old_item' is the same object as in list (reference)
             idx = self.items.index(old_item)
-            
-            # Update attributes of the existing object ref DO NOT REPLACE
-            # If we replace, we lose position if we don't know idx sure.
-            # Actually, safe to replace at idx.
             new_item['is_regenerating'] = False
             self.items[idx] = new_item
-            
             head = new_item.get('headline', '...')
             self.status.update(f"✨ Regeneración completada: '{head}'.")
         except ValueError:
-            pass # Item might have been discarded in the meantime
-    
-    def _finish_regen(self, new_item):
-        self.items[self.current_idx] = new_item
-        self.btn_regen.config(state="normal", text="🔄 REGENERAR IA")
-        self.load_item()
+            pass 
 
-    def remove_subtitles(self):
-        """Re-render the current video without subtitles."""
+    def add_to_batch(self):
+        """Schedule the current item for all selected platforms via CentralPublishingHub."""
         item = self.items[self.current_idx]
-        self.btn_remove_subs.config(state="disabled", text="⏳ RE-RENDERIZANDO...")
+        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
+        caption = self.caption_text.get('1.0', tk.END).strip()
+        video_path = item['reel_path']
         
-        # Force skip_subtitles and re-render
-        tweet_data = item.get('tweet_data', {})
-        tweet_data['skip_subtitles'] = True
-        self.status.update(f"   🔄 Re-renderizando sin subtítulos...")
+        platforms = []
+        if self.use_yt.get(): platforms.append("youtube")
+        if self.use_fb.get(): platforms.append("facebook")
+        if self.use_ig.get(): platforms.append("instagram")
+        if self.use_ig_stories.get(): platforms.append("instagram_story")
         
-        def remove_subs_task():
-            try:
-                new_item = self.process_callback(item, None)
-                self.root.after(0, lambda: self._finish_remove_subs(new_item))
-            except Exception as e:
-                self.root.after(0, lambda: self.status.update(f"   ❌ Error quitando subs: {e}"))
-                self.root.after(0, lambda: self.btn_remove_subs.config(state="normal", text="🚫 QUITAR SUBS"))
-        
-        threading.Thread(target=remove_subs_task, daemon=True).start()
-
-    def restore_subtitles(self):
-        """Re-render the current video WITH subtitles (Toggle)."""
-        item = self.items[self.current_idx]
-        self.btn_remove_subs.config(state="disabled", text="⏳ RE-RENDERIZANDO...")
-        
-        # Enable subtitles and re-render
-        tweet_data = item.get('tweet_data', {})
-        tweet_data['skip_subtitles'] = False
-        self.status.update(f"   🔄 Re-renderizando CON subtítulos...")
-        
-        def restore_subs_task():
-            try:
-                new_item = self.process_callback(item, None)
-                self.root.after(0, lambda: self._finish_restore_subs(new_item))
-            except Exception as e:
-                self.root.after(0, lambda: self.status.update(f"   ❌ Error restaurando subs: {e}"))
-                self.root.after(0, lambda: self.btn_remove_subs.config(state="normal", text="🚫 QUITAR SUBS"))
-        
-        threading.Thread(target=restore_subs_task, daemon=True).start()
-    
-    def _finish_remove_subs(self, new_item):
-        self.items[self.current_idx] = new_item
-        self.btn_remove_subs.config(state="normal", text="✅ PONER SUBS", command=self.restore_subtitles, bg="#27ae60")
-        self.status.update(f"   ✅ Vídeo re-renderizado sin subtítulos.")
-        self.load_item()
-
-    def _finish_restore_subs(self, new_item):
-        self.items[self.current_idx] = new_item
-        self.btn_remove_subs.config(state="normal", text="🚫 QUITAR SUBS", command=self.remove_subtitles, bg="#e74c3c")
-        self.status.update(f"   ✅ Vídeo re-renderizado con subtítulos.")
-        self.load_item()
-
-    def generate_ai_cover(self):
-        """Generate a custom cover image using free AI."""
-        item = self.items[self.current_idx]
-        headline = item.get('headline', 'News')
-        
-        # Prompt engineering for the cover
-        prompt = f"editorial documentary photography, {headline}, hyper-realistic, economic minimalist style, red and black theme, high contrast, 8k, cinematic lighting, f/1.8, bokeh, detailed texture, no text, no watermark"
-        
-        self.status.update(f"   🎨 Generando portada AI (Gratis)...")
-        # Disable temporarily
-        self.btn_cover.config(state="disabled")
-        
-        def gen_task():
-            try:
-                from core.image_gen import generate_image_pollinations
-                folder = item['folder']
-                cover_path = os.path.join(folder, "ai_cover.jpg")
-                
-                res = generate_image_pollinations(prompt, cover_path)
-                if res:
-                    self.root.after(0, lambda: self.status.update(f"   ✅ Portada generada: {os.path.basename(cover_path)}"))
-                    self.root.after(0, lambda: messagebox.showinfo("Portada Generada", f"Se ha guardado en la carpeta.\nAhora puedes pulsar '🎞️ INCRUSTAR' para ponerla al inicio del vídeo."))
-                    # Enable Embed Button
-                    self.root.after(0, lambda: self.btn_embed.config(state="normal", bg="#e67e22"))
-                else:
-                    self.root.after(0, lambda: self.status.update(f"   ❌ Falló generación de portada."))
-            except Exception as e:
-                self.root.after(0, lambda: self.status.update(f"   ❌ Error portada: {e}"))
-            finally:
-                self.root.after(0, lambda: self.btn_cover.config(state="normal"))
-
-        threading.Thread(target=gen_task, daemon=True).start()
-
-    def embed_cover(self):
-        """Re-render video with the cover prepended."""
-        item = self.items[self.current_idx]
-        folder = item['folder']
-        cover_path = os.path.join(folder, "ai_cover.jpg")
-        
-        if not os.path.exists(cover_path):
-            messagebox.showerror("Error", "Primero debes generar la portada.")
+        if not platforms:
+            messagebox.showwarning("Sin plataformas", "Selecciona plataformas para programar.")
             return
 
-        self.btn_embed.config(state="disabled", text="⏳ INCRUSTANDO...")
-        self.status.update(f"   🔄 Re-renderizando con portada al inicio...")
+        self.status.update(f"   📅 Programando lote para {', '.join(platforms).upper()}...")
         
-        def embed_task():
-            try:
-                # We reuse process_callback but we need to pass the cover_path somehow
-                # Since process_callback calls render_item_assets which calls process_video_for_reel
-                # We need to hack tweet_data to carry the cover_path temp info
-                tweet_data = item.get('tweet_data', {})
-                tweet_data['cover_path'] = cover_path
-                
-                new_item = self.process_callback(item, None) 
-                
-                # Cleanup hack
-                if 'cover_path' in tweet_data: del tweet_data['cover_path']
-                
-                self.root.after(0, lambda: self._finish_embed(new_item))
-            except Exception as e:
-                self.root.after(0, lambda: self.status.update(f"   ❌ Error incrustando: {e}"))
-                self.root.after(0, lambda: self.btn_embed.config(state="normal", text="🎞️ INCRUSTAR"))
-        
-        threading.Thread(target=embed_task, daemon=True).start()
-
-    def _finish_embed(self, new_item):
-        self.items[self.current_idx] = new_item
-        self.btn_embed.config(state="normal", text="✅ INCRUSTADA", bg="#27ae60")
-        self.status.update(f"   ✅ Portada añadida al inicio del vídeo.")
-        self.load_item()
-
-    def search_location_ui(self):
-        query = self.loc_entry.get().strip()
-        if not query: return
-        
-        config = publisher.load_config()
-        if not config or 'access_token' not in config:
-            messagebox.showerror("Error", "No Access Token configured")
-            return
+        def run_schedule():
+            success = True
+            for plat in platforms:
+                try:
+                    # Delegate scheduling to publisher.py
+                    res = publisher.schedule_publication(video_path, caption, platform=plat, title=shorts_title)
+                    if not res or res.get('status') != 'success':
+                        success = False
+                except:
+                    success = False
             
-        self.status.update(f"🔍 Buscando ubicación: {query}...")
-        results = publisher.search_locations(query, config['access_token'])
-        
-        if results:
-            # Simple dropdown or just pick first for now, user can refine query
-            # For better UX, let's just pick the first one and show name
-            first = results[0]
-            self.loc_id_var.set(f"{first['id']} | {first['name']}")
-            self.loc_entry.delete(0, tk.END)
-            self.loc_entry.insert(0, first['name'])
-            self.status.update(f"📍 Ubicación seleccionada: {first['name']}")
-        else:
-            messagebox.showinfo("Sin resultados", f"No se encontraron ubicaciones para '{query}'")
+            if success:
+                self.root.after(0, lambda: self.status.update(f"   ✅ Lote programado con éxito."))
+                self.root.after(0, self.keep)
+            else:
+                self.root.after(0, lambda: messagebox.showwarning("Error parcial", "Algunas programaciones fallaron."))
+
+        threading.Thread(target=run_schedule, daemon=True).start()
 
     def next_item(self):
         self.current_idx += 1
@@ -802,136 +625,8 @@ class PostAiCurationManager:
             self.player.set_volume(0.0 if self.is_muted else 1.0)
         self.btn_mute.config(text="🔇" if self.is_muted else "🔊")
 
-    def add_single_to_batch(self):
-        """Add current item to batch: schedules ONLY ONE BRANDED post (Instagram, Facebook, YouTube)."""
-        item = self.items[self.current_idx]
-        caption = self.caption_text.get('1.0', tk.END).strip()
-        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
-        
-        self.scheduled_posts.append({
-            'reel_path': item['reel_path'],
-            'caption': caption,
-            'shorts_title': shorts_title,
-            'folder': item['folder'],
-            'variant': 'Branded',
-            'platforms': ['instagram_reel', 'instagram_story', 'facebook_reel', 'youtube_shorts'],
-            'location_id': self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None,
-            'tweet_data': item.get('tweet_data')
-        })
-        self.status.update(f"   📅 Post programado: '{os.path.basename(item['folder'])}' ({len(self.scheduled_posts)} total).")
-        self.keep()
-
-    def add_to_batch(self):
-        """Add current item to A/B testing batch: schedules TWO posts (branded A + raw B)."""
-        item = self.items[self.current_idx]
-        caption_a = self.caption_text.get('1.0', tk.END).strip()
-        shorts_title = self.shorts_text.get('1.0', tk.END).strip()
-        caption_b = item.get('caption_b', caption_a)  # Use AI-generated B or fallback to A
-        
-        # A/B Testing: Schedule branded version with caption A
-        self.scheduled_posts.append({
-            'reel_path': item['reel_path'],
-            'caption': caption_a,
-            'shorts_title': shorts_title,
-            'folder': item['folder'],
-            'variant': 'A (Branded)',
-            'platforms': ['instagram_reel', 'instagram_story', 'facebook_reel', 'youtube_shorts'],
-            'tweet_data': item.get('tweet_data'),
-            'location_id': self.loc_id_var.get().split(" | ")[0] if self.loc_id_var.get() else None
-        })
-        
-        # A/B Testing: Schedule raw version with caption B
-        raw_video_path = item.get('tweet_data', {}).get('local_media_path')
-        is_image = False
-        if raw_video_path:
-            ext = raw_video_path.lower()
-            if ext.endswith(('.jpg', '.jpeg', '.png', '.webp')):
-                is_image = True
-        
-        if raw_video_path and os.path.exists(raw_video_path) and not is_image:
-            self.scheduled_posts.append({
-                'reel_path': raw_video_path,
-                'caption': caption_b,
-                'folder': item['folder'],
-                'variant': 'B (Raw Video)',
-                'platforms': ['instagram_reel', 'facebook_reel'] # No YouTube for B
-            })
-            self.status.update(f"   📅 A/B Test añadido: 2 vídeos programados ({len(self.scheduled_posts)} total).")
-        else:
-            # For images or missing raw, use branded version for B too with different caption
-            self.scheduled_posts.append({
-                'reel_path': item['reel_path'],
-                'caption': caption_b,
-                'folder': item['folder'],
-                'variant': 'B (Branded, Alt Caption)',
-                'platforms': ['instagram_reel', 'facebook_reel'] # No YouTube for B
-            })
-            msg = "imagen detectada, usando vídeo renderizado para B" if is_image else "sin vídeo original"
-            self.status.update(f"   📅 A/B Test añadido ({msg}): 2 posts programados.")
-        
-        self.keep()
-
-    def publish_raw(self):
-        """Publish the original/raw video without Economika branding."""
-        item = self.items[self.current_idx]
-        tweet_data = item.get('tweet_data', {})
-        
-        # Get the original media path
-        raw_video_path = tweet_data.get('local_media_path')
-        
-        if not raw_video_path or not os.path.exists(raw_video_path):
-            messagebox.showerror("Error", "No se encontró el vídeo original. Puede que ya se haya eliminado.")
-            return
-        
-        config = publisher.load_config()
-        if not config:
-            messagebox.showerror("Error de API", "No se encontró configuración de API.")
-            return
-            
-        caption = self.caption_text.get('1.0', tk.END).strip()
-        
-        self.btn_raw.config(state="disabled", text="⏳ SUBIENDO RAW...")
-        self.status.update(f"   🎬 Publicando vídeo RAW en Instagram...")
-        
-        def run_raw_publish():
-            try:
-                # Upload original video directly
-                temp_url = publisher.upload_to_temporary_host(raw_video_path)
-                if not temp_url:
-                    self.root.after(0, lambda: messagebox.showerror("Error", "No se pudo subir el vídeo."))
-                    return
-                
-                res = publisher.upload_reel(temp_url, caption, config['access_token'], config['ig_user_id'])
-                
-                if res and "id" in res:
-                    self.root.after(0, lambda: self.status.update(f"   ✅ Publicado RAW en Instagram: {res['id']}"))
-                    
-                    
-                    # --- YOUTUBE UPLOAD (Raw) ---
-                    # DISABLED PER USER REQUEST: Only branded videos go to YouTube
-                    # try:
-                    #     self.status.update(f"   🚀 Subiendo RAW a YouTube Shorts...")
-                    #     shorts_title = self.shorts_text.get('1.0', tk.END).strip()
-                    #     yt_id = upload_short(raw_video_path, title=shorts_title, description=caption)
-                    #     if yt_id:
-                    #         self.root.after(0, lambda: self.status.update(f"   ✅ Publicado RAW en YouTube Shorts: {yt_id}"))
-                    # except Exception as e:
-                    #     self.status.update(f"   ⚠️ Falló YouTube RAW: {e}")
-                    # -----------------------------------------
-                    
-                    self.root.after(0, lambda: messagebox.showinfo("Éxito", "¡Vídeo RAW publicado con éxito!"))
-                    self.root.after(0, self.keep)
-                else:
-                    self.root.after(0, lambda: messagebox.showerror("Error", f"Fallo: {res}"))
-            except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Error: {str(e)}"))
-            finally:
-                self.root.after(0, lambda: self.btn_raw.config(state="normal", text="🎬 RAW"))
-        
-        threading.Thread(target=run_raw_publish, daemon=True).start()
-
     def on_finish(self):
-        # Stop video preview immediately to prevent audio loop
+        """Finalize curation session and cleanup."""
         if self.cap: 
             self.cap.release()
             self.cap = None
@@ -940,31 +635,11 @@ class PostAiCurationManager:
             self.player = None
         
         self.status.update(f"\n✨ Curación finalizada. {len(self.approved_folders)} reels guardados.")
-        
-        # Trigger batch scheduling in background thread if any posts were queued
-        if self.scheduled_posts:
-            self.status.update(f"📅 Programando {len(self.scheduled_posts)} posts para Instagram...")
-            
-            def schedule_task():
-                try:
-                    scheduled_times = publisher.schedule_batch(self.scheduled_posts)
-                    for i, t in enumerate(scheduled_times):
-                        self.status.update(f"   ⏰ Post {i+1} programado para {t}")
-                    if scheduled_times:
-                        self.root.after(0, lambda: messagebox.showinfo("Programación", f"¡{len(scheduled_times)} posts programados!"))
-                except Exception as e:
-                    self.status.update(f"   ❌ Error programando: {e}")
-                finally:
-                    self.root.after(0, self._finish_close)
-            
-            threading.Thread(target=schedule_task, daemon=True).start()
-        else:
-            self._finish_close()
+        self._finish_close()
     
     def _finish_close(self):
-        # Cleanup original media files now that curation is complete
+        # Cleanup original media now that curation is complete
         self._cleanup_original_media()
-        
         if self.approved_folders:
             try: os.startfile(self.approved_folders[-1])
             except: pass
@@ -974,7 +649,6 @@ class PostAiCurationManager:
         if self.cap: self.cap.release()
         if hasattr(self, 'player') and self.player:
             self.player.close_player()
-        # Cleanup original media on manual close too
         self._cleanup_original_media()
         self.root.destroy()
     
@@ -992,9 +666,14 @@ class PreAiCurationManager:
     def __init__(self, parent, raw_items, status_manager, on_complete):
         self.root = tk.Toplevel(parent)
         self.root.title(f"Filtro Pre-IA ({len(raw_items)} Tweets)")
-        self.root.geometry("1400x900") # Wider to fit everything
+        self.root.geometry("1200x800") # Resized for better fit
         self.root.configure(bg="#1a1a1a")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        
+        # Focus and Modal Enforcement
+        self.root.lift()
+        self.root.focus_force()
+        self.root.grab_set()
         
         self.raw_items = raw_items
         self.current_idx = 0
@@ -1172,7 +851,7 @@ class PreAiCurationManager:
                 self.status.update(f"   ⚠️ Media not found at: {media_path}")
 
     def update_frame(self):
-        if not self.root.winfo_exists() or self.current_idx >= len(self.raw_items): return
+        if not self.root or not self.root.winfo_exists() or self.current_idx >= len(self.raw_items): return
         
         if self.player:
             # IMPORTANT: Delete old image objects to avoid memory/layer leak
@@ -1449,6 +1128,10 @@ def batch_process(urls: list, status: StatusManager):
         filter_event.set()
 
     root.after(0, lambda: PreAiCurationManager(root, scraped_data, status, on_filter_complete))
+    
+    # Flush GUI events to ensure the window is drawn before the thread enters the wait loop
+    root.update_idletasks()
+    root.update()
     
     # Wait for UI to finish Stage 1
     while not filter_event.is_set():
@@ -1879,6 +1562,18 @@ def run_gui():
     # Viral Scout function
 
     def run_process():
+        # --- PRE-FLIGHT HEALTH CHECK ---
+        print("\n" + "!" * 80)
+        print("🔍 EJECUTANDO PRE-FLIGHT CHECK: Verificando CentralAIService...")
+        if not check_centralai_health(CENTRAL_AI_URL):
+            print("\n❌ ERROR CRÍTICO: CentralAIService no está corriendo en " + CENTRAL_AI_URL)
+            print("❌ Abortando proceso para no gastar recursos innecesariamente.")
+            print("!" * 80 + "\n")
+            messagebox.showerror("Error de Conexión", f"CentralAIService no está respondiendo en {CENTRAL_AI_URL}.\n\nPor favor, inicia el servicio antes de continuar.")
+            sys.exit(1)
+        print("✅ CentralAIService: ONLINE")
+        print("!" * 80 + "\n")
+
         nonlocal viral_scout_cache
         raw_text = input_text.get('1.0', tk.END).strip()
         if not raw_text:
@@ -1960,4 +1655,14 @@ if __name__ == "__main__":
         status = StatusManager()
         batch_process(urls, status)
     else:
-        run_gui()
+        try:
+            run_gui()
+        except BaseException as e:
+            import traceback
+            with open("LAST_CRASH.txt", "w", encoding="utf-8") as f:
+                f.write(f"FATAL ERROR AT {datetime.now()}:\n")
+                f.write(str(e) + "\n\n")
+                f.write(traceback.format_exc())
+            print(f"\n[FATAL] El programa ha fallado: {e}")
+            print("Se ha generado LAST_CRASH.txt con los detalles.")
+            sys.exit(1)

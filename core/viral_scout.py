@@ -3,6 +3,7 @@ import os
 import time
 import asyncio
 import re
+import random
 from typing import List, Dict, Optional, Any
 
 def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
@@ -14,6 +15,27 @@ def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
             val = getattr(obj, key, None)
             if val is not None: return val or 0
     return default
+import httpx
+# --- DEFINTIVE MONKEY PATCH FOR HTTPX COOKIE CONFLICT ---
+# This prevents the fatal 'Multiple cookies exist with name=twid' error.
+try:
+    _original_get = httpx.Cookies.get
+    def _patched_get(self, name, default=None, domain=None, path=None):
+        try:
+            return _original_get(self, name, default, domain, path)
+        except Exception as e:
+            if "Multiple cookies exist" in str(e):
+                # If a conflict occurs, return the first matching cookie instead of crashing
+                for cookie in self.jar:
+                    if cookie.name == name:
+                        if domain is None or cookie.domain == domain:
+                            if path is None or cookie.path == path:
+                                return cookie.value
+            return default
+    httpx.Cookies.get = _patched_get
+except Exception as e:
+    print(f"Warning: Failed to patch httpx cookies: {e}")
+
 from twikit import Client
 from config.cookie_utils import netscape_to_dict
 from datetime import datetime, timedelta
@@ -101,7 +123,25 @@ class ViralScout:
             return []
             
         try:
-            self.client.set_cookies(cookies)
+            # Final Resolution for Domain Conflict: Inject cookies with explicit .x.com domain
+            self.client = Client('en-US')
+            
+            from config.cookie_utils import netscape_to_json
+            import json
+            json_cookies_path = COOKIES_FILE.replace('.txt', '.json')
+            netscape_to_json(COOKIES_FILE, json_cookies_path)
+            
+            if hasattr(self.client, '_session') and hasattr(self.client._session, 'cookies'):
+                self.client._session.cookies.clear()
+                cookie_dict = json.load(open(json_cookies_path, encoding='utf-8'))
+                for k, v in cookie_dict.items():
+                    # explicitly set domain to avoid `httpx` CookieConflictError 
+                    # when Twitter's API replies with 'Domain=.x.com'
+                    self.client._session.cookies.set(k, v, domain=".x.com")
+                print(f"✅ Twikit cookies injected manually with explicitly set domain.")
+            else:
+                self.client.load_cookies(json_cookies_path)
+                
         except Exception as e:
             progress_callback(f"❌ Error de cookies: {e}")
             return []
@@ -115,11 +155,20 @@ class ViralScout:
             
             try:
                 # 1. Get User Data (Fresh followers)
+                # Small initial pause to avoid burst detection
+                await asyncio.sleep(random.uniform(2, 4))
+                
                 try:
                     user_data = await self.client.get_user_by_screen_name(user_screen_name)
                     user_id = user_data.id
                     followers = user_data.followers_count
                 except Exception as e:
+                    if "429" in str(e):
+                        progress_callback(f"   🛑 RATE LIMIT (429) en lookup! Enfriando 15 minutos...")
+                        for i in range(15, 0, -1):
+                            progress_callback(f"   ⏳ Quedan {i} minutos...")
+                            await asyncio.sleep(60)
+                        continue
                     # Fallback to search if direct lookup fails
                     try:
                         search_results = await self.client.search_user(user_screen_name)
@@ -163,8 +212,9 @@ class ViralScout:
                                     created_at = created_at.replace(tzinfo=None)
                                 except: pass
                             
-                            # Stop if we hit the date limit or a safety cap (e.g. 150 tweets)
-                            if (isinstance(created_at, datetime) and created_at < limit_date) or len(all_tweets) > 150:
+                            # Stop if we hit the date limit or a safety cap (e.g. 80 tweets)
+                            # 80 tweets is more than enough for a 24h scan and safer for 429s.
+                            if (isinstance(created_at, datetime) and created_at < limit_date) or len(all_tweets) > 80:
                                 break
                             
                             next_tweets = await tweets.next()
@@ -172,8 +222,15 @@ class ViralScout:
                                 break
                             all_tweets.extend(next_tweets)
                             tweets = next_tweets
-                            await asyncio.sleep(1) # Safety delay
+                            await asyncio.sleep(random.uniform(2, 5)) # Dynamic pagination delay
                 except Exception as e:
+                    if "429" in str(e):
+                        progress_callback(f"   🛑 RATE LIMIT (429)! Enfriando 15 minutos...")
+                        for i in range(15, 0, -1):
+                            progress_callback(f"   ⏳ Quedan {i} minutos...")
+                            await asyncio.sleep(60)
+                        # Continue to next account with fresh state.
+                        continue
                     progress_callback(f"   ⚠️ Error obteniendo tuits de @{user_screen_name}: {e}")
                     continue
 
@@ -261,12 +318,16 @@ class ViralScout:
                             'description': getattr(tweet, 'full_text', getattr(tweet, 'text', ''))
                         })
                         progress_callback(f"   🔥 IMPACTO: {score:.1f} ({reposts} RTs, {likes} Likes) - {type_str}")
-                
-                await asyncio.sleep(1) # Pequeña pausa entre cuentas
-                
             except Exception as e:
                 progress_callback(f"   ❌ Error inesperado con @{user_screen_name}: {e}")
                 continue
+            except BaseException as b_e:
+                progress_callback(f"   🛑 ERROR CRÍTICO DE HILO (@{user_screen_name}): {b_e}")
+                continue # Prevent thread from dying and crashing main process
+            
+            # Inter-account jittered delay to avoid detection
+            if idx < total_accounts - 1:
+                await asyncio.sleep(random.uniform(5, 12))
                 
         # Sort by score descending
         viral_urls.sort(key=lambda x: x['score'], reverse=True)
