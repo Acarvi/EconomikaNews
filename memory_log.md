@@ -23,6 +23,9 @@
 
 ### [2026-04-11] Emergency Fix (Task 03) - Core Stabilization
 - **Subtitler (SoX Fix)**: Resolved a critical regression where missing system dependencies (SoX/FFmpeg) caused a violent crash during Whisper fallback. Implemented robust exception handling that logs the specific error and proceeds without subtitles.
-- **Publisher (AttributeError Fix)**: Refactored `core/publisher.py` to fix the `AttributeError: publish_video`. The module now acts as a pure client for the `CentralPublishingHub`.
+- **Publisher (AttributeError & Sync Fix)**: Refactored `core/publisher.py` to fix the `AttributeError: publish_video`.
+  - **URL Fix**: Resolved the bug causing `/api/v1/api/v1` duplication in the Hub request URL.
+  - **Resilience**: Integrated the new `check_publishing_hub_health` with auto-start logic (Port 8000).
+  - **Fallback Queue**: Implemented a local JSON queue (`data/failed_posts.json`) to store posts if the Hub is offline, preventing pipeline failure.
 - **Architectural Shift**: `EconomikaNoticias` has officially stopped handling local publishing logic. It now delegates all immediate and scheduled publications to the Hub via HTTP API (`publish_video`, `schedule_publication`).
 - **Backlog**: Reorganized the entire backlog to prioritize this emergency fix. Task 02 moved to `done/`.
