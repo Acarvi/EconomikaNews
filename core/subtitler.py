@@ -76,6 +76,11 @@ SALIDA (Formato esperado):
     from core.ai_handler import GEMINI_API_KEY
     import re
     
+    # Robust validation for API Key
+    if not GEMINI_API_KEY or len(GEMINI_API_KEY) < 10:
+        print("[WARN] API Key de Gemini inválida o vacía. Omitiendo traducción de subtítulos (Fallback).")
+        return segments # Devuelve los segmentos originales de Whisper sin traducir
+    
     client = genai.Client(api_key=GEMINI_API_KEY)
     try:
         response = client.models.generate_content(

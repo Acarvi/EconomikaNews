@@ -12,5 +12,11 @@
 - **Patch Over Clean**: When dealing with library-level strictness (like `httpx`), runtime patching is often the only way to achieve stability without forking.
 - **UI Lifecycle**: Radical cleanup is safer than conditional updates when dealing with complex Tkinter Toplevel navigations.
 
-### 📅 Next (Backlog)
-- Track major infrastructure and vision tasks in `docs/TODO_List.md`.
+### [2026-04-11] - Fix Subtitler API Key & Env Refactor
+
+- **The Problem**: Subtitler would crash if `GEMINI_API_KEY` was missing. Also, environment variable loading was inconsistent across modules.
+- **The Solution**:
+    - Standardized environment loading using `python-dotenv` in `core/ai_handler.py`.
+    - Implemented a **Safety Fallback** in `core/subtitler.py`: if the API key is invalid, it skips translation and returns original Whisper segments.
+    - Added a functional test case in `tests/test_funcionalidades_core.py` to ensure this behavior is preserved.
+- **Result**: Pipeline is now resilient to credential failure. Rendering continues in original language instead of crashing.

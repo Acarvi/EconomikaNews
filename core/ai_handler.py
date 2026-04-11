@@ -3,6 +3,10 @@ import json
 import time
 import requests
 from typing import Dict, Tuple, Optional, List
+from dotenv import load_dotenv
+
+# Initialize environment
+load_dotenv()
 
 # === CONFIGURATION ===
 CENTRAL_AI_URL = os.environ.get("CENTRAL_AI_URL", "http://localhost:8080")

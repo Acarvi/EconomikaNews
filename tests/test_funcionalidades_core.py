@@ -169,3 +169,30 @@ def test_viral_scout_scraping_integrity(mock_twikit_client):
     assert len(hits) == 0
     assert any("404" in l or "Error inesperado" in l for l in logs)
     print("LOGS CAPTURADOS:", logs)
+
+# -----------------------------------------------------------------------------
+# 6. TEST: FALLBACK DE SUBTITULADO (API KEY FALTANTE)
+# -----------------------------------------------------------------------------
+@patch('core.ai_handler.GEMINI_API_KEY', "")
+def test_subtitler_fallback_missing_key():
+    """
+    OBJETIVO: Evitar el colapso del renderizador (WinError/Crash) ante falta de credenciales.
+    LIVING DOCUMENTATION: Si GEMINI_API_KEY está vacía o es inválida, la función
+    translate_subtitles_to_spanish debe devolver los segmentos originales intactos.
+    """
+    from core.subtitler import translate_subtitles_to_spanish
+    
+    # Mock de segmentos originales (Whisper)
+    mock_segments = [
+        {'start': 0.0, 'end': 2.0, 'text': 'Original Text 1'},
+        {'start': 2.0, 'end': 4.0, 'text': 'Original Text 2'}
+    ]
+    
+    # Ejecución
+    # No debería lanzar excepciones ni intentar instanciar genai.Client
+    result = translate_subtitles_to_spanish(mock_segments)
+    
+    # Verificación
+    assert result == mock_segments, "Los segmentos deberían devolverse intactos en el fallback"
+    assert result[0]['text'] == 'Original Text 1'
+
