@@ -196,3 +196,24 @@ def test_subtitler_fallback_missing_key():
     assert result == mock_segments, "Los segmentos deberían devolverse intactos en el fallback"
     assert result[0]['text'] == 'Original Text 1'
 
+# -----------------------------------------------------------------------------
+# 7. TEST: FALLBACK WHISPER (SYSTEM ERROR / SOX MISSING)
+# -----------------------------------------------------------------------------
+@patch('core.subtitler.whisper.load_model')
+def test_subtitler_whisper_system_error(mock_whisper_load):
+    """
+    OBJETIVO: Evitar crash violento cuando faltan dependencias del sistema (SoX, FFmpeg).
+    """
+    from core.subtitler import transcribe_audio
+    
+    # Simulamos error de carga de Whisper (e.g. SoX no encontrado)
+    mock_whisper_load.side_effect = Exception("System dependency 'sox' not found")
+    
+    # Ejecución
+    # No debe levantar excepción, debe devolver segments vacíos y loguear.
+    with patch('core.subtitler.os.path.exists', return_value=True):
+        result = transcribe_audio("fake_video.mp4")
+    
+    # Verificación
+    assert result == {'language': 'es', 'segments': []}
+

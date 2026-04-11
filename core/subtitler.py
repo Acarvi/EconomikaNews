@@ -15,7 +15,11 @@ def get_whisper_model():
             _model = whisper.load_model("large-v3")
         except Exception as e:
             print(f"[WARN] Failed to load large-v3 model, falling back to medium: {e}")
-            _model = whisper.load_model("medium")
+            try:
+                _model = whisper.load_model("medium")
+            except Exception as e2:
+                print(f"[ERROR] Whisper local fallback failed completely: {e2}")
+                _model = "FAILED" # Marker to skip transcription
     return _model
 
 def transcribe_audio(video_path: str) -> Dict:
@@ -25,22 +29,27 @@ def transcribe_audio(video_path: str) -> Dict:
         return {'language': 'es', 'segments': []}
 
     model = get_whisper_model()
+    if model == "FAILED":
+        print("[WARN] Fallback a Whisper falló por dependencias del sistema. Renderizando vídeo SIN subtítulos.")
+        return {'language': 'es', 'segments': []}
+
     print(f"[INFO] Transcribing {video_path}...")
     
     try:
         # Enable word_timestamps for maximum precision in sync
-        # Added condition checking effectively
         result = model.transcribe(video_path, word_timestamps=True)
         return result
-    except RuntimeError as e:
-        if "size" in str(e):
+    except Exception as e:
+        print(f"[WARN] Transcription failed or SoX/FFmpeg missing: {e}")
+        if "size" in str(e) and isinstance(e, RuntimeError):
             print(f"[WARN] Whisper shape error detected. Retrying with fp16=False...")
             try:
                 result = model.transcribe(video_path, word_timestamps=True, fp16=False)
                 return result
             except Exception as e2:
                  print(f"[ERROR] Whisper retry failed: {e2}")
-        print(f"[ERROR] Transcription failed: {e}")
+        
+        print("[WARN] Fallback a Whisper falló por dependencias del sistema o error interno. Renderizando vídeo SIN subtítulos.")
         return {'language': 'es', 'segments': []} # Return empty on failure to prevent crash
 
 def translate_subtitles_to_spanish(segments: List[Dict]) -> List[Dict]:
