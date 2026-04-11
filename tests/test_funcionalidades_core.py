@@ -4,60 +4,90 @@ import os
 """
 TESTS FUNCIONALES - ECONOMIKA NOTICIAS
 Estos tests documentan el comportamiento crítico del sistema para evitar amnesias técnicas.
+No buscan cobertura de líneas (Jacoco-style), sino COBERTURA FUNCIONAL.
 """
 
 def test_subtitler_force_spanish_translation():
     """
-    OBJETIVO: Garantizar que la línea editorial se mantenga en español.
-    COMPORTAMIENTO ESPERADO: 
-    El módulo subtitler (o el AI handler que transcribe) debe forzar siempre la salida 
-    a español, incluso si el audio de entrada está en inglés, catalán o cualquier otro idioma.
-    Esto es crítico para la consistencia de la marca en YouTube Shorts.
+    OBJETIVO: Garantizar la consistencia de marca y línea editorial en español.
+    
+    COMPORTAMIENTO ESPERADO:
+    El módulo de subtitulación o el AI Handler encargado de la transcripción DEBE 
+    forzar la salida a español (ES), independientemente de si el audio de entrada 
+    está en inglés, catalán o cualquier otro idioma detectado.
+    
+    POR QUÉ ES CRÍTICO:
+    Los Shorts y Reels de Economika Noticias están dirigidos exclusivamente al 
+    público hispanohablante. Una transcripción en el idioma original (ej. inglés) 
+    sin traducción rompería la retención de la audiencia.
     """
-    # TODO: Implementar mock de transcripción con audio multilingüe
+    # TODO: Implementar mock de Gemini/Whisper con entrada 'Hello World' -> Salida 'Hola Mundo'
     pass
 
 def test_pre_flight_check_auto_start():
     """
-    OBJETIVO: Verificar que el sistema es resiliente y autosuficiente.
+    OBJETIVO: Resiliencia y auto-gestión de servicios locales.
+    
     COMPORTAMIENTO ESPERADO:
-    Si CentralAIService no está corriendo en localhost, la función utils.network.check_centralai_health
-    debe intentar levantarlo automáticamente usando uvicorn antes de abortar.
-    La prueba debe validar que el puerto 8080 pasa de cerrado a abierto tras la llamada.
+    Si CentralAIService no responde en el puerto 8080 de localhost, la función 
+    utility `check_centralai_health` debe:
+    1. Detectar la caída.
+    2. Intentar levantar el servicio en un proceso de background (uvicorn).
+    3. Realizar reintentos periódicos (backoff) antes de dar por fallida la operación.
+    
+    POR QUÉ ES CRÍTICO:
+    Evita que el usuario tenga que levantar manualmente microservicios dependientes, 
+    reduciendo la fricción en el pipeline de renderizado.
     """
-    # TODO: Implementar test de integración real o mock de subprocess
+    # TODO: Validar que el puerto 8080 se abre tras invocar la lógica de auto-start
     pass
 
 def test_ai_handler_quota_fallback():
     """
-    OBJETIVO: Gestionar límites de API (Rate Limits).
+    OBJETIVO: Gestión robusta de límites de la API de Gemini (Rate Limits).
+    
     COMPORTAMIENTO ESPERADO:
-    Ante un error HTTP 429 (Too Many Requests) de Gemini, el sistema debe:
-    1. Implementar un exponential backoff simple.
-    2. Si falla tras 3 intentos, notificar al usuario y permitir la continuación manual
-       o el guardado del estado para reintentar más tarde sin perder el progreso del batch.
+    Ante un error HTTP 429 (Too Many Requests), el sistema no debe colapsar. 
+    Debe implementar un mecanismo de retry con Exponential Backoff. Si tras 3 
+    intentos el error persiste, debe guardar el estado actual del batch para 
+    permitir una reanudación manual sin pérdida de datos.
+    
+    POR QUÉ ES CRÍTICO:
+    En sesiones de procesamiento masivo, es común alcanzar las cuotas de la capa 
+    gratuita/pro de Gemini. El sistema debe ser "amnésico" respecto al error, 
+    pero "memorable" respecto al progreso.
     """
-    # TODO: Implementar simulación de error 429
+    # TODO: Simular excepción de API con código 429
     pass
 
 def test_video_conforming_30fps():
     """
-    OBJETIVO: Evitar desincronización de audio/video en el renderizado.
+    OBJETIVO: Sincronización perfecta audio-subtítulos.
+    
     COMPORTAMIENTO ESPERADO:
-    Los videos descargados de X (Twitter) suelen tener timestamps corruptos o frames variables.
-    El generador DEBE conformar el video a 30fps constantes (CFR) usando ffmpeg antes de 
-    procesar con MoviePy, garantizando que los subtítulos coincidan con el audio.
+    Los videos descargados de X (Twitter) suelen tener Variable Frame Rate (VFR) 
+    o timestamps corruptos. El generador DEBE conformar el video a 30fps constantes 
+    (CFR) usando FFmpeg antes de pasarlo a MoviePy.
+    
+    POR QUÉ ES CRÍTICO:
+    Sin conformación, los subtítulos generados por IA se desincronizan gradualmente 
+    respecto al audio, arruinando la calidad final del video.
     """
-    # TODO: Validar metadata de salida tras conformación
+    # TODO: Validar metadata de stream de video (r_frame_rate == 30/1)
     pass
 
 def test_viral_scout_scraping_integrity():
     """
-    OBJETIVO: Detección temprana de cambios en la estructura de X.com.
+    OBJETIVO: Detección temprana de obsolescencia del scraper de X.com.
+    
     COMPORTAMIENTO ESPERADO:
-    Si Twikit o el scraper de X devuelven un error 404 persistente o estructura nula,
-    el sistema debe alertar inmediatamente sobre una posible obsolescencia del selector/API
-    y no simplemente devolver '0 resultados', para distinguir entre 'poca actividad' y 'error técnico'.
+    Si el scraper recibe un error 404 persistente o una estructura de DOM 
+    irreconocible, debe elevar una alerta de "Integridad de Scraper" en lugar 
+    de devolver una lista vacía de resultados.
+    
+    POR QUÉ ES CRÍTICO:
+    Permite distinguir entre "hoy no hay noticias virales" y "el scraper se ha 
+    roto por un cambio en la interfaz de X", acelerando el mantenimiento correctivo.
     """
-    # TODO: Simular respuesta de red corrupta o 404
+    # TODO: Simular respuesta de red 404 o JSON vacío inesperado
     pass
