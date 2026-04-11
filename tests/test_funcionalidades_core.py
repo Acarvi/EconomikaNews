@@ -19,6 +19,8 @@ def test_subtitler_force_spanish_translation(mock_genai, mock_whisper_load):
     OBJETIVO: Garantizar la consistencia de marca y línea editorial en español.
     """
     from core.subtitler import get_subtitles
+    import core.subtitler
+    core.subtitler._model = None
     
     # Mock Whisper (Simulamos audio detectado como Inglés)
     mock_model = MagicMock()

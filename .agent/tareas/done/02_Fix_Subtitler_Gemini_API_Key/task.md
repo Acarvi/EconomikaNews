@@ -2,7 +2,7 @@
 
 **Épica:** Robustez del Pipeline de IA
 **Prioridad:** ALTA
-**Estado:** Pendiente
+**Estado:** Completada
 
 ## Descripción
 El proceso de subtitulado falla estrepitosamente cuando la variable `GEMINI_API_KEY` existe en el entorno pero está vacía. El cargador actual no maneja correctamente los strings vacíos como valores inválidos, saltándose los fallbacks de seguridad.

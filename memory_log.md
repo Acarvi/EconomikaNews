@@ -20,3 +20,9 @@
     - Implemented a **Safety Fallback** in `core/subtitler.py`: if the API key is invalid, it skips translation and returns original Whisper segments.
     - Added a functional test case in `tests/test_funcionalidades_core.py` to ensure this behavior is preserved.
 - **Result**: Pipeline is now resilient to credential failure. Rendering continues in original language instead of crashing.
+
+### [2026-04-11] Emergency Fix (Task 03) - Core Stabilization
+- **Subtitler (SoX Fix)**: Resolved a critical regression where missing system dependencies (SoX/FFmpeg) caused a violent crash during Whisper fallback. Implemented robust exception handling that logs the specific error and proceeds without subtitles.
+- **Publisher (AttributeError Fix)**: Refactored `core/publisher.py` to fix the `AttributeError: publish_video`. The module now acts as a pure client for the `CentralPublishingHub`.
+- **Architectural Shift**: `EconomikaNoticias` has officially stopped handling local publishing logic. It now delegates all immediate and scheduled publications to the Hub via HTTP API (`publish_video`, `schedule_publication`).
+- **Backlog**: Reorganized the entire backlog to prioritize this emergency fix. Task 02 moved to `done/`.

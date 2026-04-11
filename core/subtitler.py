@@ -40,7 +40,7 @@ def transcribe_audio(video_path: str) -> Dict:
         result = model.transcribe(video_path, word_timestamps=True)
         return result
     except Exception as e:
-        print(f"[WARN] Transcription failed or SoX/FFmpeg missing: {e}")
+        print(f"[WARN] Transcription failed or system dependency error: {e}")
         if "size" in str(e) and isinstance(e, RuntimeError):
             print(f"[WARN] Whisper shape error detected. Retrying with fp16=False...")
             try:
@@ -49,7 +49,7 @@ def transcribe_audio(video_path: str) -> Dict:
             except Exception as e2:
                  print(f"[ERROR] Whisper retry failed: {e2}")
         
-        print("[WARN] Fallback a Whisper falló por dependencias del sistema o error interno. Renderizando vídeo SIN subtítulos.")
+        print("[WARN] Fallback a Whisper falló por dependencias del sistema. Renderizando vídeo SIN subtítulos.")
         return {'language': 'es', 'segments': []} # Return empty on failure to prevent crash
 
 def translate_subtitles_to_spanish(segments: List[Dict]) -> List[Dict]:

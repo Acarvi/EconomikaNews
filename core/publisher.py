@@ -4,16 +4,9 @@ import os
 import json
 from typing import List, Dict, Optional
 
-# Configuration for Hub - in environment or default
-CENTRAL_HUB_URL = os.environ.get("CENTRAL_HUB_URL", "http://localhost:8000")
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_FILE = os.path.join(BASE_DIR, "config", "config_api.json")
-
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return {}
+# Configuration for Hub - Standardize on CENTRAL_PUBLISHING_HUB_URL
+# Default to localhost:8000 for development compatibility
+CENTRAL_HUB_URL = os.environ.get("CENTRAL_PUBLISHING_HUB_URL", "http://localhost:8000").rstrip("/")
 
 def upload_to_temporary_host(file_path):
     """Uploads a file to catbox.moe to get a public URL for the Publishing Hub."""
@@ -35,10 +28,10 @@ def upload_to_temporary_host(file_path):
         if attempt < 3: time.sleep(5)
     return None
 
-def publish_now(video_path, caption, platforms: List[str], shorts_title: str = "Noticia"):
+def publish_video(video_path: str, caption: str, platform: str = "instagram", title: str = "Noticia"):
     """
-    Publishes immediately using the CentralPublishingHub.
-    Flow: Upload to Catbox -> Send URL to Hub.
+    Main entry point for immediate publication.
+    Delegates to the CentralPublishingHub via HTTP POST.
     """
     video_url = upload_to_temporary_host(video_path)
     if not video_url:
@@ -47,52 +40,61 @@ def publish_now(video_path, caption, platforms: List[str], shorts_title: str = "
     payload = {
         "video_url": video_url,
         "caption": caption,
-        "platforms": platforms,
-        "shorts_title": shorts_title,
+        "platforms": [platform], # Wrap in list for Hub compatibility
+        "shorts_title": title,
         "account_id": "economika"
     }
 
     try:
-        response = requests.post(f"{CENTRAL_HUB_URL}/api/v1/publish-now", json=payload, timeout=60)
+        # Use Hub's /api/v1/publish-now endpoint
+        hub_api = f"{CENTRAL_HUB_URL}/api/v1/publish-now"
+        print(f"[HUB] Sending project to {hub_api}...")
+        response = requests.post(hub_api, json=payload, timeout=60)
         return response.json()
     except Exception as e:
         print(f"[ERROR] Hub Publication Failed: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"Hub unreachable: {str(e)}"}
 
-def schedule_batch(posts_to_schedule: List[Dict]):
+def schedule_publication(video_path: str, caption: str, platform: str = "instagram", title: str = "Noticia", target_time: str = None):
     """
-    Schedules multiple posts via the CentralPublishingHub.
-    Each post in posts_to_schedule should have: reel_path, caption, target_time, platforms.
+    Main entry point for scheduled publication.
+    Delegates to the CentralPublishingHub via HTTP POST to /api/v1/schedule.
     """
-    batch_posts = []
-    for post in posts_to_schedule:
-        print(f"[INFO] Preparing scheduled post: {os.path.basename(post['reel_path'])}")
-        video_url = upload_to_temporary_host(post['reel_path'])
-        if video_url:
-            batch_posts.append({
+    video_url = upload_to_temporary_host(video_path)
+    if not video_url:
+        return {"status": "error", "message": "Failed to upload to Catbox"}
+
+    # Default to 1 hour from now if not specified
+    if not target_time:
+        from datetime import datetime, timedelta
+        target_time = (datetime.now() + timedelta(hours=1)).isoformat()
+
+    payload = {
+        "posts": [
+            {
                 "video_url": video_url,
-                "caption": post['caption'],
-                "target_time": post['target_time'],
-                "platforms": post.get('platforms', ["instagram_reel", "facebook_reel"]),
-                "shorts_title": post.get('shorts_title', "Economika Noticia"),
+                "caption": caption,
+                "target_time": target_time,
+                "platforms": [platform],
+                "shorts_title": title,
                 "account_id": "economika"
-            })
-
-    if not batch_posts:
-        return {"status": "error", "message": "No posts could be prepared for scheduling"}
+            }
+        ]
+    }
 
     try:
-        response = requests.post(f"{CENTRAL_HUB_URL}/api/v1/schedule", json={"posts": batch_posts}, timeout=60)
+        hub_api = f"{CENTRAL_HUB_URL}/api/v1/schedule"
+        print(f"[HUB] Scheduling project at {hub_api}...")
+        response = requests.post(hub_api, json=payload, timeout=60)
         return response.json()
     except Exception as e:
         print(f"[ERROR] Hub Scheduling Failed: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"Hub unreachable: {str(e)}"}
 
-def search_locations(query: str):
-    """Proxies location search to the Hub."""
-    try:
-        response = requests.get(f"{CENTRAL_HUB_URL}/api/v1/locations", params={"q": query, "account_id": "economika"})
-        return response.json().get("results", [])
-    except Exception as e:
-        print(f"[ERROR] Hub Location Search Failed: {e}")
-        return []
+# Legacy aliases for backward compatibility if needed within core
+def publish_now(video_path, caption, platforms, shorts_title="Noticia"):
+    # Bridge to the new unified publish_video for each platform
+    results = []
+    for p in platforms:
+        results.append(publish_video(video_path, caption, platform=p, title=shorts_title))
+    return results[0] if results else {"status": "error"}
