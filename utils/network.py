@@ -30,38 +30,39 @@ def check_centralai_health(url: str, auto_start: bool = True) -> bool:
             logger.error(f"Unexpected error during health check: {e}")
             return False
 
-    is_healthy = _do_check()
-    
-    if is_healthy:
+    if _do_check():
         return True
     
     # Auto-start logic if unreachable and on localhost
     is_localhost = "localhost" in url or "127.0.0.1" in url
     if auto_start and is_localhost:
-        print(f"WARNING: CentralAIService no responde en {url}. Intentando auto-arranque...")
+        print(f"\n⚠️  [PRE-FLIGHT] CentralAIService no responde en {url}.")
+        print(f"🚀 Intentando auto-arranque en segundo plano...")
         
         # Identify CentralAIService path (sibling directory)
+        # Assumes EconomikaNoticias and CentralAIService share the same parent folder
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         central_ai_path = os.path.abspath(os.path.join(base_dir, "..", "CentralAIService"))
         
         if os.path.exists(os.path.join(central_ai_path, "main.py")):
             try:
                 # Launch uvicorn in a new minimized console window on Windows
-                cmd = f'start /min "CentralAIService" python -m uvicorn main:app --port 8080'
+                # Use sys.executable to ensure we use the same Python environment
+                cmd = f'start /min "CentralAIService" {sys.executable} -m uvicorn main:app --port 8080'
                 subprocess.Popen(cmd, shell=True, cwd=central_ai_path)
                 
-                print("WAIT: Esperando a que CentralAIService se levante (5s)...")
-                time.sleep(5)
+                # Retry loop: 4 attempts, every 2 seconds
+                for i in range(1, 5):
+                    print(f"⏳ [WAIT] Esperando respuesta del servicio... (intento {i}/4)")
+                    time.sleep(2)
+                    if _do_check():
+                        print("✅ [SUCCESS] CentralAIService arrancado y saludable.")
+                        return True
                 
-                # Retry health check
-                if _do_check():
-                    print("SUCCESS: CentralAIService arrancado y saludable.")
-                    return True
-                else:
-                    logger.error("ERROR: El auto-arranque se ejecutó pero el servicio sigue sin responder.")
+                logger.error("❌ [TIMEOUT] El servicio se ejecutó pero sigue sin responder.")
             except Exception as e:
-                logger.error(f"❌ Error al intentar auto-arranque: {e}")
+                logger.error(f"💥 [ERROR] Error fatal al intentar auto-arranque: {e}")
         else:
-            logger.error(f"❌ No se encontró CentralAIService en: {central_ai_path}")
+            logger.error(f"🚫 [ERROR] Ruta no encontrada: {central_ai_path}")
             
     return False
