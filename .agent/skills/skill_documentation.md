@@ -1,16 +1,15 @@
-# Skill: Documentación Viva y Memoria Técnica
+# Skill: Living Documentation y Memoria Técnica
 
-Este documento establece las reglas para mantener la memoria del proyecto EconomikaNoticias, evitando la pérdida de contexto en tareas de larga duración.
+Las IAs y los humanos pierden contexto en proyectos largos. Este skill asegura que la "intención" del sistema permanezca intacta.
 
-## Componentes de la Memoria
-
+## Memoria del Proyecto
 1. **Memory Log (`memory_log.md`):**
-   - Debe actualizarse al final de cada sesión significativa.
-   - Debe registrar: decisiones de diseño, "gotchas" técnicos (ej. errores de encoding en Windows) y deudas técnicas.
-2. **Docstrings de Tests:**
-   - Los tests no solo prueban código, documentan intención de negocio.
-   - Cada test en `tests/` debe tener un docstring detallado que explique el **PORQUÉ** del comportamiento esperado.
+   - Actualizar al final de cada sesión significativa.
+   - Registrar decisiones críticas, "gotchas" técnicos (ej. parches de bibliotecas) y deuda técnica acumulada.
+2. **Tests como Documentación:**
+   - Los docstrings de los tests en `tests/` deben redactarse como **Living Documentation**.
+   - No deben describir *qué* hace el código (eso lo hace el código), sino la **intención de negocio** y el comportamiento crítico esperado.
 
 ## Mantenimiento
-- Al heredar un repositorio o retomar una tarea, la primera acción debe ser leer el `memory_log.md` y los skills en `.agent/skills/`.
-- La documentación debe ser tratada como código: precisa, sin redundancias y versionada.
+- Trata la documentación con el mismo rigor que el código fuente.
+- Antes de empezar, lee siempre los últimos cambios en `memory_log.md`.

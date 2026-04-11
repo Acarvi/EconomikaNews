@@ -1,22 +1,16 @@
-# Skill: Ejecución de Tests Anti-Regresión
+# Skill: Protocolo de Testing y Anti-Regresión
 
-Este documento define el protocolo para la ejecución de pruebas en el ecosistema EconomikaNoticias. El objetivo es garantizar la estabilidad funcional y prevenir amnesias técnicas.
+Para garantizar que el sistema mantenga su integridad funcional a largo plazo, este skill define el estándar de validación.
 
-## Protocolo de Ejecución
-
-1. **Uso de Pytest:** Se debe utilizar siempre `pytest -v`.
-   - Los nombres de los tests deben ser descriptivos (ej. `test_subtitler_force_spanish_translation`) para servir como recordatorio funcional.
-2. **Ciclo de Desarrollo:**
-   - Antes de iniciar una tarea, revisar si existen tests relacionados.
-   - Antes de considerar una tarea como lista para revisión, **TODOS** los tests en la carpeta `tests/` deben estar en verde.
-3. **Manejo de Fallos:**
-   - Si un test falla, se debe corregir la regresión antes de continuar con nuevas funcionalidades, a menos que el test mismo esté obsoleto por un cambio de diseño aprobado.
+## Ejecución de Tests
+1. **Uso de Pytest:** Ejecuta siempre `pytest -v`.
+   - La verbosidad alta permite que los nombres de los tests funcionen como un **recordatorio funcional** de las reglas de negocio que el sistema está protegiendo.
+2. **Criterio de Aceptación:**
+   - Una tarea **NUNCA** se considera "lista para revisión" si existe un solo test fallando en la carpeta `tests/`.
+   - Si una nueva funcionalidad rompe un test antiguo, la prioridad absoluta es resolver la regresión antes de continuar.
 
 ## Recordatorio de Comandos
 ```powershell
-# Ejecutar todos los tests con verbosidad alta
+# Ejecución estándar con nombres de tests visibles
 pytest -v
-
-# Ejecutar un archivo específico
-pytest tests/test_funcionalidades_core.py -v
 ```
