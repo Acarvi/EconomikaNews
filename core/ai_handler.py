@@ -54,37 +54,49 @@ def generate_content_ai(tweet_data: Dict, media_path: str = None, feedback: str 
     }}
     """
 
-    try:
-        # Si hay video, usamos el endpoint de análisis de video del Hub
-        if media_path and os.path.exists(media_path) and media_path.lower().endswith(('.mp4', '.mov', '.avi')):
-            print(f"   🧠 Consultando CentralAIService (/v1/analyzer/draft) para video...")
-            payload = {
-                "video_path": os.path.abspath(media_path),
-                "global_comments": feedback or "",
-                "custom_prompt": prompt
-            }
-            response = requests.post(f"{CENTRAL_AI_URL}/v1/analyzer/draft", json=payload, timeout=300)
-        else:
-            # Para texto o imágenes (por ahora), usamos storyboard o refine adaptado
-            # NOTA: CentralAIService parece estar muy enfocado en video
-            # Si el Hub no soporta texto/imagen directo, implementamos fallback o usamos draft con path nulo
-            print(f"   🧠 Consultando CentralAIService para contenido estático...")
-            payload = {
-                "script_data": {"description": description, "uploader": uploader_id},
-                "global_comments": f"{prompt}\n{feedback or ''}"
-            }
-            response = requests.post(f"{CENTRAL_AI_URL}/v1/analyzer/storyboard", json=payload, timeout=60)
+    max_retries = 3
+    base_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            # Si hay video, usamos el endpoint de análisis de video del Hub
+            if media_path and os.path.exists(media_path) and media_path.lower().endswith(('.mp4', '.mov', '.avi')):
+                print(f"   🧠 Consultando CentralAIService (/v1/analyzer/draft) [Intento {attempt+1}/{max_retries}]...")
+                payload = {
+                    "video_path": os.path.abspath(media_path),
+                    "global_comments": feedback or "",
+                    "custom_prompt": prompt
+                }
+                response = requests.post(f"{CENTRAL_AI_URL}/v1/analyzer/draft", json=payload, timeout=300)
+            else:
+                print(f"   🧠 Consultando CentralAIService para contenido estático [Intento {attempt+1}/{max_retries}]...")
+                payload = {
+                    "script_data": {"description": description, "uploader": uploader_id},
+                    "global_comments": f"{prompt}\n{feedback or ''}"
+                }
+                response = requests.post(f"{CENTRAL_AI_URL}/v1/analyzer/storyboard", json=payload, timeout=60)
 
-        if response.status_code == 200:
-            data = response.json()
-            return parse_hub_response(data)
-        else:
-            print(f"   ❌ CentralAIService error ({response.status_code}): {response.text}")
-            raise Exception("Service error")
+            if response.status_code == 200:
+                data = response.json()
+                return parse_hub_response(data)
+            elif response.status_code == 429:
+                delay = base_delay * (2 ** attempt)
+                print(f"   🛑 ERROR 429 (Rate Limit). Reintentando en {delay}s...")
+                time.sleep(delay)
+                continue
+            else:
+                print(f"   ❌ CentralAIService error ({response.status_code}): {response.text}")
+                raise Exception(f"Service error {response.status_code}")
 
-    except Exception as e:
-        print(f"   ⚠️ Fallback: Error conectando con CentralAIService: {e}")
-        return "ERROR DE CONEXIÓN HUB", "Asegúrate de que CentralAIService esté corriendo.", "error", "error", "", "", "", "00:00", "END"
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"   ⚠️ Error en intento {attempt+1}: {e}. Reintentando...")
+                time.sleep(base_delay)
+                continue
+            print(f"   ⚠️ Fallo final tras {max_retries} intentos: {e}")
+            return "ERROR DE CONEXIÓN HUB", "Asegúrate de que CentralAIService esté corriendo.", "error", "error", "", "", "", "00:00", "END"
+    
+    return "ERROR DE CONEXIÓN HUB", "Máximo de reintentos alcanzado.", "error", "error", "", "", "", "00:00", "END"
 
 def parse_hub_response(data: dict) -> Tuple:
     """Adapta la respuesta del Hub al formato de EconomikaNoticias."""
