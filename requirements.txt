@@ -5,7 +5,7 @@ google-auth-oauthlib
 requests
 moviepy
 Pillow
-twikit
+twikit>=2.3.3
 opencv-python-headless
 numpy
 ffpyplayer

@@ -158,18 +158,36 @@ class ViralScout:
                 # Small initial pause to avoid burst detection
                 await asyncio.sleep(random.uniform(2, 4))
                 
-                try:
-                    user_data = await self.client.get_user_by_screen_name(user_screen_name)
-                    user_id = user_data.id
-                    followers = user_data.followers_count
-                except Exception as e:
-                    if "429" in str(e):
-                        progress_callback(f"   🛑 RATE LIMIT (429) en lookup! Enfriando 15 minutos...")
-                        for i in range(15, 0, -1):
-                            progress_callback(f"   ⏳ Quedan {i} minutos...")
-                            await asyncio.sleep(60)
-                        continue
-                    # Fallback to search if direct lookup fails
+                user_data = None
+                for attempt in range(2): # Retry mechanism (initial + 1 retry)
+                    try:
+                        user_data = await self.client.get_user_by_screen_name(user_screen_name)
+                        user_id = user_data.id
+                        followers = user_data.followers_count
+                        break # Success
+                    except Exception as e:
+                        err_msg = str(e)
+                        if "429" in err_msg:
+                            progress_callback(f"   🛑 RATE LIMIT (429) en lookup! Enfriando 15 minutos...")
+                            for i in range(15, 0, -1):
+                                progress_callback(f"   ⏳ Quedan {i} minutos...")
+                                await asyncio.sleep(60)
+                            continue # Try next account or retry? User said continue if 429? Actually 429 needs cooling.
+                        
+                        if attempt == 0:
+                            progress_callback(f"   ⚠️ Fallo lookup @{user_screen_name}, reintentando en 5s... ({err_msg})")
+                            await asyncio.sleep(5)
+                        else:
+                            # Final failure for this account
+                            if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
+                                progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name}: {err_msg}")
+                                user_data = None # Mark as failed
+                                break
+                            else:
+                                raise e # Unexpected error
+
+                if not user_data:
+                    # Try fallback to search if direct lookup fails definitely
                     try:
                         search_results = await self.client.search_user(user_screen_name)
                         if search_results:
@@ -189,16 +207,32 @@ class ViralScout:
                                 progress_callback(f"   ⚠️ No se encontró coincidencia exacta para @{user_screen_name}.")
                                 continue
                         else:
-                            progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda: {e}")
+                            progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda.")
                             continue
                     except Exception as e2:
-                        progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {e} | {e2}")
+                        progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {e2}")
                         continue
 
-                # 2. Get Recent Tweets (with pagination for deep scan)
+                # 2. Get Recent Tweets
+                all_tweets = []
                 try:
-                    all_tweets = []
-                    tweets = await self.client.get_user_tweets(user_id, 'Tweets', count=40)
+                    tweets = None
+                    for attempt in range(2):
+                        try:
+                            tweets = await self.client.get_user_tweets(user_id, 'Tweets', count=40)
+                            break
+                        except Exception as e:
+                            err_msg = str(e)
+                            if attempt == 0:
+                                progress_callback(f"   ⚠️ Fallo obteniendo tuits de @{user_screen_name}, reintentando en 5s... ({err_msg})")
+                                await asyncio.sleep(5)
+                            else:
+                                if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
+                                    progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name} (Tweets): {err_msg}")
+                                    break
+                                else:
+                                    raise e
+
                     if tweets:
                         all_tweets.extend(tweets)
                         
@@ -210,26 +244,29 @@ class ViralScout:
                                 try:
                                     created_at = datetime.strptime(created_at, "%a %b %d %H:%M:%S %z %Y")
                                     created_at = created_at.replace(tzinfo=None)
+                                # pylint: disable=bare-except
                                 except: pass
                             
                             # Stop if we hit the date limit or a safety cap (e.g. 80 tweets)
-                            # 80 tweets is more than enough for a 24h scan and safer for 429s.
                             if (isinstance(created_at, datetime) and created_at < limit_date) or len(all_tweets) > 80:
                                 break
                             
-                            next_tweets = await tweets.next()
-                            if not next_tweets:
+                            try:
+                                next_tweets = await tweets.next()
+                                if not next_tweets:
+                                    break
+                                all_tweets.extend(next_tweets)
+                                tweets = next_tweets
+                                await asyncio.sleep(random.uniform(2, 5)) 
+                            except Exception as e:
+                                progress_callback(f"   ⚠️ Error en paginación para @{user_screen_name}: {e}")
                                 break
-                            all_tweets.extend(next_tweets)
-                            tweets = next_tweets
-                            await asyncio.sleep(random.uniform(2, 5)) # Dynamic pagination delay
                 except Exception as e:
                     if "429" in str(e):
                         progress_callback(f"   🛑 RATE LIMIT (429)! Enfriando 15 minutos...")
                         for i in range(15, 0, -1):
                             progress_callback(f"   ⏳ Quedan {i} minutos...")
                             await asyncio.sleep(60)
-                        # Continue to next account with fresh state.
                         continue
                     progress_callback(f"   ⚠️ Error obteniendo tuits de @{user_screen_name}: {e}")
                     continue

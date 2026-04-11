@@ -1,0 +1,149 @@
+import pytest
+import asyncio
+from unittest.mock import MagicMock, patch, AsyncMock
+from core.viral_scout import ViralScout
+
+@pytest.mark.asyncio
+async def test_viral_scout_retry_lookup_success():
+    """Test that account lookup retries once on failure and then succeeds."""
+    scout = ViralScout()
+    scout.accounts = {"test_user": 1000}
+    
+    # Mocking the internal imports and Client class
+    with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+        with patch('config.cookie_utils.netscape_to_json'):
+            with patch('json.load', return_value={'ct0': 'dummy'}):
+                with patch('core.viral_scout.Client') as mock_client_class:
+                    mock_instance = mock_client_class.return_value
+                    
+                    mock_user = MagicMock()
+                    mock_user.id = 123
+                    mock_user.followers_count = 1000
+                    
+                    # Mocking get_user_by_screen_name to fail once then succeed
+                    # It must be a coroutine
+                    async def mock_lookup_side_effect(*args, **kwargs):
+                        if mock_lookup_side_effect.call_count == 0:
+                            mock_lookup_side_effect.call_count += 1
+                            raise Exception("Couldn't get KEY_BYTE indices | status: 404")
+                        return mock_user
+                    mock_lookup_side_effect.call_count = 0
+                    
+                    mock_instance.get_user_by_screen_name = mock_lookup_side_effect
+                    mock_instance.get_user_tweets = AsyncMock(return_value=[])
+                    
+                    logs = []
+                    # Avoid sleep in tests
+                    with patch('asyncio.sleep', return_value=None):
+                        hits = await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                        
+                        assert mock_lookup_side_effect.call_count == 1 # One failure, then success
+                        assert any("reintentando en 5s" in l for l in logs)
+                        assert len(hits) == 0
+
+@pytest.mark.asyncio
+async def test_viral_scout_skip_on_total_failure():
+    """Test that an account is skipped with a warning after total lookup failure."""
+    scout = ViralScout()
+    scout.accounts = {"fail_user": 1000, "success_user": 1000}
+    
+    with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+        with patch('config.cookie_utils.netscape_to_json'):
+            with patch('json.load', return_value={'ct0': 'dummy'}):
+                with patch('core.viral_scout.Client') as mock_client_class:
+                    mock_instance = mock_client_class.return_value
+                    
+                    mock_success_user = MagicMock()
+                    mock_success_user.id = 456
+                    mock_success_user.followers_count = 1000
+                    
+                    async def mock_lookup_side_effect(user_name, *args, **kwargs):
+                        if user_name == "fail_user":
+                            raise Exception("404 KEY_BYTE indices")
+                        return mock_success_user
+                    
+                    mock_instance.get_user_by_screen_name = mock_lookup_side_effect
+                    mock_instance.get_user_tweets = AsyncMock(return_value=[])
+                    mock_instance.search_user = AsyncMock(return_value=[])
+                    
+                    logs = []
+                    with patch('asyncio.sleep', return_value=None):
+                        await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                        
+                        # Verify User 1 was skipped with WARN
+                        assert any("[WARN] Fallo scrapeando @fail_user" in l for l in logs)
+                        # Verify it moved to success_user
+                        assert any("Scanning @success_user" in l for l in logs)
+
+@pytest.mark.asyncio
+async def test_viral_scout_retry_tweets_success():
+    """Test that tweet fetching retries once on failure and then succeeds."""
+    scout = ViralScout()
+    scout.accounts = {"test_user": 1000}
+    
+    with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+        with patch('config.cookie_utils.netscape_to_json'):
+            with patch('json.load', return_value={'ct0': 'dummy'}):
+                with patch('core.viral_scout.Client') as mock_client_class:
+                    mock_instance = mock_client_class.return_value
+                    
+                    mock_user = MagicMock()
+                    mock_user.id = 123
+                    mock_user.followers_count = 1000
+                    
+                    mock_instance.get_user_by_screen_name = AsyncMock(return_value=mock_user)
+                    
+                    async def mock_tweets_side_effect(*args, **kwargs):
+                        if mock_tweets_side_effect.call_count == 0:
+                            mock_tweets_side_effect.call_count += 1
+                            raise Exception("KEY_BYTE indices failure")
+                        return []
+                    mock_tweets_side_effect.call_count = 0
+                    
+                    mock_instance.get_user_tweets = mock_tweets_side_effect
+                    
+                    logs = []
+                    with patch('asyncio.sleep', return_value=None):
+                        await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                        
+                        assert mock_tweets_side_effect.call_count == 1
+                        assert any("reintentando en 5s" in l for l in logs)
+
+@pytest.mark.asyncio
+async def test_viral_scout_skip_on_total_tweet_failure():
+    """Test that an account is skipped with a warning after total tweet fetch failure."""
+    scout = ViralScout()
+    scout.accounts = {"fail_user": 1000, "success_user": 1000}
+    
+    with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+        with patch('config.cookie_utils.netscape_to_json'):
+            with patch('json.load', return_value={'ct0': 'dummy'}):
+                with patch('core.viral_scout.Client') as mock_client_class:
+                    mock_instance = mock_client_class.return_value
+                    
+                    mock_user1 = MagicMock()
+                    mock_user1.id = 1
+                    mock_user2 = MagicMock()
+                    mock_user2.id = 2
+                    
+                    mock_instance.get_user_by_screen_name = AsyncMock(side_effect=[mock_user1, mock_user2])
+                    
+                    async def mock_tweets_side_effect(*args, **kwargs):
+                        # Use a simpler way to track which user it is if possible, 
+                        # but here id=1 is the one that fails.
+                        # Wait, the way it's called is get_user_tweets(user_id, ...)
+                        user_id = args[0]
+                        if user_id == 1:
+                            raise Exception("KEY_BYTE indices info")
+                        return []
+                    
+                    mock_instance.get_user_tweets = mock_tweets_side_effect
+                    
+                    logs = []
+                    with patch('asyncio.sleep', return_value=None):
+                        await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                        
+                        # Verify User 1 was skipped with WARN
+                        assert any("[WARN] Fallo scrapeando @fail_user (Tweets)" in l for l in logs)
+                        # Verify success for user 2
+                        assert any("Scanning @success_user" in l for l in logs)
