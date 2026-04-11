@@ -2,20 +2,20 @@
 
 **Épica:** Estabilidad de Integración
 **Prioridad:** ALTA
-**Estado:** Pendiente
+**Estado:** Completada
 
 ## Descripción
 El generador de vídeos de `EconomikaNoticias` falla al intentar comunicarse con el servicio de análisis de `CentralAIService` en el puerto 8080. El error indica una negación activa de conexión, lo que sugiere que el servicio no está levantado o es inalcanzable.
 
 ## Criterios de Aceptación
-- [ ] Implementar un mecanismo de "Pre-flight check" que verifique la disponibilidad del endpoint `/health` de CentralAIService antes de iniciar el procesamiento batch.
-- [ ] Si el servicio no está disponible, el sistema debe intentar levantarlo automáticamente (si es local) o emitir una alerta clara y detener el proceso de forma segura.
-- [ ] El error no debe suceder de forma inesperada en mitad de un renderizado costoso.
+- [x] Implementar un mecanismo de "Pre-flight check" que verifique la disponibilidad del endpoint `/health` de CentralAIService antes de iniciar el procesamiento batch.
+- [x] Si el servicio no está disponible, el sistema debe intentar levantarlo automáticamente (si es local) o emitir una alerta clara y detener el proceso de forma segura.
+- [x] El error no debe suceder de forma inesperada en mitad de un renderizado costoso.
 
 ## Tareas Técnicas
-- [ ] Crear un decorador o función utilitaria en `core/generator.py` para verificar salud de servicios externos.
-- [ ] Configurar variables de puerto y host para que sean consistentes entre repositorios.
-- [ ] Probar el escenario de "Service Down" y verificar la gestión de la excepción.
+- [x] Crear un decorador o función utilitaria en `core/generator.py` para verificar salud de servicios externos.
+- [x] Configurar variables de puerto y host para que sean consistentes entre repositorios.
+- [x] Probar el escenario de "Service Down" y verificar la gestión de la excepción.
 
 ## Logs / Contexto
 ```text
