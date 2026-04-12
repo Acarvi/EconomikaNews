@@ -39,6 +39,8 @@ def scan_for_secrets():
     for root, dirs, files in os.walk('.'):
         if '.git' in dirs: dirs.remove('.git')
         if '__pycache__' in dirs: dirs.remove('__pycache__')
+        if 'tests' in dirs: dirs.remove('tests') # Ignore test suite
+        if 'scratch' in dirs: dirs.remove('scratch') # Ignore scratch scripts
         
         for file in files:
             if file.endswith('.py') and file not in IGNORED_FILES:

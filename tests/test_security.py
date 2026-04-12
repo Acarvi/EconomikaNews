@@ -27,18 +27,19 @@ def test_security_audit_gitignore():
     assert check_gitignore() is True
 
 def test_secret_scanner_fail():
-    """Verify that the scanner detects hardcoded keys in dummy files."""
-    dummy_file = "scratch/fake_exposure.py"
-    os.makedirs("scratch", exist_ok=True)
+    """Verify that the scanner detects hardcoded keys."""
+    dummy_file = "temp_secret_exposure.py"
     with open(dummy_file, "w") as f:
         f.write('API_KEY = "AIzaSyBzKk3iLoYKlcr-eZJGV_AXMEfPatxC6io"')
     
-    # scan_for_secrets scans the current directory
-    # We expect it to find the secret in the scratch folder
-    assert scan_for_secrets() is False
+    # scan_for_secrets should now catch it in the root (but skip IGNORED_FILES)
+    result = scan_for_secrets()
     
-    # Cleanup
-    os.remove(dummy_file)
+    # Cleanup FIRST to ensure we don't block the next run
+    if os.path.exists(dummy_file):
+        os.remove(dummy_file)
+    
+    assert result is False
 
 if __name__ == "__main__":
     pytest.main([__file__])
