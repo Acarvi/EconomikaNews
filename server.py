@@ -1,9 +1,15 @@
-from utils.security_audit import validate_environment
-from utils.log_sanitizer import init_sanitizer
+import os
+import sys
 
-# --- SECURITY FIRST ---
-validate_environment()
-init_sanitizer()
+# --- SENTINEL API BOOTSTRAP ---
+SENTINEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "SentinelAPI"))
+if SENTINEL_PATH not in sys.path:
+    sys.path.insert(0, SENTINEL_PATH)
+try:
+    from bootstrap import activate_security
+    activate_security()
+except ImportError:
+    print("⚠️ Warning: SentinelAPI module not found. Proceeding with caution.")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

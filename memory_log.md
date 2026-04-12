@@ -40,3 +40,8 @@
     - The system now automatically switches to RSS ingestion if Twikit fails, ensuring zero-downtime content scraping.
     - Integrated multiple Nitter instances to ensure resilience against instance failure.
 - **Testing**: Achieved 100% functional coverage for these new layers with `tests/test_security.py` and `tests/test_fallback.py`.
+
+### [2026-04-12] Security Unification & key Update
+- **API Renewal**: Updated Gemini key to `AIzaSyC...yE` across the ecosystem.
+- **Microservice Unification**: Extracted the Anti-Exposure system to `d:\Scripts\shared_security`.
+- **Integration**: `EconomikaNoticias` now imports security logic from the shared module via the `bootstrap.activate_security()` hook, enabling centralized security management for all siblings scripts.
