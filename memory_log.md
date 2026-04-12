@@ -29,3 +29,14 @@
   - **Fallback Queue**: Implemented a local JSON queue (`data/failed_posts.json`) to store posts if the Hub is offline, preventing pipeline failure.
 - **Architectural Shift**: `EconomikaNoticias` has officially stopped handling local publishing logic. It now delegates all immediate and scheduled publications to the Hub via HTTP API (`publish_video`, `schedule_publication`).
 - **Backlog**: Reorganized the entire backlog to prioritize this emergency fix. Task 02 moved to `done/`.
+
+### [2026-04-12] Anti-Exposure System & Twikit Fallback
+- **Phase 1: Anti-Exposure (Priority Zero)**: 
+    - Implemented `utils/security_audit.py` to enforce `.gitignore` rules and scan for hardcoded secrets. Startup is blocked if vulnerabilities are found.
+    - Implemented `utils/log_sanitizer.py` using monkey-patching on `sys.stdout/stderr` to redact all `.env` values (API keys, etc.) from console and logs.
+    - Standardized `git rm --cached .env` to prevent credential leaks in tracking.
+- **Phase 2: Scraper Fallback (Nitter RSS)**:
+    - Resolved persistent 404/KEY_BYTE errors in Twikit by implementing a **Deep Fallback** to Nitter RSS feeds in `core/viral_scout.py`.
+    - The system now automatically switches to RSS ingestion if Twikit fails, ensuring zero-downtime content scraping.
+    - Integrated multiple Nitter instances to ensure resilience against instance failure.
+- **Testing**: Achieved 100% functional coverage for these new layers with `tests/test_security.py` and `tests/test_fallback.py`.

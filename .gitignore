@@ -8,6 +8,8 @@ config/config_api.json
 config/accounts.json
 config/x.com_cookies.txt
 .env
+client_secrets.json
+*.pickle
 *.mp4
 *.mp3
 !data/pending_tweets.json

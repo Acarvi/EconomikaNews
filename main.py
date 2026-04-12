@@ -1,4 +1,11 @@
 import sys
+from utils.security_audit import validate_environment
+from utils.log_sanitizer import init_sanitizer
+
+# --- SECURITY FIRST ---
+validate_environment()
+init_sanitizer()
+
 from typing import Dict
 import os
 import shutil

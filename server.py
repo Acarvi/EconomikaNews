@@ -1,7 +1,10 @@
-"""
-Economika Cloud Server - FastAPI Backend
-Runs on Render (free tier) with scheduled Viral Scout scanning and publishing queue.
-"""
+from utils.security_audit import validate_environment
+from utils.log_sanitizer import init_sanitizer
+
+# --- SECURITY FIRST ---
+validate_environment()
+init_sanitizer()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler

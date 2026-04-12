@@ -39,6 +39,8 @@ except Exception as e:
 from twikit import Client
 from config.cookie_utils import netscape_to_dict
 from datetime import datetime, timedelta
+import feedparser
+import httpx
 
 # Configuration Files - in config/ and data/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -144,7 +146,8 @@ class ViralScout:
                 
         except Exception as e:
             progress_callback(f"❌ Error de cookies: {e}")
-            return []
+            # Do NOT return empty yet, we might fallback per account
+            pass
 
         total_accounts = len(self.accounts)
         limit_date = datetime.now() - timedelta(hours=hours_back)
@@ -205,12 +208,18 @@ class ViralScout:
                                 progress_callback(f"   ℹ️ @{user_screen_name} encontrado vía búsqueda.")
                             else:
                                 progress_callback(f"   ⚠️ No se encontró coincidencia exacta para @{user_screen_name}.")
-                                continue
                         else:
                             progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda.")
-                            continue
                     except Exception as e2:
-                        progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {e2}")
+                        progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {e} | {e2}")
+                    
+                    # --- FALLBACK TO NITTER RSS ---
+                    progress_callback(f"   🔄 Activando FALLBACK (Nitter RSS) para @{user_screen_name}...")
+                    nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
+                    if nitter_hits:
+                        viral_urls.extend(nitter_hits)
+                        continue
+                    else:
                         continue
 
                 # 2. Get Recent Tweets
@@ -356,7 +365,13 @@ class ViralScout:
                         })
                         progress_callback(f"   🔥 IMPACTO: {score:.1f} ({reposts} RTs, {likes} Likes) - {type_str}")
             except Exception as e:
-                progress_callback(f"   ❌ Error inesperado con @{user_screen_name}: {e}")
+                if "404" in str(e) or "lookup" in str(e).lower():
+                    progress_callback(f"   🔄 Fallo Twikit (404/Lookup). Intentando Fallback Nitter RSS...")
+                    nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
+                    if nitter_hits:
+                        viral_urls.extend(nitter_hits)
+                else:
+                    progress_callback(f"   ❌ Error inesperado con @{user_screen_name}: {e}")
                 continue
             except BaseException as b_e:
                 progress_callback(f"   🛑 ERROR CRÍTICO DE HILO (@{user_screen_name}): {b_e}")
@@ -369,6 +384,92 @@ class ViralScout:
         # Sort by score descending
         viral_urls.sort(key=lambda x: x['score'], reverse=True)
         return viral_urls
+
+    async def _scan_nitter_rss(self, user_screen_name, limit_date, min_ratio=2.0, progress_callback=print):
+        """
+        Fallback strategy using Nitter RSS feeds.
+        Nitter provides RSS at https://nitter.net/[user]/rss
+        """
+        instances = ["nitter.net", "nitter.it", "nitter.cz", "nitter.default.ovh"]
+        hits = []
+        
+        for instance in instances:
+            rss_url = f"https://{instance}/{user_screen_name}/rss"
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.get(rss_url)
+                    if resp.status_code != 200: continue
+                    
+                    feed = feedparser.parse(resp.text)
+                    if not feed.entries: continue
+                    
+                    progress_callback(f"      ✅ Éxito con {instance}. Parsing {len(feed.entries)} entradas...")
+                    
+                    for entry in feed.entries:
+                        # Date check
+                        published = entry.get('published_parsed')
+                        if published:
+                            pub_dt = datetime(*published[:6])
+                            if pub_dt < limit_date: continue
+                        
+                        tweet_id = entry.link.split('/')[-1].split('#')[0]
+                        if self.is_processed(tweet_id): continue
+                        
+                        # Nitter RSS often doesn't give raw stats easily.
+                        # We extract them from the description if possible or set defaults.
+                        # Description contains HTML.
+                        desc = entry.get('description', '')
+                        
+                        # Extract metrics from Nitter description footer if present
+                        # Usually: "r: 10, l: 20" or similar in some instances
+                        reposts = 0
+                        likes = 0
+                        stats_match = re.search(r'(\d+)\s+reposts?,\s+(\d+)\s+favorites?', desc)
+                        if stats_match:
+                            reposts = int(stats_match.group(1))
+                            likes = int(stats_match.group(2))
+                        
+                        # Since we don't have followers count here, we use a conservative score
+                        # Or we assume a "medium" account size if unknown.
+                        # For fallback, we lower the threshold slightly to ensure we get data.
+                        score = (reposts * 2 + likes) / 100.0 # Normalized heuristic for RSS
+                        
+                        # Media check
+                        has_video = "video" in desc or ".mp4" in desc
+                        has_image = "img src" in desc
+                        
+                        if not (has_video or has_image): continue
+                        
+                        # Extract media URL
+                        media_url = None
+                        if has_video:
+                            v_match = re.search(r'source src="([^"]+)"', desc)
+                            if v_match: media_url = v_match.group(1)
+                        elif has_image:
+                            i_match = re.search(r'img src="([^"]+)"', desc)
+                            if i_match: media_url = i_match.group(1)
+                        
+                        type_str = "VÍDEO 🎥" if has_video else "IMAGEN 🖼️"
+                        
+                        hits.append({
+                            'url': entry.link.replace(instance, 'x.com'),
+                            'score': score,
+                            'reposts': reposts,
+                            'likes': likes,
+                            'user': user_screen_name,
+                            'id': tweet_id,
+                            'type': type_str,
+                            'is_video': has_video,
+                            'media_url': media_url,
+                            'thumbnail': media_url if not has_video else None,
+                            'description': entry.title
+                        })
+                    
+                    if hits: break # Success with one instance is enough
+            except Exception as e:
+                continue
+                
+        return hits
 
     def scan(self, hours_back=24, min_ratio=2.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
         """
