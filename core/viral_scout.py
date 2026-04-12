@@ -181,7 +181,17 @@ class ViralScout:
                             progress_callback(f"   ⚠️ Fallo lookup @{user_screen_name}, reintentando en 5s... ({err_msg})")
                             await asyncio.sleep(5)
                         else:
-                            # Final failure for this account
+                            # Final failure for this account - INVESTIGACIÓN FORENSE
+                            if user_screen_name.lower() == 'wallstwolverine':
+                                with open("debug_x_response.txt", "w", encoding="utf-8") as f:
+                                    f.write(f"USER: {user_screen_name}\n")
+                                    f.write(f"ERROR: {err_msg}\n")
+                                    f.write(f"EXCEPTION TYPE: {type(e).__name__}\n")
+                                    if hasattr(e, 'response'):
+                                        f.write(f"RESPONSE STATUS: {e.response.status_code}\n")
+                                        f.write(f"RESPONSE TEXT: {e.response.text}\n")
+                                progress_callback(f"   🔍 [DEBUG] Dump guardado en debug_x_response.txt para @{user_screen_name}")
+
                             if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
                                 progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name}: {err_msg}")
                                 user_data = None # Mark as failed
@@ -365,8 +375,8 @@ class ViralScout:
                         })
                         progress_callback(f"   🔥 IMPACTO: {score:.1f} ({reposts} RTs, {likes} Likes) - {type_str}")
             except Exception as e:
-                if "404" in str(e) or "lookup" in str(e).lower():
-                    progress_callback(f"   🔄 Fallo Twikit (404/Lookup). Intentando Fallback Nitter RSS...")
+                if any(msg in str(e).lower() for msg in ["404", "403", "lookup", "key_byte", "indices"]):
+                    progress_callback(f"   🔄 Fallo Twikit ({e}). Intentando Fallback Nitter RSS...")
                     nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
                     if nitter_hits:
                         viral_urls.extend(nitter_hits)
@@ -387,23 +397,28 @@ class ViralScout:
 
     async def _scan_nitter_rss(self, user_screen_name, limit_date, min_ratio=2.0, progress_callback=print):
         """
-        Fallback strategy using Nitter RSS feeds.
-        Nitter provides RSS at https://nitter.net/[user]/rss
+        Fallback strategy using Nitter RSS feeds with instance rotation.
         """
-        instances = ["nitter.net", "nitter.it", "nitter.cz", "nitter.default.ovh"]
+        # --- ROTACIÓN DE INSTANCIAS NITTER ---
+        instances = ['nitter.net', 'nitter.cz', 'nitter.poast.org', 'nitter.privacydev.net']
         hits = []
         
         for instance in instances:
             rss_url = f"https://{instance}/{user_screen_name}/rss"
+            progress_callback(f"      📡 Probando instancia Nitter: {instance}...")
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                     resp = await client.get(rss_url)
-                    if resp.status_code != 200: continue
+                    if resp.status_code != 200: 
+                        progress_callback(f"      ⚠️ Instancia {instance} devolvió status {resp.status_code}")
+                        continue
                     
                     feed = feedparser.parse(resp.text)
-                    if not feed.entries: continue
+                    if not feed.entries:
+                        progress_callback(f"      ⚠️ Instancia {instance} no devolvió entradas.")
+                        continue
                     
-                    progress_callback(f"      ✅ Éxito con {instance}. Parsing {len(feed.entries)} entradas...")
+                    progress_callback(f"      ✨ Éxito con {instance}. Analizando {len(feed.entries)} noticias...")
                     
                     for entry in feed.entries:
                         # Date check
@@ -412,31 +427,35 @@ class ViralScout:
                             pub_dt = datetime(*published[:6])
                             if pub_dt < limit_date: continue
                         
-                        tweet_id = entry.link.split('/')[-1].split('#')[0]
+                        # Extract Tweet ID from link
+                        # Format: https://nitter.net/[user]/status/[id]#m
+                        link = entry.get('link', '')
+                        tweet_id = link.split('/')[-1].split('#')[0]
+                        
+                        if not tweet_id: continue
                         if self.is_processed(tweet_id): continue
                         
-                        # Nitter RSS often doesn't give raw stats easily.
-                        # We extract them from the description if possible or set defaults.
-                        # Description contains HTML.
+                        # Description contains HTML with metrics and media
                         desc = entry.get('description', '')
                         
-                        # Extract metrics from Nitter description footer if present
-                        # Usually: "r: 10, l: 20" or similar in some instances
+                        # --- ROBUST METRIC MAPPING ---
+                        # Usually: "r: 10, l: 20" or "Reposts: 10, Favorites: 20"
                         reposts = 0
                         likes = 0
-                        stats_match = re.search(r'(\d+)\s+reposts?,\s+(\d+)\s+favorites?', desc)
+                        
+                        # Try various patterns
+                        stats_match = re.search(r'(\d+)\s+(?:reposts?|r),?\s+(\d+)\s+(?:favorites?|f|likes?)', desc, re.I)
                         if stats_match:
                             reposts = int(stats_match.group(1))
                             likes = int(stats_match.group(2))
                         
-                        # Since we don't have followers count here, we use a conservative score
-                        # Or we assume a "medium" account size if unknown.
-                        # For fallback, we lower the threshold slightly to ensure we get data.
-                        score = (reposts * 2 + likes) / 100.0 # Normalized heuristic for RSS
+                        # Heuristic score for RSS (since we don't have followers count)
+                        # We use a lower threshold but still require some impact
+                        score = (reposts * 3 + likes) / 50.0 
                         
                         # Media check
                         has_video = "video" in desc or ".mp4" in desc
-                        has_image = "img src" in desc
+                        has_image = "img src" in desc or "dc:image" in entry or "media_content" in entry
                         
                         if not (has_video or has_image): continue
                         
@@ -449,10 +468,14 @@ class ViralScout:
                             i_match = re.search(r'img src="([^"]+)"', desc)
                             if i_match: media_url = i_match.group(1)
                         
+                        # Final Safety: If media_url is still None but has_image is true, try entry.media
+                        if not media_url and entry.get('media_content'):
+                            media_url = entry.media_content[0].get('url')
+
                         type_str = "VÍDEO 🎥" if has_video else "IMAGEN 🖼️"
                         
                         hits.append({
-                            'url': entry.link.replace(instance, 'x.com'),
+                            'url': f"https://x.com/{user_screen_name}/status/{tweet_id}",
                             'score': score,
                             'reposts': reposts,
                             'likes': likes,
@@ -462,11 +485,14 @@ class ViralScout:
                             'is_video': has_video,
                             'media_url': media_url,
                             'thumbnail': media_url if not has_video else None,
-                            'description': entry.title
+                            'description': entry.get('title', '')
                         })
                     
-                    if hits: break # Success with one instance is enough
+                    if hits:
+                        progress_callback(f"      ✅ Fallback completado: {len(hits)} items rescatados vía RSS.")
+                        break # Success with one instance is enough
             except Exception as e:
+                progress_callback(f"      ❌ Error en instancia {instance}: {e}")
                 continue
                 
         return hits

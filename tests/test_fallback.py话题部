@@ -1,0 +1,60 @@
+import pytest
+import asyncio
+from unittest.mock import MagicMock, AsyncMock, patch
+from core.viral_scout import ViralScout
+from datetime import datetime, timedelta
+
+@pytest.mark.asyncio
+async def test_nitter_fallback_integration():
+    """
+    Integration test: Simulates a Twikit KEY_BYTE error and verifies
+    that the system falls back to Nitter RSS successfully.
+    """
+    scout = ViralScout()
+    scout.accounts = {"wallstwolverine": 850000}
+    
+    # Mock Twikit client to raise the infamous KEY_BYTE error
+    scout.client.get_user_by_screen_name = AsyncMock(side_effect=Exception("Couldn't get KEY_BYTE indices"))
+    
+    # Mock Nitter RSS response
+    mock_rss_content = """<?xml version="1.0" encoding="UTF-8"?>
+    <rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+      <channel>
+        <title>wallstwolverine / @wallstwolverine</title>
+        <item>
+          <title>🚨 URGENTE: Test de Fallback exitoso.</title>
+          <link>https://nitter.net/wallstwolverine/status/123456789#m</link>
+          <description><![CDATA[<p>Contenido de prueba con video <source src="https://video.twimg.com/test.mp4"></p>
+          <p>r: 500, l: 2000</p>]]></description>
+          <pubDate>""" + (datetime.now() - timedelta(hours=1)).strftime("%a, %d %b %Y %H:%M:%S GMT") + """</pubDate>
+          <guid isPermaLink="false">https://nitter.net/wallstwolverine/status/123456789#m</guid>
+        </item>
+      </channel>
+    </rss>"""
+
+    # We need to mock httpx to return our fake RSS
+    with patch("httpx.AsyncClient.get") as mock_get:
+        # Mocking the response object
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = mock_rss_content
+        mock_get.return_value = mock_response
+        
+        # Run scan
+        # We need to mock the cookie loading to avoid file IO errors in test environment
+        with patch.object(scout.client, 'load_cookies', return_value=None):
+            hits = await scout._scan_async(hours_back=24, min_ratio=0.1, progress_callback=lambda x: None)
+            
+            # Verifications
+            assert len(hits) > 0, "Fallback failed to rescue the scan!"
+            assert hits[0]['user'] == "wallstwolverine"
+            assert hits[0]['id'] == "123456789"
+            assert hits[0]['reposts'] == 500
+            assert hits[0]['likes'] == 2000
+            assert "x.com" in hits[0]['url']
+            print("\n✅ Test de Fallback INTEGRATION PASSED!")
+
+if __name__ == "__main__":
+    import sys
+    # Use the pytest runner to execute this file
+    pytest.main([__file__, "-v"])
