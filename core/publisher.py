@@ -18,10 +18,42 @@ HUB_API_V1 = f"{CENTRAL_HUB_BASE}/api/v1"
 
 FAILED_POSTS_FILE = os.path.join("data", "failed_posts.json")
 GRAPH_API_VERSION = os.environ.get("GRAPH_API_VERSION", "v22.0")
+IG_MEDIA_PROCESSING_TIMEOUT_SECONDS = int(os.environ.get("IG_MEDIA_PROCESSING_TIMEOUT_SECONDS", "300"))
+IG_MEDIA_PROCESSING_POLL_SECONDS = max(1, int(os.environ.get("IG_MEDIA_PROCESSING_POLL_SECONDS", "5")))
 
 def _admin_headers() -> Dict[str, str]:
     api_key = os.environ.get("ECONOMIKA_ADMIN_API_KEY")
     return {"X-API-Key": api_key} if api_key else {}
+
+def _normalize_platform(platform: str) -> str:
+    return {
+        "instagram": "instagram_reel",
+        "facebook": "facebook_reel",
+        "youtube": "youtube_shorts",
+    }.get(platform, platform)
+
+def _wait_for_ig_media_finished(creation_id: str, access_token: str):
+    status_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{creation_id}"
+    deadline = time.monotonic() + IG_MEDIA_PROCESSING_TIMEOUT_SECONDS
+
+    while time.monotonic() < deadline:
+        response = requests.get(
+            status_url,
+            params={"fields": "status_code", "access_token": access_token},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        status_code = payload.get("status_code")
+
+        if status_code == "FINISHED":
+            return payload
+        if status_code == "ERROR":
+            raise RuntimeError(f"Instagram media processing failed: {payload}")
+
+        time.sleep(IG_MEDIA_PROCESSING_POLL_SECONDS)
+
+    raise RuntimeError(f"Instagram media processing timed out for creation_id={creation_id}")
 
 def _upload_to_ig(
     video_url: str,
@@ -49,6 +81,8 @@ def _upload_to_ig(
     creation_id = creation.get("id")
     if not creation_id:
         raise RuntimeError(f"Instagram media creation failed: {creation}")
+
+    _wait_for_ig_media_finished(creation_id, access_token)
 
     publish_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{ig_user_id}/media_publish"
     publish_payload = {
@@ -126,7 +160,7 @@ def publish_video(video_path: str, caption: str, platform: str = "instagram", ti
     payload = {
         "video_url": video_url,
         "caption": caption,
-        "platforms": [platform],
+        "platforms": [_normalize_platform(platform)],
         "shorts_title": title,
         "account_id": "economika"
     }
@@ -164,7 +198,7 @@ def schedule_publication(video_path: str, caption: str, platform: str = "instagr
                 "video_url": video_url,
                 "caption": caption,
                 "target_time": target_time,
-                "platforms": [platform],
+                "platforms": [_normalize_platform(platform)],
                 "shorts_title": title,
                 "account_id": "economika"
             }

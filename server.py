@@ -72,6 +72,13 @@ def parse_utc_datetime(value: str) -> datetime:
         dt = dt.replace(tzinfo=MADRID_TZ)
     return dt.astimezone(timezone.utc)
 
+def normalize_platform(platform: str) -> str:
+    return {
+        "instagram": "instagram_reel",
+        "facebook": "facebook_reel",
+        "youtube": "youtube_shorts",
+    }.get(platform, platform)
+
 def atomic_write_json(filepath: str, data):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fd, temp_path = tempfile.mkstemp(prefix=".tmp_", suffix=".json", dir=os.path.dirname(filepath))
@@ -324,10 +331,8 @@ def schedule_posts_batch(request: ScheduleRequest):
             
         post['status'] = 'pending'
         post['added_at'] = now_utc().isoformat()
-        post['platforms'] = [
-            {"instagram": "instagram_reel", "facebook": "facebook_reel"}.get(platform, platform)
-            for platform in post.get("platforms", [])
-        ]
+        requested_platforms = post.get("platforms") or ["instagram"]
+        post['platforms'] = [normalize_platform(platform) for platform in requested_platforms]
         
         # Avoid duplicates (by video_url)
         if not any(p['video_url'] == post['video_url'] for p in publishing_queue):
@@ -471,6 +476,8 @@ def process_publishing_queue():
             print(f"[{now}] 📤 Publishing queued post: {post['video_url'][:50]}...")
             try:
                 from core.publisher import upload_reel, upload_story, upload_facebook_reel
+                published_platforms = []
+                skipped_platforms = []
                 
                 # Instagram Reel
                 if "instagram_reel" in post["platforms"]:
@@ -481,6 +488,7 @@ def process_publishing_queue():
                         config["ig_user_id"]
                     )
                     if result and "id" in result:
+                        published_platforms.append("instagram_reel")
                         print(f"[{now}] ✅ IG Reel published! ID: {result['id']}")
                     else:
                         raise Exception(f"IG Reel failed: {result}")
@@ -488,13 +496,31 @@ def process_publishing_queue():
                 # Instagram Story
                 if "instagram_story" in post["platforms"]:
                     upload_story(post["video_url"], config["access_token"], config["ig_user_id"])
+                    published_platforms.append("instagram_story")
                 
                 # Facebook Reel
                 if "facebook_reel" in post["platforms"] and config["fb_page_id"]:
-                    upload_facebook_reel(post["video_url"], post["caption"], config["access_token"], config["fb_page_id"])
+                    try:
+                        upload_facebook_reel(post["video_url"], post["caption"], config["access_token"], config["fb_page_id"])
+                        published_platforms.append("facebook_reel")
+                    except NotImplementedError as e:
+                        skipped_platforms.append({"platform": "facebook_reel", "reason": "not_implemented"})
+                        print(f"[{now}] Facebook Reel skipped/not_implemented: {e}", flush=True)
                 
+                if not published_platforms and skipped_platforms:
+                    publishing_queue[i]["status"] = "skipped"
+                    publishing_queue[i]["skipped_platforms"] = skipped_platforms
+                    publishing_queue[i]["last_retry"] = now.isoformat()
+                    print(f"[{now}] Post {i+1} skipped: no implemented platforms requested.")
+                    continue
+                if not published_platforms:
+                    raise Exception("No supported publishing platform was requested")
+
                 publishing_queue[i]["status"] = "published"
                 publishing_queue[i]["published_at"] = now.isoformat()
+                publishing_queue[i]["published_platforms"] = published_platforms
+                if skipped_platforms:
+                    publishing_queue[i]["skipped_platforms"] = skipped_platforms
                 print(f"[{now}] ✅ Post {i+1} successfully published.")
                 
             except Exception as e:
