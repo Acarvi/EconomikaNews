@@ -17,6 +17,56 @@ else:
 HUB_API_V1 = f"{CENTRAL_HUB_BASE}/api/v1"
 
 FAILED_POSTS_FILE = os.path.join("data", "failed_posts.json")
+GRAPH_API_VERSION = os.environ.get("GRAPH_API_VERSION", "v22.0")
+
+def _admin_headers() -> Dict[str, str]:
+    api_key = os.environ.get("ECONOMIKA_ADMIN_API_KEY")
+    return {"X-API-Key": api_key} if api_key else {}
+
+def _upload_to_ig(
+    video_url: str,
+    caption: str,
+    access_token: str,
+    ig_user_id: str,
+    media_type: str = "REELS",
+    location_id: Optional[str] = None,
+):
+    """Upload a public video URL to Instagram Graph API and publish it."""
+    create_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{ig_user_id}/media"
+    payload = {
+        "media_type": media_type,
+        "video_url": video_url,
+        "access_token": access_token,
+    }
+    if caption:
+        payload["caption"] = caption
+    if location_id:
+        payload["location_id"] = location_id
+
+    response = requests.post(create_url, data=payload, timeout=60)
+    response.raise_for_status()
+    creation = response.json()
+    creation_id = creation.get("id")
+    if not creation_id:
+        raise RuntimeError(f"Instagram media creation failed: {creation}")
+
+    publish_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{ig_user_id}/media_publish"
+    publish_payload = {
+        "creation_id": creation_id,
+        "access_token": access_token,
+    }
+    publish_response = requests.post(publish_url, data=publish_payload, timeout=60)
+    publish_response.raise_for_status()
+    return publish_response.json()
+
+def upload_reel(video_url: str, caption: str, access_token: str, ig_user_id: str, location_id: Optional[str] = None):
+    return _upload_to_ig(video_url, caption, access_token, ig_user_id, media_type="REELS", location_id=location_id)
+
+def upload_story(video_url: str, access_token: str, ig_user_id: str, location_id: Optional[str] = None):
+    return _upload_to_ig(video_url, "", access_token, ig_user_id, media_type="STORIES", location_id=location_id)
+
+def upload_facebook_reel(video_url: str, caption: str, access_token: str, fb_page_id: str):
+    raise NotImplementedError("Facebook Reels direct publishing is not implemented in this module yet.")
 
 def _queue_failed_post(payload: Dict, error: str):
     """Saves a failed post payload to a local JSON file for later retry."""
@@ -84,7 +134,7 @@ def publish_video(video_path: str, caption: str, platform: str = "instagram", ti
     try:
         hub_api = f"{HUB_API_V1}/publish-now"
         print(f"[HUB] Sending project to {hub_api}...")
-        response = requests.post(hub_api, json=payload, timeout=60)
+        response = requests.post(hub_api, json=payload, headers=_admin_headers(), timeout=60)
         return response.json()
     except Exception as e:
         print(f"[ERROR] Hub Publication Failed: {e}")
@@ -104,8 +154,9 @@ def schedule_publication(video_path: str, caption: str, platform: str = "instagr
         return {"status": "error", "message": "Failed to upload to Catbox"}
 
     if not target_time:
-        from datetime import datetime, timedelta
-        target_time = (datetime.now() + timedelta(hours=1)).isoformat()
+        from datetime import datetime, timedelta, timezone
+        from zoneinfo import ZoneInfo
+        target_time = (datetime.now(ZoneInfo("Europe/Madrid")) + timedelta(hours=1)).astimezone(timezone.utc).isoformat()
 
     payload = {
         "posts": [
@@ -123,7 +174,7 @@ def schedule_publication(video_path: str, caption: str, platform: str = "instagr
     try:
         hub_api = f"{HUB_API_V1}/schedule"
         print(f"[HUB] Scheduling project at {hub_api}...")
-        response = requests.post(hub_api, json=payload, timeout=60)
+        response = requests.post(hub_api, json=payload, headers=_admin_headers(), timeout=60)
         return response.json()
     except Exception as e:
         print(f"[ERROR] Hub Scheduling Failed: {e}")
