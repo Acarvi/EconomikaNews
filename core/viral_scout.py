@@ -15,6 +15,19 @@ def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
             val = getattr(obj, key, None)
             if val is not None: return val or 0
     return default
+
+def _is_recoverable_twikit_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        isinstance(exc, KeyError)
+        or "urls" in msg
+        or "key_byte" in msg
+        or "indices" in msg
+        or "couldn't get key_byte" in msg
+        or "404" in msg
+        or "403" in msg
+        or "lookup" in msg
+    )
 import httpx
 # --- DEFINTIVE MONKEY PATCH FOR HTTPX COOKIE CONFLICT ---
 # This prevents the fatal 'Multiple cookies exist with name=twid' error.
@@ -162,6 +175,8 @@ class ViralScout:
                 await asyncio.sleep(random.uniform(2, 4))
                 
                 user_data = None
+                last_lookup_error = None
+                skip_twikit_for_account = False
                 for attempt in range(2): # Retry mechanism (initial + 1 retry)
                     try:
                         user_data = await self.client.get_user_by_screen_name(user_screen_name)
@@ -169,6 +184,7 @@ class ViralScout:
                         followers = user_data.followers_count
                         break # Success
                     except Exception as e:
+                        last_lookup_error = e
                         err_msg = str(e)
                         if "429" in err_msg:
                             progress_callback(f"   🛑 RATE LIMIT (429) en lookup! Enfriando 15 minutos...")
@@ -192,36 +208,40 @@ class ViralScout:
                                         f.write(f"RESPONSE TEXT: {e.response.text}\n")
                                 progress_callback(f"   🔍 [DEBUG] Dump guardado en debug_x_response.txt para @{user_screen_name}")
 
-                            if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
+                            if _is_recoverable_twikit_error(e):
                                 progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name}: {err_msg}")
                                 user_data = None # Mark as failed
+                                skip_twikit_for_account = True
                                 break
                             else:
                                 raise e # Unexpected error
 
                 if not user_data:
                     # Try fallback to search if direct lookup fails definitely
-                    try:
-                        search_results = await self.client.search_user(user_screen_name)
-                        if search_results:
-                            # Try to find an exact match in results
-                            matching_user = None
-                            for u in search_results:
-                                if u.screen_name.lower() == user_screen_name.lower():
-                                    matching_user = u
-                                    break
-                            
-                            if matching_user:
-                                user_data = matching_user
-                                user_id = user_data.id
-                                followers = user_data.followers_count
-                                progress_callback(f"   ℹ️ @{user_screen_name} encontrado vía búsqueda.")
+                    if skip_twikit_for_account:
+                        pass
+                    else:
+                        try:
+                            search_results = await self.client.search_user(user_screen_name)
+                            if search_results:
+                                # Try to find an exact match in results
+                                matching_user = None
+                                for u in search_results:
+                                    if u.screen_name.lower() == user_screen_name.lower():
+                                        matching_user = u
+                                        break
+                                
+                                if matching_user:
+                                    user_data = matching_user
+                                    user_id = user_data.id
+                                    followers = user_data.followers_count
+                                    progress_callback(f"   ℹ️ @{user_screen_name} encontrado vía búsqueda.")
+                                else:
+                                    progress_callback(f"   ⚠️ No se encontró coincidencia exacta para @{user_screen_name}.")
                             else:
-                                progress_callback(f"   ⚠️ No se encontró coincidencia exacta para @{user_screen_name}.")
-                        else:
-                            progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda.")
-                    except Exception as e2:
-                        progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {e} | {e2}")
+                                progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda.")
+                        except Exception as e2:
+                            progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {last_lookup_error} | {e2}")
                     
                     # --- FALLBACK TO NITTER RSS ---
                     progress_callback(f"   🔄 Activando FALLBACK (Nitter RSS) para @{user_screen_name}...")
@@ -236,6 +256,7 @@ class ViralScout:
                 all_tweets = []
                 try:
                     tweets = None
+                    tweets_failed_recoverably = False
                     for attempt in range(2):
                         try:
                             tweets = await self.client.get_user_tweets(user_id, 'Tweets', count=40)
@@ -246,11 +267,19 @@ class ViralScout:
                                 progress_callback(f"   ⚠️ Fallo obteniendo tuits de @{user_screen_name}, reintentando en 5s... ({err_msg})")
                                 await asyncio.sleep(5)
                             else:
-                                if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
+                                if _is_recoverable_twikit_error(e):
                                     progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name} (Tweets): {err_msg}")
+                                    tweets_failed_recoverably = True
                                     break
                                 else:
                                     raise e
+
+                    if tweets_failed_recoverably:
+                        progress_callback(f"   Fallo Twikit ({err_msg}). Intentando Fallback Nitter RSS...")
+                        nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
+                        if nitter_hits:
+                            viral_urls.extend(nitter_hits)
+                        continue
 
                     if tweets:
                         all_tweets.extend(tweets)
@@ -375,7 +404,7 @@ class ViralScout:
                         })
                         progress_callback(f"   🔥 IMPACTO: {score:.1f} ({reposts} RTs, {likes} Likes) - {type_str}")
             except Exception as e:
-                if any(msg in str(e).lower() for msg in ["404", "403", "lookup", "key_byte", "indices"]):
+                if _is_recoverable_twikit_error(e):
                     progress_callback(f"   🔄 Fallo Twikit ({e}). Intentando Fallback Nitter RSS...")
                     nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
                     if nitter_hits:

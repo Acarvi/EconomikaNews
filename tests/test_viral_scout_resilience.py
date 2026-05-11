@@ -1,7 +1,20 @@
 import pytest
 import asyncio
+import inspect
 from unittest.mock import MagicMock, patch, AsyncMock
-from core.viral_scout import ViralScout
+import core.viral_scout as viral_scout
+from core.viral_scout import ViralScout, _is_recoverable_twikit_error
+
+
+def test_recoverable_twikit_error_helper_detects_schema_errors():
+    assert _is_recoverable_twikit_error(KeyError("urls")) is True
+    assert _is_recoverable_twikit_error(Exception("Couldn't get KEY_BYTE indices")) is True
+
+
+def test_fallback_logging_does_not_reference_undefined_e():
+    source = inspect.getsource(viral_scout.ViralScout._scan_async)
+    assert "{e} | {e2}" not in source
+    assert "{last_lookup_error} | {e2}" in source
 
 @pytest.mark.asyncio
 async def test_viral_scout_retry_lookup_success():
@@ -67,13 +80,15 @@ async def test_viral_scout_skip_on_total_failure():
                     mock_instance.search_user = AsyncMock(return_value=[])
                     
                     logs = []
-                    with patch('asyncio.sleep', return_value=None):
-                        await scout._scan_async(progress_callback=lambda m: logs.append(m))
-                        
-                        # Verify User 1 was skipped with WARN
-                        assert any("[WARN] Fallo scrapeando @fail_user" in l for l in logs)
-                        # Verify it moved to success_user
-                        assert any("Scanning @success_user" in l for l in logs)
+                    with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
+                        mock_nitter.return_value = []
+                        with patch('asyncio.sleep', return_value=None):
+                            await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                            
+                            # Verify User 1 was skipped with WARN
+                            assert any("[WARN] Fallo scrapeando @fail_user" in l for l in logs)
+                            # Verify it moved to success_user
+                            assert any("Scanning @success_user" in l for l in logs)
 
 @pytest.mark.asyncio
 async def test_viral_scout_retry_tweets_success():
@@ -140,10 +155,12 @@ async def test_viral_scout_skip_on_total_tweet_failure():
                     mock_instance.get_user_tweets = mock_tweets_side_effect
                     
                     logs = []
-                    with patch('asyncio.sleep', return_value=None):
-                        await scout._scan_async(progress_callback=lambda m: logs.append(m))
-                        
-                        # Verify User 1 was skipped with WARN
-                        assert any("[WARN] Fallo scrapeando @fail_user (Tweets)" in l for l in logs)
-                        # Verify success for user 2
-                        assert any("Scanning @success_user" in l for l in logs)
+                    with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
+                        mock_nitter.return_value = []
+                        with patch('asyncio.sleep', return_value=None):
+                            await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                            
+                            # Verify User 1 was skipped with WARN
+                            assert any("[WARN] Fallo scrapeando @fail_user (Tweets)" in l for l in logs)
+                            # Verify success for user 2
+                            assert any("Scanning @success_user" in l for l in logs)
