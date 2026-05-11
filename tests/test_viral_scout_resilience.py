@@ -132,7 +132,8 @@ async def test_viral_scout_retry_lookup_success():
                     logs = []
                     # Avoid sleep in tests
                     with patch('asyncio.sleep', return_value=None):
-                        hits = await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                        with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])):
+                            hits = await scout._scan_async(progress_callback=lambda m: logs.append(m))
                         
                         assert mock_lookup_side_effect.call_count == 1 # One failure, then success
                         assert any("reintentando en 5s" in l for l in logs)
@@ -167,7 +168,8 @@ async def test_viral_scout_skip_on_total_failure():
                     with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
                         mock_nitter.return_value = []
                         with patch('asyncio.sleep', return_value=None):
-                            await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                            with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])):
+                                await scout._scan_async(progress_callback=lambda m: logs.append(m))
                             
                             # Verify User 1 was skipped with WARN
                             assert any("[WARN] Fallo scrapeando @fail_user" in l for l in logs)
@@ -203,7 +205,8 @@ async def test_viral_scout_retry_tweets_success():
                     
                     logs = []
                     with patch('asyncio.sleep', return_value=None):
-                        await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                        with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])):
+                            await scout._scan_async(progress_callback=lambda m: logs.append(m))
                         
                         assert mock_tweets_side_effect.call_count == 1
                         assert any("reintentando en 5s" in l for l in logs)
@@ -242,7 +245,8 @@ async def test_viral_scout_skip_on_total_tweet_failure():
                     with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
                         mock_nitter.return_value = []
                         with patch('asyncio.sleep', return_value=None):
-                            await scout._scan_async(progress_callback=lambda m: logs.append(m))
+                            with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])):
+                                await scout._scan_async(progress_callback=lambda m: logs.append(m))
                             
                             # Verify User 1 was skipped with WARN
                             assert any("[WARN] Fallo scrapeando @fail_user (Tweets)" in l for l in logs)
