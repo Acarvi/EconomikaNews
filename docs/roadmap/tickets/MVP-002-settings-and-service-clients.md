@@ -57,3 +57,10 @@ Changing env var names can break existing local setups unless aliases are suppor
 
 Changing the hub implementations themselves.
 
+## Implementation Notes
+
+- Added `config/settings.py` with explicit environment-backed settings for CentralAIService, CentralPublishingHub, optional `ECONOMIKA_ADMIN_API_KEY`, and `ECONOMIKA_ACCOUNT_ID`.
+- Added `services/central_ai_client.py` for `/health`, `/v1/analyzer/draft`, and `/v1/analyzer/refine` using `requests` with timeouts.
+- Added `services/publishing_hub_client.py` for `/health`, `/api/v1/publish`, `/api/v1/schedule`, and `/api/v1/queue`, including `X-API-Key` when configured and base URL normalization to avoid duplicated `/api/v1`.
+- Added mocked client/settings tests; no real network calls are made by the new test coverage.
+
