@@ -20,3 +20,4 @@ google-auth-oauthlib
 
 # Note: moviepy, whisper, etc. NOT included - server only scrapes
 # Heavy processing (video rendering) happens on local client
+feedparser>=6.0.0
