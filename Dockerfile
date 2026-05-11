@@ -8,8 +8,9 @@ RUN pip install --no-cache-dir -r requirements-server.txt
 
 # Copy directories and entry points
 COPY core/ core/
-COPY config/ config/
-COPY data/ data/
+COPY config/__init__.py config/__init__.py
+COPY config/cookie_utils.py config/cookie_utils.py
+COPY data/__init__.py data/__init__.py
 COPY prompts/ prompts/
 COPY server.py .
 COPY requirements.txt .

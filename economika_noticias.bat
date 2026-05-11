@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 > nul
 title Economika Noticias - Reel Automation
 cd /d "%~dp0"
 echo ========================================

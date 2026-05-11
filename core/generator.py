@@ -156,23 +156,16 @@ def draw_branding(draw: ImageDraw.Draw):
     # But for now, let's leave handle here and add source in add_premium_overlay
 
 
-def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, handle: str = "", source: str = ""):
-    """Add branding and the new 'Characteristic' Headline Card."""
+def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, handle: str = "", source: str = "", headline_pos: str = "bottom"):
+    """
+    Add branding and the new 'Characteristic' Headline Card.
+    headline_pos: 'top', 'center', 'bottom'
+    """
     draw = ImageDraw.Draw(image, 'RGBA')
     
     # 1. Draw TOP Branding
     draw_branding(draw)
 
-    # 1.5 Draw Source (if available) - Below Handle or somewhere visible
-    if source:
-        # We'll put it at the very bottom of the screen or just below branding
-        # Below branding seems crowded by handle. Let's put it top-left or top-right?
-        # Or better: Bottom Center, small, semi-transparent.
-        font_source = get_font("arial.ttf", 30)
-        source_text = f"Fuente: {source}"
-        sh = draw.textbbox((0, 0), source_text, font=font_source)
-        sw = sh[2] - sh[0]
-        
     # 1.5 Draw Source (if available) - Moved to TOP LEFT for visibility
     if source:
         font_source = get_font("arial.ttf", 26) # Slightly smaller
@@ -220,19 +213,21 @@ def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, 
         lines, f_headline, text_h, text_w, wrapped = try_fit(headline, font_size)
     
     card_height = text_h + (text_margin_y * 2)
-    # Remove min height constraint to make it compact
     
-    # Position Card: Anchor exactly relative to the media bottom
-    # Use a relaxed gap of 100px
-    card_y = media_bottom_y + 100
-    
-    # Safety check: if card goes off screen, push it up
-    # Safety check: if card goes off screen or overlaps bottom UI
-    # Instagram bottom UI is approx 280-350px from bottom on various devices
-    MAX_CONTENT_Y = REEL_HEIGHT - 380 
-    
-    if card_y + card_height > MAX_CONTENT_Y:
-        card_y = MAX_CONTENT_Y - card_height
+    # POSITIONING LOGIC
+    if headline_pos == "top":
+        card_y = 450 # Below branding
+    elif headline_pos == "center":
+        card_y = (REEL_HEIGHT - card_height) // 2
+    else: # bottom
+        # Position Card: Anchor exactly relative to the media bottom
+        # Use a relaxed gap of 100px
+        card_y = media_bottom_y + 100
+        
+        # Safety check: if card goes off screen or overlaps bottom UI
+        MAX_CONTENT_Y = REEL_HEIGHT - 380 
+        if card_y + card_height > MAX_CONTENT_Y:
+            card_y = MAX_CONTENT_Y - card_height
 
     box_cx = REEL_WIDTH // 2
     box_x0 = box_cx - (card_width // 2)
@@ -261,30 +256,23 @@ def add_premium_overlay(image: Image.Image, headline: str, media_bottom_y: int, 
     
     return card_y
 
-def generate_reel_from_image(image_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", source: str = "") -> str:
-    """Generate a vertical Reel. Handles missing images gracefully with a branded background."""
-    
+def generate_reel_from_image(image_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", source: str = "", headline_pos: str = "bottom") -> str:
     if image_path and os.path.exists(image_path):
         original = Image.open(image_path).convert('RGB')
-        background = create_blurred_background(original)
+        background = Image.new('RGB', (REEL_WIDTH, REEL_HEIGHT), (0,0,0)) # Pure Black background
         foreground = create_foreground_image(original, max_width=1000, max_height=950)
-        fg_x = (REEL_WIDTH - foreground.width) // 2
-        fg_y = 500 # Lowered start position
+        fg_x, fg_y = (REEL_WIDTH - foreground.width) // 2, (REEL_HEIGHT - foreground.height) // 2
         composite = background.copy()
         composite.paste(foreground, (fg_x, fg_y))
         media_bottom = fg_y + foreground.height
     else:
-        # Create a branded "Economika" background for text-only tweets
         composite = Image.new('RGB', (REEL_WIDTH, REEL_HEIGHT), (15, 15, 15))
         draw = ImageDraw.Draw(composite)
-        # Subtle red gradient or accent
         draw.rectangle([0, 0, REEL_WIDTH, 40], fill=ECONOMIKA_RED)
         draw.rectangle([0, REEL_HEIGHT-40, REEL_WIDTH, REEL_HEIGHT], fill=ECONOMIKA_RED)
-        media_bottom = 400 # Theoretical bottom of empty media space
+        media_bottom = 400
     
-    # Static overlays
-    card_y = add_premium_overlay(composite, headline, media_bottom, handle, source=source)
-    
+    card_y = add_premium_overlay(composite, headline, media_bottom, handle, source=source, headline_pos=headline_pos)
     frame = np.array(composite)
     clip = ImageClip(frame).set_duration(REEL_DURATION)
     
@@ -337,16 +325,18 @@ def time_str_to_seconds(time_str: str) -> float:
     except:
         return 0.0
 
-def process_video_for_reel(video_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", skip_subtitles: bool = False, source: str = "", start_time_str: str = "00:00", end_time_str: str = "END", cover_path: str = None) -> str:
+def process_video_for_reel(video_path: str, headline: str, handle: str = "", output_name: str = "reel.mp4", 
+                           skip_subtitles: bool = False, source: str = "", 
+                           start_time_str: str = "00:00", end_time_str: str = "END", 
+                           cover_path: str = None, 
+                           headline_pos: str = "bottom",
+                           subtitle_pos: str = "bottom") -> str:
     """Process video with PRO-TIGHT zone management and duration capping."""
     print(f"[GENERATOR] Starting video processing: {os.path.basename(video_path)}")
     
     # PRE-PROCESS: Conform to CFR to avoid desync/slow-motion
     conformed_path = conform_video_to_cfr(video_path)
     
-    clip = VideoFileClip(conformed_path)
-    
-    # SMART TRIMMING LOGIC
     clip = VideoFileClip(conformed_path)
     total_duration = clip.duration
     
@@ -358,13 +348,12 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
             print(f"[GENERATOR] Smart Trimming: {start_sec}s to {end_sec}s")
             clip = clip.subclip(start_sec, end_sec)
         else:
-             # Fallback if AI gave bad End time
              if start_sec > 0: clip = clip.subclip(start_sec)
     elif start_sec > 0:
         print(f"[GENERATOR] Smart Trimming Start: {start_sec}s")
         clip = clip.subclip(start_sec)
 
-    # CAP DURATION to 90 seconds (Shorts/Reels max is usually 60-90)
+    # CAP DURATION to 90 seconds
     MAX_DURATION = 90
     if clip.duration > MAX_DURATION:
         print(f"[GENERATOR] Video exceeds {MAX_DURATION}s ({clip.duration:.1f}s), capping...")
@@ -373,125 +362,77 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
     duration = clip.duration
     print(f"[GENERATOR] Duration: {duration:.1f}s | Resolution: {clip.w}x{clip.h}")
     
-    # PREPEND COVER?
     prepend_clip = None
     if cover_path and os.path.exists(cover_path):
         print(f"[GENERATOR] Prepending Cover Image ({cover_path})...")
         try:
-            # Create a 0.1-second clip of the cover (Imperceptible but selectable as thumbnail)
-            # We must adhere to the same dimensions as the REEL (1080x1920)
-            # The cover generator presumably makes 1080x1920
             cover_img = Image.open(cover_path).convert('RGB').resize((REEL_WIDTH, REEL_HEIGHT))
-            prepend_clip = ImageClip(np.array(cover_img)).set_duration(0.1) # 0.1 second frame
+            prepend_clip = ImageClip(np.array(cover_img)).set_duration(0.1)
         except Exception as e:
             print(f"[GENERATOR] Failed to load cover: {e}")
     
     try:
-        # Background
-        print("[GENERATOR] Creating blurred background...")
-        frame_0 = clip.get_frame(0)
-        bg_img = Image.fromarray(frame_0)
-        background = create_blurred_background(bg_img)
+        # Background: Pure Black
+        print("[GENERATOR] Creating black background (No Blur)...")
+        bg_img = Image.new('RGB', (REEL_WIDTH, REEL_HEIGHT), (0, 0, 0))
+        bg_clip = ImageClip(np.array(bg_img)).set_duration(duration)
         
         # Foreground Video Positioning
-        scale = min(1080 / clip.w, 950 / clip.h)
+        target_max_w = REEL_WIDTH
+        target_max_h = 1080 
+        scale = min(target_max_w / clip.w, target_max_h / clip.h)
         resized_clip = clip.resize(scale)
         resized_h = resized_clip.h
-        
-        # Position Lowered
-        fg_y = 500
+        fg_y = (REEL_HEIGHT - resized_h) // 2
         
         # Common Overlay
         print("[GENERATOR] Creating branding overlay...")
         overlay_img = Image.new('RGBA', (REEL_WIDTH, REEL_HEIGHT), (0, 0, 0, 0))
-        card_y = add_premium_overlay(overlay_img, headline, fg_y + resized_h, handle, source=source)
-        overlay_array = np.array(overlay_img)
-        overlay_clip = ImageClip(overlay_array).set_duration(duration)
+        card_y = add_premium_overlay(overlay_img, headline, fg_y + resized_h, handle, source=source, headline_pos=headline_pos)
+        overlay_clip = ImageClip(np.array(overlay_img)).set_duration(duration)
         
-        bg_array = np.array(background)
-        bg_clip = ImageClip(bg_array).set_duration(duration)
-        
-        # Subtitles Integration (only if not skipped)
+        # Subtitles Integration: Hormozi Style
         subtitle_clips = []
         if not skip_subtitles:
-            print("[GENERATOR] Transcribing audio for subtitles...")
+            print("[GENERATOR] Transcribing and rendering Hormozi-style subtitles...")
             try:
                 segments = get_subtitles(conformed_path)
                 
-                # --- PREMIUM "ECONOMIKA" SUBTITLE DESIGN ---
-                # Reduced font size from 72 to 55 per user request
-                current_font = get_font("ariblk.ttf", 55) # Bold sans-serif
+                # --- STYLE DEFINITIONS ---
+                font_size = 75
+                current_font = get_font("ariblk.ttf", font_size)
                 YELLOW = (255, 255, 0)
                 
                 for seg in segments:
                     text_content = seg['text'].strip().upper() 
                     if not text_content: continue
                     
-                    start = seg['start']
-                    end = min(seg['end'], duration)
-                    if start >= duration: continue
-                    
-                    # Wrap text manually
-                    words = text_content.split()
-                    lines = []
-                    curr_line = []
-                    
-                    # Temp image for measuring
-                    temp_draw = ImageDraw.Draw(Image.new('RGBA', (1,1)))
-                    max_box_width = REEL_WIDTH * 0.8
-                    
-                    for word in words:
-                        # Fixed spacing for measuring
-                        test_line = " ".join(curr_line + [word])
-                        bbox = temp_draw.textbbox((0, 0), test_line, font=current_font)
-                        if (bbox[2] - bbox[0]) < (max_box_width - 80): 
-                            curr_line.append(word)
-                        else:
-                            if curr_line: lines.append(" ".join(curr_line))
-                            curr_line = [word]
-                    if curr_line: lines.append(" ".join(curr_line))
-                    wrapped_text = "\n".join(lines)
-                    
-                    # Calculate final box size
-                    t_bbox = temp_draw.multiline_textbbox((0, 0), wrapped_text, font=current_font, spacing=15)
-                    tw = t_bbox[2] - t_bbox[0]
-                    th = t_bbox[3] - t_bbox[1]
-                    
-                    # Reduced padding from 60/30 to 45/20 for neater look
-                    padding_x, padding_y = 45, 20
-                    box_w = tw + (padding_x * 2)
-                    box_h = th + (padding_y * 2)
-                    
-                    # Create Alpha Image for the subtitle
                     sub_img = Image.new('RGBA', (REEL_WIDTH, REEL_HEIGHT), (0, 0, 0, 0))
                     sub_draw = ImageDraw.Draw(sub_img)
                     
-                    # Position: Lower-Middle
+                    # Position: Dynamic
                     text_x = REEL_WIDTH // 2
-                    text_y = fg_y + (resized_h * 0.8) # 80% down the video area
+                    if subtitle_pos == "top":
+                        text_y = 550 # Below branding/headline
+                    elif subtitle_pos == "center":
+                        text_y = REEL_HEIGHT // 2
+                    else: # bottom
+                        text_y = card_y - 120 # Above the white card
                     
-                    # Draw Rounded Background (Capsule)
-                    bg_box = [
-                        text_x - (box_w // 2),
-                        text_y - (box_h // 2),
-                        text_x + (box_w // 2),
-                        text_y + (box_h // 2)
-                    ]
-                    sub_draw.rounded_rectangle(bg_box, radius=box_h//2, fill=(0, 0, 0, 180)) # Semi-transparent black
+                    # Render text with Stroke and Shadow
+                    shadow_color = (0, 0, 0, 200)
+                    sub_draw.text((text_x + 6, text_y + 6), text_content, font=current_font, fill=shadow_color, anchor="mm", align="center")
+                    stroke_w = 6
+                    stroke_color = (0, 0, 0)
+                    for ox in range(-stroke_w, stroke_w + 1):
+                        for oy in range(-stroke_w, stroke_w + 1):
+                            if ox*ox + oy*oy <= stroke_w*stroke_w:
+                                sub_draw.text((text_x + ox, text_y + oy), text_content, font=current_font, fill=stroke_color, anchor="mm", align="center")
                     
-                    # Draw Main Text (Yellow for impact)
-                    sub_draw.multiline_text(
-                        (text_x, text_y),
-                        wrapped_text,
-                        font=current_font,
-                        fill=YELLOW,
-                        anchor="mm",
-                        align="center",
-                        spacing=15
-                    )
+                    # Draw Main Text (Yellow)
+                    sub_draw.text((text_x, text_y), text_content, font=current_font, fill=YELLOW, anchor="mm", align="center")
                     
-                    sub_array = np.array(sub_img)
-                    sub_clip = ImageClip(sub_array).set_start(start).set_end(end)
+                    sub_clip = ImageClip(np.array(sub_img)).set_start(seg['start']).set_end(min(seg['end'], duration))
                     subtitle_clips.append(sub_clip)
                     
             except Exception as e:
@@ -499,13 +440,10 @@ def process_video_for_reel(video_path: str, headline: str, handle: str = "", out
         else:
             print("[GENERATOR] Skipping subtitles as requested.")
 
-        # IMPORTANT: Subtitles use absolute canvas coordinates, so they must be 
-        # added to the FINAL composite, not the center video segment
-        center_video_segment = resized_clip
-
+        # Composite the final video
         final_body = CompositeVideoClip([
             bg_clip, 
-            center_video_segment.set_position(('center', fg_y)), 
+            resized_clip.set_position(('center', fg_y)), 
             overlay_clip
         ] + subtitle_clips, size=(REEL_WIDTH, REEL_HEIGHT)).set_duration(duration)
         

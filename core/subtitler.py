@@ -10,12 +10,16 @@ _model = None
 def get_whisper_model():
     global _model
     if _model is None:
-        print("[INFO] Loading Whisper model (medium)...")
+        print("[INFO] Loading Whisper model (large-v3)...")
         try:
-            _model = whisper.load_model("medium")
+            _model = whisper.load_model("large-v3")
         except Exception as e:
-            print(f"[WARN] Failed to load medium model, falling back to small: {e}")
-            _model = whisper.load_model("small")
+            print(f"[WARN] Failed to load large-v3 model, falling back to medium: {e}")
+            try:
+                _model = whisper.load_model("medium")
+            except Exception as e2:
+                print(f"[ERROR] Whisper local fallback failed completely: {e2}")
+                _model = "FAILED" # Marker to skip transcription
     return _model
 
 def transcribe_audio(video_path: str) -> Dict:
@@ -25,22 +29,27 @@ def transcribe_audio(video_path: str) -> Dict:
         return {'language': 'es', 'segments': []}
 
     model = get_whisper_model()
+    if model == "FAILED":
+        print("[WARN] Fallback a Whisper falló por dependencias del sistema. Renderizando vídeo SIN subtítulos.")
+        return {'language': 'es', 'segments': []}
+
     print(f"[INFO] Transcribing {video_path}...")
     
     try:
         # Enable word_timestamps for maximum precision in sync
-        # Added condition checking effectively
         result = model.transcribe(video_path, word_timestamps=True)
         return result
-    except RuntimeError as e:
-        if "size" in str(e):
+    except Exception as e:
+        print(f"[WARN] Transcription failed or system dependency error: {e}")
+        if "size" in str(e) and isinstance(e, RuntimeError):
             print(f"[WARN] Whisper shape error detected. Retrying with fp16=False...")
             try:
                 result = model.transcribe(video_path, word_timestamps=True, fp16=False)
                 return result
             except Exception as e2:
                  print(f"[ERROR] Whisper retry failed: {e2}")
-        print(f"[ERROR] Transcription failed: {e}")
+        
+        print("[WARN] Fallback a Whisper falló por dependencias del sistema. Renderizando vídeo SIN subtítulos.")
         return {'language': 'es', 'segments': []} # Return empty on failure to prevent crash
 
 def translate_subtitles_to_spanish(segments: List[Dict]) -> List[Dict]:
@@ -75,6 +84,11 @@ SALIDA (Formato esperado):
     from google.genai import types
     from core.ai_handler import GEMINI_API_KEY
     import re
+    
+    # Robust validation for API Key
+    if not GEMINI_API_KEY or len(GEMINI_API_KEY) < 10:
+        print("[WARN] API Key de Gemini inválida o vacía. Omitiendo traducción de subtítulos (Fallback).")
+        return segments # Devuelve los segmentos originales de Whisper sin traducir
     
     client = genai.Client(api_key=GEMINI_API_KEY)
     try:
@@ -151,7 +165,7 @@ def get_subtitles(video_path: str) -> List[Dict]:
     else:
         print(f"[INFO] Language already Spanish. No translation needed.")
     
-    # Optimization: Split into short pieces for professional look
-    segments = split_segments(segments, max_words=3)
+    # Optimization: Split into short pieces (Hormozi style)
+    segments = split_segments(segments, max_words=2)
         
     return segments

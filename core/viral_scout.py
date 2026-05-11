@@ -3,6 +3,7 @@ import os
 import time
 import asyncio
 import re
+import random
 from typing import List, Dict, Optional, Any
 
 def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
@@ -14,9 +15,32 @@ def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
             val = getattr(obj, key, None)
             if val is not None: return val or 0
     return default
+import httpx
+# --- DEFINTIVE MONKEY PATCH FOR HTTPX COOKIE CONFLICT ---
+# This prevents the fatal 'Multiple cookies exist with name=twid' error.
+try:
+    _original_get = httpx.Cookies.get
+    def _patched_get(self, name, default=None, domain=None, path=None):
+        try:
+            return _original_get(self, name, default, domain, path)
+        except Exception as e:
+            if "Multiple cookies exist" in str(e):
+                # If a conflict occurs, return the first matching cookie instead of crashing
+                for cookie in self.jar:
+                    if cookie.name == name:
+                        if domain is None or cookie.domain == domain:
+                            if path is None or cookie.path == path:
+                                return cookie.value
+            return default
+    httpx.Cookies.get = _patched_get
+except Exception as e:
+    print(f"Warning: Failed to patch httpx cookies: {e}")
+
 from twikit import Client
 from config.cookie_utils import netscape_to_dict
 from datetime import datetime, timedelta
+import feedparser
+import httpx
 
 # Configuration Files - in config/ and data/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -101,10 +125,29 @@ class ViralScout:
             return []
             
         try:
-            self.client.set_cookies(cookies)
+            # Final Resolution for Domain Conflict: Inject cookies with explicit .x.com domain
+            self.client = Client('en-US')
+            
+            from config.cookie_utils import netscape_to_json
+            import json
+            json_cookies_path = COOKIES_FILE.replace('.txt', '.json')
+            netscape_to_json(COOKIES_FILE, json_cookies_path)
+            
+            if hasattr(self.client, '_session') and hasattr(self.client._session, 'cookies'):
+                self.client._session.cookies.clear()
+                cookie_dict = json.load(open(json_cookies_path, encoding='utf-8'))
+                for k, v in cookie_dict.items():
+                    # explicitly set domain to avoid `httpx` CookieConflictError 
+                    # when Twitter's API replies with 'Domain=.x.com'
+                    self.client._session.cookies.set(k, v, domain=".x.com")
+                print(f"✅ Twikit cookies injected manually with explicitly set domain.")
+            else:
+                self.client.load_cookies(json_cookies_path)
+                
         except Exception as e:
             progress_callback(f"❌ Error de cookies: {e}")
-            return []
+            # Do NOT return empty yet, we might fallback per account
+            pass
 
         total_accounts = len(self.accounts)
         limit_date = datetime.now() - timedelta(hours=hours_back)
@@ -115,12 +158,49 @@ class ViralScout:
             
             try:
                 # 1. Get User Data (Fresh followers)
-                try:
-                    user_data = await self.client.get_user_by_screen_name(user_screen_name)
-                    user_id = user_data.id
-                    followers = user_data.followers_count
-                except Exception as e:
-                    # Fallback to search if direct lookup fails
+                # Small initial pause to avoid burst detection
+                await asyncio.sleep(random.uniform(2, 4))
+                
+                user_data = None
+                for attempt in range(2): # Retry mechanism (initial + 1 retry)
+                    try:
+                        user_data = await self.client.get_user_by_screen_name(user_screen_name)
+                        user_id = user_data.id
+                        followers = user_data.followers_count
+                        break # Success
+                    except Exception as e:
+                        err_msg = str(e)
+                        if "429" in err_msg:
+                            progress_callback(f"   🛑 RATE LIMIT (429) en lookup! Enfriando 15 minutos...")
+                            for i in range(15, 0, -1):
+                                progress_callback(f"   ⏳ Quedan {i} minutos...")
+                                await asyncio.sleep(60)
+                            continue # Try next account or retry? User said continue if 429? Actually 429 needs cooling.
+                        
+                        if attempt == 0:
+                            progress_callback(f"   ⚠️ Fallo lookup @{user_screen_name}, reintentando en 5s... ({err_msg})")
+                            await asyncio.sleep(5)
+                        else:
+                            # Final failure for this account - INVESTIGACIÓN FORENSE
+                            if user_screen_name.lower() == 'wallstwolverine':
+                                with open("debug_x_response.txt", "w", encoding="utf-8") as f:
+                                    f.write(f"USER: {user_screen_name}\n")
+                                    f.write(f"ERROR: {err_msg}\n")
+                                    f.write(f"EXCEPTION TYPE: {type(e).__name__}\n")
+                                    if hasattr(e, 'response'):
+                                        f.write(f"RESPONSE STATUS: {e.response.status_code}\n")
+                                        f.write(f"RESPONSE TEXT: {e.response.text}\n")
+                                progress_callback(f"   🔍 [DEBUG] Dump guardado en debug_x_response.txt para @{user_screen_name}")
+
+                            if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
+                                progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name}: {err_msg}")
+                                user_data = None # Mark as failed
+                                break
+                            else:
+                                raise e # Unexpected error
+
+                if not user_data:
+                    # Try fallback to search if direct lookup fails definitely
                     try:
                         search_results = await self.client.search_user(user_screen_name)
                         if search_results:
@@ -138,18 +218,40 @@ class ViralScout:
                                 progress_callback(f"   ℹ️ @{user_screen_name} encontrado vía búsqueda.")
                             else:
                                 progress_callback(f"   ⚠️ No se encontró coincidencia exacta para @{user_screen_name}.")
-                                continue
                         else:
-                            progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda: {e}")
-                            continue
+                            progress_callback(f"   ⚠️ No se encontró al usuario @{user_screen_name} ni vía búsqueda.")
                     except Exception as e2:
                         progress_callback(f"   ⚠️ Fallo total buscando a @{user_screen_name}: {e} | {e2}")
+                    
+                    # --- FALLBACK TO NITTER RSS ---
+                    progress_callback(f"   🔄 Activando FALLBACK (Nitter RSS) para @{user_screen_name}...")
+                    nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
+                    if nitter_hits:
+                        viral_urls.extend(nitter_hits)
+                        continue
+                    else:
                         continue
 
-                # 2. Get Recent Tweets (with pagination for deep scan)
+                # 2. Get Recent Tweets
+                all_tweets = []
                 try:
-                    all_tweets = []
-                    tweets = await self.client.get_user_tweets(user_id, 'Tweets', count=40)
+                    tweets = None
+                    for attempt in range(2):
+                        try:
+                            tweets = await self.client.get_user_tweets(user_id, 'Tweets', count=40)
+                            break
+                        except Exception as e:
+                            err_msg = str(e)
+                            if attempt == 0:
+                                progress_callback(f"   ⚠️ Fallo obteniendo tuits de @{user_screen_name}, reintentando en 5s... ({err_msg})")
+                                await asyncio.sleep(5)
+                            else:
+                                if any(msg in err_msg for msg in ["404", "indices", "KEY_BYTE"]) or isinstance(e, KeyError):
+                                    progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name} (Tweets): {err_msg}")
+                                    break
+                                else:
+                                    raise e
+
                     if tweets:
                         all_tweets.extend(tweets)
                         
@@ -161,19 +263,30 @@ class ViralScout:
                                 try:
                                     created_at = datetime.strptime(created_at, "%a %b %d %H:%M:%S %z %Y")
                                     created_at = created_at.replace(tzinfo=None)
+                                # pylint: disable=bare-except
                                 except: pass
                             
-                            # Stop if we hit the date limit or a safety cap (e.g. 150 tweets)
-                            if (isinstance(created_at, datetime) and created_at < limit_date) or len(all_tweets) > 150:
+                            # Stop if we hit the date limit or a safety cap (e.g. 80 tweets)
+                            if (isinstance(created_at, datetime) and created_at < limit_date) or len(all_tweets) > 80:
                                 break
                             
-                            next_tweets = await tweets.next()
-                            if not next_tweets:
+                            try:
+                                next_tweets = await tweets.next()
+                                if not next_tweets:
+                                    break
+                                all_tweets.extend(next_tweets)
+                                tweets = next_tweets
+                                await asyncio.sleep(random.uniform(2, 5)) 
+                            except Exception as e:
+                                progress_callback(f"   ⚠️ Error en paginación para @{user_screen_name}: {e}")
                                 break
-                            all_tweets.extend(next_tweets)
-                            tweets = next_tweets
-                            await asyncio.sleep(1) # Safety delay
                 except Exception as e:
+                    if "429" in str(e):
+                        progress_callback(f"   🛑 RATE LIMIT (429)! Enfriando 15 minutos...")
+                        for i in range(15, 0, -1):
+                            progress_callback(f"   ⏳ Quedan {i} minutos...")
+                            await asyncio.sleep(60)
+                        continue
                     progress_callback(f"   ⚠️ Error obteniendo tuits de @{user_screen_name}: {e}")
                     continue
 
@@ -261,16 +374,128 @@ class ViralScout:
                             'description': getattr(tweet, 'full_text', getattr(tweet, 'text', ''))
                         })
                         progress_callback(f"   🔥 IMPACTO: {score:.1f} ({reposts} RTs, {likes} Likes) - {type_str}")
-                
-                await asyncio.sleep(1) # Pequeña pausa entre cuentas
-                
             except Exception as e:
-                progress_callback(f"   ❌ Error inesperado con @{user_screen_name}: {e}")
+                if any(msg in str(e).lower() for msg in ["404", "403", "lookup", "key_byte", "indices"]):
+                    progress_callback(f"   🔄 Fallo Twikit ({e}). Intentando Fallback Nitter RSS...")
+                    nitter_hits = await self._scan_nitter_rss(user_screen_name, limit_date, min_ratio, progress_callback)
+                    if nitter_hits:
+                        viral_urls.extend(nitter_hits)
+                else:
+                    progress_callback(f"   ❌ Error inesperado con @{user_screen_name}: {e}")
                 continue
+            except BaseException as b_e:
+                progress_callback(f"   🛑 ERROR CRÍTICO DE HILO (@{user_screen_name}): {b_e}")
+                continue # Prevent thread from dying and crashing main process
+            
+            # Inter-account jittered delay to avoid detection
+            if idx < total_accounts - 1:
+                await asyncio.sleep(random.uniform(5, 12))
                 
         # Sort by score descending
         viral_urls.sort(key=lambda x: x['score'], reverse=True)
         return viral_urls
+
+    async def _scan_nitter_rss(self, user_screen_name, limit_date, min_ratio=2.0, progress_callback=print):
+        """
+        Fallback strategy using Nitter RSS feeds with instance rotation.
+        """
+        # --- ROTACIÓN DE INSTANCIAS NITTER ---
+        instances = ['nitter.net', 'nitter.cz', 'nitter.poast.org', 'nitter.privacydev.net']
+        hits = []
+        
+        for instance in instances:
+            rss_url = f"https://{instance}/{user_screen_name}/rss"
+            progress_callback(f"      📡 Probando instancia Nitter: {instance}...")
+            try:
+                async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                    resp = await client.get(rss_url)
+                    if resp.status_code != 200: 
+                        progress_callback(f"      ⚠️ Instancia {instance} devolvió status {resp.status_code}")
+                        continue
+                    
+                    feed = feedparser.parse(resp.text)
+                    if not feed.entries:
+                        progress_callback(f"      ⚠️ Instancia {instance} no devolvió entradas.")
+                        continue
+                    
+                    progress_callback(f"      ✨ Éxito con {instance}. Analizando {len(feed.entries)} noticias...")
+                    
+                    for entry in feed.entries:
+                        # Date check
+                        published = entry.get('published_parsed')
+                        if published:
+                            pub_dt = datetime(*published[:6])
+                            if pub_dt < limit_date: continue
+                        
+                        # Extract Tweet ID from link
+                        # Format: https://nitter.net/[user]/status/[id]#m
+                        link = entry.get('link', '')
+                        tweet_id = link.split('/')[-1].split('#')[0]
+                        
+                        if not tweet_id: continue
+                        if self.is_processed(tweet_id): continue
+                        
+                        # Description contains HTML with metrics and media
+                        desc = entry.get('description', '')
+                        
+                        # --- ROBUST METRIC MAPPING ---
+                        # Usually: "r: 10, l: 20" or "Reposts: 10, Favorites: 20"
+                        reposts = 0
+                        likes = 0
+                        
+                        # Try various patterns
+                        stats_match = re.search(r'(\d+)\s+(?:reposts?|r),?\s+(\d+)\s+(?:favorites?|f|likes?)', desc, re.I)
+                        if stats_match:
+                            reposts = int(stats_match.group(1))
+                            likes = int(stats_match.group(2))
+                        
+                        # Heuristic score for RSS (since we don't have followers count)
+                        # We use a lower threshold but still require some impact
+                        score = (reposts * 3 + likes) / 50.0 
+                        
+                        # Media check
+                        has_video = "video" in desc or ".mp4" in desc
+                        has_image = "img src" in desc or "dc:image" in entry or "media_content" in entry
+                        
+                        if not (has_video or has_image): continue
+                        
+                        # Extract media URL
+                        media_url = None
+                        if has_video:
+                            v_match = re.search(r'source src="([^"]+)"', desc)
+                            if v_match: media_url = v_match.group(1)
+                        elif has_image:
+                            i_match = re.search(r'img src="([^"]+)"', desc)
+                            if i_match: media_url = i_match.group(1)
+                        
+                        # Final Safety: If media_url is still None but has_image is true, try entry.media
+                        if not media_url and entry.get('media_content'):
+                            media_url = entry.media_content[0].get('url')
+
+                        type_str = "VÍDEO 🎥" if has_video else "IMAGEN 🖼️"
+                        
+                        hits.append({
+                            'url': f"https://x.com/{user_screen_name}/status/{tweet_id}",
+                            'score': score,
+                            'reposts': reposts,
+                            'likes': likes,
+                            'user': user_screen_name,
+                            'id': tweet_id,
+                            'type': type_str,
+                            'is_video': has_video,
+                            'media_url': media_url,
+                            'thumbnail': media_url if not has_video else None,
+                            'description': entry.get('title', '')
+                        })
+                    
+                    if hits:
+                        progress_callback(f"      ✅ Fallback completado: {len(hits)} items rescatados vía RSS.")
+                        break # Success with one instance is enough
+            except Exception as e:
+                progress_callback(f"      ❌ Error en instancia {instance}: {e}")
+                continue
+                
+        return hits
 
     def scan(self, hours_back=24, min_ratio=2.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
         """
