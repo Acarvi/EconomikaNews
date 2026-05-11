@@ -46,6 +46,14 @@ Add smoke tests for imports, clients, parsing, payload construction, SQLite stat
 
 Run `python -m pytest` from a clean checkout without CentralAIService, CentralPublishingHub, or SentinelAPI checked out as siblings.
 
+## Implementation Notes
+
+- Added focused regression tests for Sentinel-free imports, platform normalization, server datetime parsing, and publisher payload construction.
+- Publisher payload tests mock hub health, Catbox upload, and `requests.post`, so they do not call external services.
+- Added GitHub Actions CI on Python 3.11 with server requirements, `py_compile`, and `pytest -q`.
+- CI is designed to run without `GEMINI_API_KEY`, publishing credentials, sibling service checkouts, or SentinelAPI.
+- `pytest.ini` now focuses collection on the MVP regression tests added here; existing legacy tests need separate cleanup before re-enabling.
+
 ## Risks
 
 Existing tests may assume local files/cookies/secrets.
@@ -53,4 +61,3 @@ Existing tests may assume local files/cookies/secrets.
 ## Out of Scope
 
 Full E2E tests against live Instagram or YouTube.
-

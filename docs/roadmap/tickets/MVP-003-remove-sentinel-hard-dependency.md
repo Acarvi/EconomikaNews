@@ -42,6 +42,14 @@ If disabled or unavailable, the app should continue without modifying `sys.path`
 
 Temporarily run with no Sentinel path and verify imports plus a server health check.
 
+## Implementation Notes
+
+- Removed the mandatory SentinelAPI bootstrap from `server.py`.
+- `server.py` no longer mutates `sys.path` to import `../SentinelAPI` during module import.
+- Added import smoke coverage to prove `server` and `core.publisher` import without SentinelAPI.
+- Reviewed local `.agent` configuration; no Sentinel bootstrap was found there.
+- A local `.git/hooks/pre-push` Sentinel audit was found, but it is not versioned. It remains a local workstation setting outside this repo change.
+
 ## Risks
 
 Existing local users may assume Sentinel is active by default.
@@ -49,4 +57,3 @@ Existing local users may assume Sentinel is active by default.
 ## Out of Scope
 
 Changing SentinelAPI itself.
-
