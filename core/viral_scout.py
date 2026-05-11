@@ -4,6 +4,7 @@ import time
 import asyncio
 import re
 import random
+import hashlib
 from typing import List, Dict, Optional, Any
 
 def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
@@ -61,6 +62,30 @@ ACCOUNTS_FILE = os.path.join(BASE_DIR, "config", "accounts.json")
 HISTORY_FILE = os.path.join(BASE_DIR, "data", "processed_history.json")
 REJECTED_FILE = os.path.join(BASE_DIR, "data", "rejected_history.json")
 COOKIES_FILE = os.path.join(BASE_DIR, "config", "x.com_cookies.txt")
+NEWS_SOURCES_FILE = os.path.join(BASE_DIR, "config", "news_sources.json")
+
+DEFAULT_NEWS_SOURCES = [
+    {
+        "name": "Libre Mercado",
+        "url": "https://www.libertaddigital.com/libremercado/rss.xml"
+    },
+    {
+        "name": "El Economista",
+        "url": "https://www.eleconomista.es/rss/rss-economia.php"
+    },
+    {
+        "name": "Expansión",
+        "url": "https://e00-expansion.uecdn.es/rss/economia.xml"
+    },
+    {
+        "name": "Investing España",
+        "url": "https://es.investing.com/rss/news_14.rss"
+    },
+    {
+        "name": "Libertad Digital Economía",
+        "url": "https://www.libertaddigital.com/empresas/rss.xml"
+    }
+]
 
 class ViralScout:
     def __init__(self):
@@ -83,6 +108,24 @@ class ViralScout:
             return default
         with open(ACCOUNTS_FILE, 'r') as f:
             return json.load(f)
+
+    def load_news_sources(self):
+        if not os.path.exists(NEWS_SOURCES_FILE):
+            os.makedirs(os.path.dirname(NEWS_SOURCES_FILE), exist_ok=True)
+            with open(NEWS_SOURCES_FILE, 'w', encoding='utf-8') as f:
+                json.dump(DEFAULT_NEWS_SOURCES, f, ensure_ascii=False, indent=4)
+            return DEFAULT_NEWS_SOURCES
+
+        try:
+            with open(NEWS_SOURCES_FILE, 'r', encoding='utf-8') as f:
+                sources = json.load(f)
+            if isinstance(sources, list):
+                return sources
+            if isinstance(sources, dict):
+                return sources.get("sources", DEFAULT_NEWS_SOURCES)
+        except Exception as e:
+            print(f"Warning: Failed to load news sources: {e}")
+        return DEFAULT_NEWS_SOURCES
 
     def load_history(self, filepath):
         if not os.path.exists(filepath):
@@ -134,8 +177,8 @@ class ViralScout:
         cookies = get_cookies()
         
         if not cookies:
-            progress_callback("❌ Error: No se encontraron cookies (ni en archivo ni en env).")
-            return []
+            progress_callback("No se encontraron cookies. Activando fallback RSS de noticias...")
+            return await self._scan_news_rss(hours_back=hours_back, max_items=max_items, progress_callback=progress_callback, ignore_history=ignore_history)
             
         try:
             # Final Resolution for Domain Conflict: Inject cookies with explicit .x.com domain
@@ -421,6 +464,17 @@ class ViralScout:
                 await asyncio.sleep(random.uniform(5, 12))
                 
         # Sort by score descending
+        if not viral_urls:
+            progress_callback("   Sin candidatos X/Nitter. Activando fallback RSS de noticias...")
+            viral_urls.extend(
+                await self._scan_news_rss(
+                    hours_back=hours_back,
+                    max_items=max_items,
+                    progress_callback=progress_callback,
+                    ignore_history=ignore_history
+                )
+            )
+
         viral_urls.sort(key=lambda x: x['score'], reverse=True)
         return viral_urls
 
@@ -428,81 +482,74 @@ class ViralScout:
         """
         Fallback strategy using Nitter RSS feeds with instance rotation.
         """
-        # --- ROTACIÓN DE INSTANCIAS NITTER ---
         instances = ['nitter.net', 'nitter.cz', 'nitter.poast.org', 'nitter.privacydev.net']
         hits = []
-        
+        failures = []
+        progress_callback(f"      Probando fallback Nitter RSS para @{user_screen_name}...")
+
         for instance in instances:
             rss_url = f"https://{instance}/{user_screen_name}/rss"
-            progress_callback(f"      📡 Probando instancia Nitter: {instance}...")
             try:
                 async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                     resp = await client.get(rss_url)
-                    if resp.status_code != 200: 
-                        progress_callback(f"      ⚠️ Instancia {instance} devolvió status {resp.status_code}")
+                    if resp.status_code != 200:
+                        failures.append(f"{instance}: HTTP {resp.status_code}")
                         continue
-                    
+
                     feed = feedparser.parse(resp.text)
                     if not feed.entries:
-                        progress_callback(f"      ⚠️ Instancia {instance} no devolvió entradas.")
+                        failures.append(f"{instance}: sin entradas")
                         continue
-                    
-                    progress_callback(f"      ✨ Éxito con {instance}. Analizando {len(feed.entries)} noticias...")
-                    
+
+                    progress_callback(f"      Nitter OK con {instance}: {len(feed.entries)} entradas.")
+
                     for entry in feed.entries:
-                        # Date check
                         published = entry.get('published_parsed')
                         if published:
                             pub_dt = datetime(*published[:6])
-                            if pub_dt < limit_date: continue
-                        
-                        # Extract Tweet ID from link
-                        # Format: https://nitter.net/[user]/status/[id]#m
+                            if pub_dt < limit_date:
+                                continue
+
                         link = entry.get('link', '')
                         tweet_id = link.split('/')[-1].split('#')[0]
-                        
-                        if not tweet_id: continue
-                        if self.is_processed(tweet_id): continue
-                        
-                        # Description contains HTML with metrics and media
+
+                        if not tweet_id:
+                            continue
+                        if self.is_processed(tweet_id):
+                            continue
+
                         desc = entry.get('description', '')
-                        
-                        # --- ROBUST METRIC MAPPING ---
-                        # Usually: "r: 10, l: 20" or "Reposts: 10, Favorites: 20"
                         reposts = 0
                         likes = 0
-                        
-                        # Try various patterns
+
                         stats_match = re.search(r'(\d+)\s+(?:reposts?|r),?\s+(\d+)\s+(?:favorites?|f|likes?)', desc, re.I)
                         if stats_match:
                             reposts = int(stats_match.group(1))
                             likes = int(stats_match.group(2))
-                        
-                        # Heuristic score for RSS (since we don't have followers count)
-                        # We use a lower threshold but still require some impact
-                        score = (reposts * 3 + likes) / 50.0 
-                        
-                        # Media check
+
+                        score = (reposts * 3 + likes) / 50.0
+
                         has_video = "video" in desc or ".mp4" in desc
                         has_image = "img src" in desc or "dc:image" in entry or "media_content" in entry
-                        
-                        if not (has_video or has_image): continue
-                        
-                        # Extract media URL
+
+                        if not (has_video or has_image):
+                            continue
+
                         media_url = None
                         if has_video:
                             v_match = re.search(r'source src="([^"]+)"', desc)
-                            if v_match: media_url = v_match.group(1)
+                            if v_match:
+                                media_url = v_match.group(1)
                         elif has_image:
                             i_match = re.search(r'img src="([^"]+)"', desc)
-                            if i_match: media_url = i_match.group(1)
-                        
-                        # Final Safety: If media_url is still None but has_image is true, try entry.media
+                            if i_match:
+                                media_url = i_match.group(1)
+
                         if not media_url and entry.get('media_content'):
                             media_url = entry.media_content[0].get('url')
 
-                        type_str = "VÍDEO 🎥" if has_video else "IMAGEN 🖼️"
-                        
+                        type_str = "VIDEO" if has_video else "IMAGEN"
+
                         hits.append({
                             'url': f"https://x.com/{user_screen_name}/status/{tweet_id}",
                             'score': score,
@@ -516,15 +563,136 @@ class ViralScout:
                             'thumbnail': media_url if not has_video else None,
                             'description': entry.get('title', '')
                         })
-                    
+
                     if hits:
-                        progress_callback(f"      ✅ Fallback completado: {len(hits)} items rescatados vía RSS.")
-                        break # Success with one instance is enough
+                        progress_callback(f"      Nitter rescato {len(hits)} items.")
+                        break
             except Exception as e:
-                progress_callback(f"      ❌ Error en instancia {instance}: {e}")
+                failures.append(f"{instance}: {e}")
                 continue
-                
+
+        if not hits and failures:
+            progress_callback(f"      Nitter sin resultados para @{user_screen_name} ({len(failures)} instancias fallidas).")
+
         return hits
+
+    async def _scan_news_rss(self, hours_back=24, max_items=20, progress_callback=print, ignore_history=False):
+        """
+        Last-resort fallback using configured economy/news RSS feeds.
+        """
+        sources = self.load_news_sources()
+        limit_date = datetime.now() - timedelta(hours=hours_back)
+        hits = []
+        seen = set()
+        progress_callback(f"   RSS noticias: probando {len(sources)} fuentes configuradas...")
+
+        headers = {
+            "User-Agent": "EconomikaNoticias ViralScout/1.0"
+        }
+
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+            for source in sources:
+                if len(hits) >= max_items:
+                    break
+
+                if isinstance(source, str):
+                    source_name = source
+                    source_url = source
+                else:
+                    source_name = source.get("name") or source.get("source") or source.get("url")
+                    source_url = source.get("url") or source.get("feed_url")
+
+                if not source_url:
+                    continue
+
+                try:
+                    resp = await client.get(source_url)
+                    if resp.status_code != 200:
+                        continue
+
+                    feed = feedparser.parse(resp.text)
+                    entries = getattr(feed, "entries", [])
+                    if not entries:
+                        continue
+
+                    for entry in entries:
+                        if len(hits) >= max_items:
+                            break
+
+                        link = entry.get("link") or entry.get("id")
+                        title = (entry.get("title") or "").strip()
+                        if not link or not title:
+                            continue
+
+                        published = entry.get("published_parsed") or entry.get("updated_parsed")
+                        if published:
+                            pub_dt = datetime(*published[:6])
+                            if pub_dt < limit_date:
+                                continue
+
+                        candidate_id = f"news-{hashlib.sha1(link.encode('utf-8')).hexdigest()[:16]}"
+                        if candidate_id in seen:
+                            continue
+                        seen.add(candidate_id)
+
+                        if not ignore_history and self.is_processed(candidate_id):
+                            continue
+
+                        desc_html = entry.get("summary") or entry.get("description") or title
+                        description = re.sub(r"<[^>]+>", " ", desc_html)
+                        description = re.sub(r"\s+", " ", description).strip()
+
+                        media_url = self._extract_entry_media_url(entry, desc_html)
+                        age_hours = 0
+                        if published:
+                            age_hours = max(0, (datetime.now() - datetime(*published[:6])).total_seconds() / 3600)
+                        recency_score = max(1.0, 24.0 - age_hours) / 4.0
+                        score = round(max(2.0, recency_score), 2)
+
+                        hits.append({
+                            'url': link,
+                            'score': score,
+                            'reposts': 0,
+                            'likes': 0,
+                            'user': source_name,
+                            'source': source_name,
+                            'id': candidate_id,
+                            'type': "NOTICIA",
+                            'is_video': False,
+                            'media_url': media_url,
+                            'thumbnail': media_url,
+                            'description': title if not description else f"{title} - {description}"
+                        })
+                except Exception:
+                    continue
+
+        if hits:
+            progress_callback(f"   RSS noticias rescato {len(hits)} candidatos.")
+        else:
+            progress_callback("   RSS noticias no devolvio candidatos.")
+
+        return hits
+
+    def _extract_entry_media_url(self, entry, html):
+        for key in ("media_content", "media_thumbnail"):
+            media_items = entry.get(key)
+            if media_items:
+                url = media_items[0].get("url")
+                if url:
+                    return url
+
+        links = entry.get("links") or []
+        for link in links:
+            href = link.get("href")
+            link_type = link.get("type", "")
+            if href and link_type.startswith("image/"):
+                return href
+
+        match = re.search(r'<img[^>]+src=["'']([^"'']+)["'']', html or "", re.I)
+        if match:
+            return match.group(1)
+
+        return None
 
     def scan(self, hours_back=24, min_ratio=2.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
         """
