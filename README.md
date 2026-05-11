@@ -1,28 +1,44 @@
-# 🗞️ Economika Noticias
+# Economika Noticias
 
-Sistema automatizado de creación y publicación de contenido para redes sociales con enfoque liberal-libertario.
+Local editorial workstation for discovering economic/news candidates, generating reviewed short-form scripts, rendering vertical videos and sending publish intents to CentralPublishingHub.
 
-## 🚀 Características Principales
-- **Viral Scout**: Escaneo inteligente de tendencias en Twitter (X).
-- **IA Content Engine**: Generación de titulares impactantes y captions detallados usando Google Gemini.
-- **A/B Testing**: Publicación dual (Branded vs Raw) para maximizar el alcance.
-- **Detección de Fuente**: Identificación automática de la fuente original de los medios.
-- **Multi-plataforma**: Soporte para Instagram Reels, Stories y Facebook Reels.
-- **Auto-Cleanup**: Sistema integrado para evitar la saturación de archivos locales.
+## MVP Direction
 
-## 📁 Estructura del Proyecto
-- `main.py`: Interfaz gráfica y orquestador principal.
-- `server.py`: Backend en la nube (Render) para publicación programada.
-- `generator.py`: Motor de renderizado de video (MoviePy).
-- `ai_handler.py`: Integración con la API de Google Gemini.
-- `publisher.py`: Lógica de subida a redes sociales y hosting temporal (Catbox).
-- `docs/`: Guías detalladas y documentación técnica.
-- `tools/`: Scripts de utilidad y diagnóstico.
-- `utils/`: Utilidades del sistema (Cleanup, etc).
+EconomikaNoticias is responsible for:
 
-## 🛠️ Requisitos Rápidos
-1. **Python 3.10+**
-2. **FFmpeg** instalado en el sistema.
-3. **API Keys**: Google Gemini, Instagram Graph API.
+- discovery/scouting through manual links, RSS/news fallback and optional X/Twikit enrichment
+- editorial review in the local GUI
+- local render
+- sending publish intent payloads to CentralPublishingHub
 
-Para más detalles, consulta [DEVELOPER.md](file:///d:/MEGA/Scripts/EconomikaNoticias/docs/DEVELOPER.md).
+CentralAIService owns AI generation. CentralPublishingHub owns temporary hosting and platform publishing.
+
+## Roadmap
+
+The active cleanup and MVP execution plan lives in:
+
+- [MVP definition](docs/roadmap/00_mvp_definition.md)
+- [Current state](docs/roadmap/01_current_state.md)
+- [Target architecture](docs/roadmap/02_target_architecture.md)
+- [Execution plan](docs/roadmap/03_execution_plan.md)
+- [Open risks](docs/roadmap/04_open_risks.md)
+- [Manual E2E checklist](docs/roadmap/05_manual_e2e_checklist.md)
+- [Implementation tickets](docs/roadmap/tickets/)
+
+## Current Entry Points
+
+- `main.py`: current Tkinter GUI and local orchestration.
+- `server.py`: legacy/Render FastAPI service for scan/queue behavior.
+- `core/viral_scout.py`: current discovery/scouting implementation.
+- `core/generator.py`: local video render implementation.
+- `core/ai_handler.py`: current CentralAIService compatibility adapter.
+- `core/publisher.py`: current CentralPublishingHub publishing adapter.
+- `services/central_ai_client.py`: CentralAIService client.
+- `services/publishing_hub_client.py`: CentralPublishingHub client.
+
+## Quick Validation
+
+```bash
+pytest -q
+```
+

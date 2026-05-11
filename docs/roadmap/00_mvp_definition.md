@@ -1,58 +1,53 @@
-# Economika Ecosystem MVP Definition
+# MVP Definition
 
-## MVP Goal
+## Product Goal
 
-The MVP is a functional ecosystem flow where EconomikaNoticias remains the product app for news discovery, local rendering, manual review, and local draft state, while CentralAIService and CentralPublishingHub provide reusable central capabilities over explicit HTTP APIs.
+EconomikaNoticias MVP is a local editorial workstation that turns a candidate news item into a reviewed short-form video and sends a publishing intent to CentralPublishingHub.
 
-The MVP must prove this end-to-end path:
+The app should be reliable when X/Twikit and Nitter are broken. The guaranteed MVP path is manual links plus configured RSS/news sources, not automated X scraping.
 
-1. EconomikaNoticias detects or receives a news candidate.
-2. EconomikaNoticias downloads or selects media.
-3. EconomikaNoticias calls CentralAIService to generate:
-   - headline
-   - Instagram caption
-   - YouTube Shorts title
-   - source/fuente
-   - suggested segment timestamps when applicable
-4. EconomikaNoticias renders a local vertical video at 1080x1920.
-5. EconomikaNoticias allows manual review before publishing.
-6. EconomikaNoticias sends video, caption, title, account, and targets to CentralPublishingHub.
-7. CentralPublishingHub publishes or schedules to:
-   - Instagram Reels
-   - Instagram Stories
-   - Instagram Feed/Post when the media format is valid
-   - YouTube Shorts
-8. EconomikaNoticias stores local workflow state for drafts and renders.
-9. CentralPublishingHub stores publishing and scheduling state.
+## In Scope
 
-## Definition of Done
+### Input
 
-The MVP is done when a local operator can create one reviewed post from a candidate/media item, render the final video locally, submit it to CentralPublishingHub, and see both local draft status and hub publishing status without requiring SentinelAPI or relative imports into sibling repositories.
+- Manual pasted links.
+- RSS/news fallback from `config/news_sources.json`.
+- Optional X/Twikit discovery when it works.
 
-## Required Architecture Properties
+### Processing
 
-- CentralAIService is the primary AI path.
-- CentralPublishingHub is the primary publishing path.
-- EconomikaNoticias calls both services over HTTP using explicit environment variables.
-- Sibling repository paths are not required for imports, tests, pushes, or normal execution.
-- Auto-start of central services is optional developer convenience, not a runtime requirement.
-- Secrets stay in environment variables or ignored local files.
+- Extract a news/candidate object from a link or RSS entry.
+- Generate a script, headline, caption, source metadata and trim hints through CentralAIService.
+- Render a local vertical video artifact.
+- Present the candidate, copy and rendered video for human review in the GUI.
 
-## MVP Targets
+### Publishing
 
-- `instagram_reel`
-- `instagram_story`
-- `instagram_feed`
-- `youtube_shorts`
+- Send a publish intent to CentralPublishingHub.
+- CentralPublishingHub owns temporary hosting and platform-specific publishing.
+- MVP targets:
+  - `youtube_shorts`
+  - `instagram_reel`
+  - `instagram_story`
+  - `instagram_feed` as planned / `NOT_IMPLEMENTED` until the Hub supports it end to end.
 
 ## Out Of Scope
 
-- Facebook publishing.
-- TikTok publishing.
-- Mandatory cloud rendering.
-- SentinelAPI as a required dependency.
-- Multi-user web app.
-- Large visual/UI redesign.
-- Massive module moves such as moving `main.py`.
-- Rebuilding CentralAIService or CentralPublishingHub from inside EconomikaNoticias.
+- Perfect X scraping.
+- Depending on Nitter for the happy path.
+- Universal scheduling.
+- Direct publication from EconomikaNoticias.
+- Moving the whole product to cloud.
+- Large Tkinter visual refactors.
+- Replacing the current GUI before the MVP path is stable.
+
+## MVP Success Criteria
+
+- A user can start CentralAIService, CentralPublishingHub and EconomikaNoticias locally with documented commands.
+- A manual link can be processed into a draft.
+- RSS fallback can produce candidates when X/Nitter fail.
+- A draft can be reviewed by a human before publishing.
+- A local video can be rendered and its path passed to CentralPublishingHub.
+- CentralPublishingHub receives one publish payload with normalized targets.
+- YouTube Shorts and Instagram Reel/Story are validated either against real APIs or documented dry-run/mock modes.
 
