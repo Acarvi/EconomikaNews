@@ -32,67 +32,59 @@ def test_subtitler_whisper_system_error_robust(mock_whisper_load):
 # -----------------------------------------------------------------------------
 # 2. TEST: PUBLISHER DELEGATION TO HUB (API SYNC)
 # -----------------------------------------------------------------------------
-@patch('core.publisher.requests.post')
+@patch('core.publisher.PublishingHubClient')
 @patch('core.publisher.upload_to_temporary_host')
-def test_publisher_hub_delegation(mock_upload, mock_post):
+def test_publisher_hub_delegation(mock_upload, mock_client_cls):
     """
     OBJETIVO: Verificar que el publicador delega correctamente al Hub vía HTTP.
     CRITERIO: Debe enviar un POST al endpoint correcto con el payload esperado.
     """
     from core.publisher import publish_video
     
-    # Mock Catbox upload
-    mock_upload.return_value = "https://catbox.moe/test.mp4"
-    
-    # Mock Hub Response
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"status": "success", "job_id": "123"}
-    mock_post.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.publish.return_value = {"status": "success", "job_id": "123"}
+    mock_client_cls.return_value = mock_client
     
     # Ejecución
     result = publish_video("test.mp4", "Caption Test", platform="instagram", title="Shorts Title")
     
     # Verificación
     assert result['status'] == 'success'
-    assert mock_post.called
+    assert mock_client.publish.called
+    assert not mock_upload.called
     
-    # Verificar URL y Payload
-    args, kwargs = mock_post.call_args
-    url = args[0]
-    payload = kwargs['json']
+    payload = mock_client.publish.call_args.args[0]
     
-    assert "/api/v1/publish-now" in url
-    assert payload['video_url'] == "https://catbox.moe/test.mp4"
-    assert payload['platforms'] == ["instagram"]
+    assert payload['video_path'] == "test.mp4"
+    assert payload['video_url'] is None
+    assert payload['targets'] == ["instagram_reel"]
+    assert payload['platforms'] == ["instagram_reel"]
     assert payload['shorts_title'] == "Shorts Title"
 
 # -----------------------------------------------------------------------------
 # 3. TEST: PUBLISHER SCHEDULING DELEGATION
 # -----------------------------------------------------------------------------
-@patch('core.publisher.requests.post')
+@patch('core.publisher.PublishingHubClient')
 @patch('core.publisher.upload_to_temporary_host')
-def test_publisher_scheduling_hub(mock_upload, mock_post):
+def test_publisher_scheduling_hub(mock_upload, mock_client_cls):
     """
     OBJETIVO: Verificar que la programación también se delega al Hub.
     """
     from core.publisher import schedule_publication
     
-    mock_upload.return_value = "https://catbox.moe/test.mp4"
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"status": "success"}
-    mock_post.return_value = mock_response
+    mock_client = MagicMock()
+    mock_client.schedule.return_value = {"status": "success"}
+    mock_client_cls.return_value = mock_client
     
     # Ejecución
     result = schedule_publication("test.mp4", "Caption", target_time="2026-04-11T20:00:00")
     
     # Verificación
     assert result['status'] == 'success'
-    args, kwargs = mock_post.call_args
-    assert "/api/v1/schedule" in args[0]
-    assert "posts" in kwargs['json']
-    assert kwargs['json']['posts'][0]['target_time'] == "2026-04-11T20:00:00"
+    payload = mock_client.schedule.call_args.args[0]
+    assert "posts" in payload
+    assert payload['posts'][0]['scheduled_at'] == "2026-04-11T20:00:00"
+    assert payload['posts'][0]['target_time'] == "2026-04-11T20:00:00"
 
 # -----------------------------------------------------------------------------
 # 4. TEST: URL CLEANING (PREVENT DUPLICATION)
@@ -120,13 +112,17 @@ def test_publisher_url_cleaning():
 # -----------------------------------------------------------------------------
 # 5. TEST: FALLBACK TO QUEUE (HUB DOWN)
 # -----------------------------------------------------------------------------
-@patch('core.publisher.check_publishing_hub_health', return_value=False)
 @patch('core.publisher._queue_failed_post')
-def test_publisher_fallback_to_queue(mock_queue, mock_health):
+@patch('core.publisher.PublishingHubClient')
+def test_publisher_fallback_to_queue(mock_client_cls, mock_queue):
     """
     OBJETIVO: Verificar que si el Hub está caído, el post se encola localmente.
     """
     from core.publisher import publish_video
+
+    mock_client = MagicMock()
+    mock_client.publish.side_effect = RuntimeError("Hub down")
+    mock_client_cls.return_value = mock_client
     
     result = publish_video("test.mp4", "Caption")
     

@@ -3,7 +3,9 @@ import time
 import os
 import json
 from typing import List, Dict, Optional
-from utils.network import check_publishing_hub_health
+
+from config.settings import get_settings
+from services.publishing_hub_client import PublishingHubClient
 
 # Configuration for Hub - Standardize on CENTRAL_PUBLISHING_HUB_URL
 # Robust initialization: ensure /api/v1 is not duplicated
@@ -26,11 +28,57 @@ def _admin_headers() -> Dict[str, str]:
     return {"X-API-Key": api_key} if api_key else {}
 
 def _normalize_platform(platform: str) -> str:
-    return {
+    return normalize_targets([platform])[0]
+
+def normalize_targets(targets: list[str] | None) -> list[str]:
+    aliases = {
         "instagram": "instagram_reel",
+        "reel": "instagram_reel",
+        "story": "instagram_story",
+        "feed": "instagram_feed",
+        "post": "instagram_feed",
+        "instagram_post": "instagram_feed",
         "facebook": "facebook_reel",
         "youtube": "youtube_shorts",
-    }.get(platform, platform)
+        "shorts": "youtube_shorts",
+    }
+    if not targets:
+        return ["instagram_reel"]
+
+    normalized = []
+    for target in targets:
+        key = str(target).strip().lower()
+        if not key:
+            continue
+        normalized.append(aliases.get(key, key))
+
+    return normalized or ["instagram_reel"]
+
+def build_publish_payload(
+    video_path: str | None = None,
+    video_url: str | None = None,
+    caption: str = "",
+    title: str = "Noticia",
+    targets: list[str] | None = None,
+    account_id: str | None = None,
+    publish_mode: str = "now",
+    scheduled_at: str | None = None,
+) -> dict:
+    normalized_targets = normalize_targets(targets)
+    return {
+        "account_id": account_id or get_settings().economika_account_id,
+        "video_path": video_path,
+        "video_url": video_url,
+        "caption": caption,
+        "title": title,
+        "targets": normalized_targets,
+        "publish_mode": publish_mode,
+        "scheduled_at": scheduled_at,
+        # Transitional compatibility fields. The new Hub contract uses targets/title.
+        "platforms": normalized_targets,
+        "shorts_title": title,
+        "target_time": scheduled_at,
+    }
 
 def _wait_for_ig_media_finished(creation_id: str, access_token: str):
     status_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{creation_id}"
@@ -122,7 +170,11 @@ def _queue_failed_post(payload: Dict, error: str):
         print(f"[CRITICAL] No se pudo guardar en cola local: {e}")
 
 def upload_to_temporary_host(file_path):
-    """Uploads a file to catbox.moe to get a public URL for the Publishing Hub."""
+    """
+    LEGACY FALLBACK ONLY. Primary temporary hosting lives in CentralPublishingHub.
+
+    Uploads a file to catbox.moe to get a public URL for legacy fallback flows.
+    """
     print(f"[INFO] Uploading {os.path.basename(file_path)} to catbox.moe...")
     url = "https://catbox.moe/user/api.php"
     for attempt in range(1, 4):
@@ -144,32 +196,18 @@ def upload_to_temporary_host(file_path):
 def publish_video(video_path: str, caption: str, platform: str = "instagram", title: str = "Noticia"):
     """
     Main entry point for immediate publication.
-    Delegates to the CentralPublishingHub via HTTP POST.
+    Delegates to CentralPublishingHub through PublishingHubClient.
     """
-    # Pre-flight check with auto-start
-    if not check_publishing_hub_health(CENTRAL_HUB_BASE):
-        print("[ERROR] CentralPublishingHub inaccesible. Procediendo a encolado local.")
-        # We don't have the video_url yet, but we want to store the intention
-        _queue_failed_post({"video_path": video_path, "caption": caption, "platform": platform, "title": title}, "Hub down")
-        return {"status": "queued", "message": "Post queued locally (Hub down)"}
-
-    video_url = upload_to_temporary_host(video_path)
-    if not video_url:
-        return {"status": "error", "message": "Failed to upload to Catbox"}
-
-    payload = {
-        "video_url": video_url,
-        "caption": caption,
-        "platforms": [_normalize_platform(platform)],
-        "shorts_title": title,
-        "account_id": "economika"
-    }
-
+    payload = build_publish_payload(
+        video_path=video_path,
+        caption=caption,
+        title=title,
+        targets=[platform],
+        publish_mode="now",
+    )
     try:
-        hub_api = f"{HUB_API_V1}/publish-now"
-        print(f"[HUB] Sending project to {hub_api}...")
-        response = requests.post(hub_api, json=payload, headers=_admin_headers(), timeout=60)
-        return response.json()
+        print("[HUB] Sending publishing intent to CentralPublishingHub...")
+        return PublishingHubClient().publish(payload)
     except Exception as e:
         print(f"[ERROR] Hub Publication Failed: {e}")
         _queue_failed_post(payload, str(e))
@@ -179,44 +217,40 @@ def schedule_publication(video_path: str, caption: str, platform: str = "instagr
     """
     Main entry point for scheduled publication.
     """
-    if not check_publishing_hub_health(CENTRAL_HUB_BASE):
-        _queue_failed_post({"video_path": video_path, "caption": caption, "platform": platform, "title": title, "sched": True}, "Hub down")
-        return {"status": "queued", "message": "Post queued locally (Hub down)"}
-
-    video_url = upload_to_temporary_host(video_path)
-    if not video_url:
-        return {"status": "error", "message": "Failed to upload to Catbox"}
-
     if not target_time:
         from datetime import datetime, timedelta, timezone
         from zoneinfo import ZoneInfo
         target_time = (datetime.now(ZoneInfo("Europe/Madrid")) + timedelta(hours=1)).astimezone(timezone.utc).isoformat()
 
-    payload = {
-        "posts": [
-            {
-                "video_url": video_url,
-                "caption": caption,
-                "target_time": target_time,
-                "platforms": [_normalize_platform(platform)],
-                "shorts_title": title,
-                "account_id": "economika"
-            }
-        ]
-    }
-
+    payload = build_publish_payload(
+        video_path=video_path,
+        caption=caption,
+        title=title,
+        targets=[platform],
+        publish_mode="scheduled",
+        scheduled_at=target_time,
+    )
+    schedule_payload = {"posts": [payload]}
     try:
-        hub_api = f"{HUB_API_V1}/schedule"
-        print(f"[HUB] Scheduling project at {hub_api}...")
-        response = requests.post(hub_api, json=payload, headers=_admin_headers(), timeout=60)
-        return response.json()
+        print("[HUB] Sending scheduled publishing intent to CentralPublishingHub...")
+        return PublishingHubClient().schedule(schedule_payload)
     except Exception as e:
         print(f"[ERROR] Hub Scheduling Failed: {e}")
-        _queue_failed_post(payload, str(e))
+        _queue_failed_post(schedule_payload, str(e))
         return {"status": "queued", "message": f"Hub error, post queued: {str(e)}"}
 
 def publish_now(video_path, caption, platforms, shorts_title="Noticia"):
-    results = []
-    for p in platforms:
-        results.append(publish_video(video_path, caption, platform=p, title=shorts_title))
-    return results[0] if results else {"status": "error"}
+    payload = build_publish_payload(
+        video_path=video_path,
+        caption=caption,
+        title=shorts_title,
+        targets=platforms,
+        publish_mode="now",
+    )
+    try:
+        print("[HUB] Sending multi-target publishing intent to CentralPublishingHub...")
+        return PublishingHubClient().publish(payload)
+    except Exception as e:
+        print(f"[ERROR] Hub Publication Failed: {e}")
+        _queue_failed_post(payload, str(e))
+        return {"status": "queued", "message": f"Hub error, post queued: {str(e)}"}

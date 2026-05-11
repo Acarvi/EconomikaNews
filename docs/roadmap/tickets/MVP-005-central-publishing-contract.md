@@ -27,6 +27,22 @@ Turn `core/publisher.py` into an adapter/client for CentralPublishingHub. Move o
 4. Store returned job id in local state once MVP-006 exists.
 5. Keep direct fallback explicit and disabled by default.
 
+## Implementation Notes
+
+EconomikaNoticias now sends publishing intent to CentralPublishingHub.
+
+EconomikaNoticias sends `video_path` when Hub can access the local file.
+
+Hub owns Meta temporary hosting via Gofile/Uguu/Catbox.
+
+`targets` is the new contract field.
+
+`platforms` and `shorts_title` are transitional compatibility fields.
+
+Instagram Feed/Post is a target alias, but actual implementation is Hub-side and may return `NOT_IMPLEMENTED`.
+
+Immediate publishing is an MVP requirement; scheduling remains target-dependent.
+
 ## Acceptance Criteria
 
 - Publishing path sends a single request to CentralPublishingHub.
