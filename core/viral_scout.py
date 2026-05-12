@@ -99,11 +99,14 @@ class ViralScout:
     def get_discovery_mode(self, manual_urls: Optional[List[str]] = None) -> str:
         mode = os.environ.get("ECONOMIKA_DISCOVERY_MODE", "").strip().lower()
         if not mode:
-            return "manual" if manual_urls else "rss"
-        return mode if mode in DISCOVERY_MODES else "rss"
+            return "manual" if manual_urls else "x"
+        return mode if mode in DISCOVERY_MODES else "x"
 
     def is_x_scout_enabled(self) -> bool:
-        return os.environ.get("ECONOMIKA_ENABLE_X_SCOUT", "").strip().lower() in {"1", "true", "yes", "on"}
+        enabled = os.environ.get("ECONOMIKA_ENABLE_X_SCOUT")
+        if enabled is None:
+            return True
+        return enabled.strip().lower() in {"1", "true", "yes", "on"}
 
     def build_manual_candidates(self, urls: List[str]) -> List[Dict[str, Any]]:
         candidates = []
@@ -209,8 +212,7 @@ class ViralScout:
             return []
 
         if discovery_mode == "rss":
-            progress_callback("X scout disabled by default for MVP.")
-            progress_callback("Scanning RSS/news sources...")
+            progress_callback("RSS/news mode selected explicitly.")
             return await self._scan_news_rss(
                 hours_back=hours_back,
                 max_items=max_items,
@@ -219,14 +221,16 @@ class ViralScout:
             )
 
         if not self.is_x_scout_enabled():
-            progress_callback("X scout disabled by default for MVP.")
-            progress_callback("Scanning RSS/news sources...")
-            return await self._scan_news_rss(
-                hours_back=hours_back,
-                max_items=max_items,
-                progress_callback=progress_callback,
-                ignore_history=ignore_history
-            )
+            progress_callback("X Viral Scout disabled by ECONOMIKA_ENABLE_X_SCOUT=false.")
+            if discovery_mode == "mixed":
+                progress_callback("Mixed mode: X disabled, scanning RSS/news fallback.")
+                return await self._scan_news_rss(
+                    hours_back=hours_back,
+                    max_items=max_items,
+                    progress_callback=progress_callback,
+                    ignore_history=ignore_history
+                )
+            return []
 
         # CRITICAL: Reload history to ensure we have the latest processed items
         if not ignore_history:
@@ -236,30 +240,19 @@ class ViralScout:
         viral_urls = []
         schema_failures = 0
 
-        if discovery_mode == "mixed":
-            progress_callback("Scanning RSS/news sources...")
-            viral_urls.extend(
-                await self._scan_news_rss(
-                    hours_back=hours_back,
-                    max_items=max_items,
-                    progress_callback=progress_callback,
-                    ignore_history=ignore_history
-                )
-            )
-            if len(viral_urls) >= max_items:
-                viral_urls.sort(key=lambda x: x['score'], reverse=True)
-                return viral_urls[:max_items]
-            progress_callback("X Scout experimental enabled; scanning after RSS.")
-        else:
-            progress_callback("X Scout experimental enabled.")
+        progress_callback("Scanning configured X accounts...")
         
         # Use get_cookies which handles both env var (cloud) and file (local)
         from config.cookie_utils import get_cookies
         cookies = get_cookies()
         
         if not cookies:
-            progress_callback("No se encontraron cookies. Activando fallback RSS de noticias...")
-            return await self._scan_news_rss(hours_back=hours_back, max_items=max_items, progress_callback=progress_callback, ignore_history=ignore_history)
+            progress_callback("No se encontraron cookies X/Twitter.")
+            if discovery_mode == "mixed":
+                progress_callback("Mixed mode: usando RSS/news fallback.")
+                return await self._scan_news_rss(hours_back=hours_back, max_items=max_items, progress_callback=progress_callback, ignore_history=ignore_history)
+            progress_callback("No se encontraron tuits virales. Prueba renovar cookies o usar modo mixed/rss.")
+            return []
             
         try:
             # Final Resolution for Domain Conflict: Inject cookies with explicit .x.com domain
@@ -292,7 +285,7 @@ class ViralScout:
         
         for idx, (user_screen_name, _) in enumerate(self.accounts.items()):
             if schema_failures >= X_SCHEMA_FAILURE_LIMIT:
-                progress_callback("X/Twikit parece degradado tras 3 fallos de schema. Saltando X scout y usando RSS fallback.")
+                progress_callback("X/Twikit degraded: KEY_BYTE / urls schema error.")
                 break
 
             progress_callback(f"🔎 Scanning @{user_screen_name} ({idx+1}/{total_accounts})...")
@@ -553,25 +546,31 @@ class ViralScout:
                 await asyncio.sleep(random.uniform(5, 12))
                 
         # Sort by score descending
-        if not viral_urls or schema_failures >= X_SCHEMA_FAILURE_LIMIT:
-            progress_callback("   Sin candidatos X/Nitter. Activando fallback RSS de noticias...")
-            viral_urls.extend(
-                await self._scan_news_rss(
-                    hours_back=hours_back,
-                    max_items=max_items,
-                    progress_callback=progress_callback,
-                    ignore_history=ignore_history
-                )
-            )
+        if viral_urls:
+            deduped = {}
+            for item in viral_urls:
+                url = item.get("url")
+                if url and url not in deduped:
+                    deduped[url] = item
+            viral_urls = list(deduped.values())
+            viral_urls.sort(key=lambda x: x['score'], reverse=True)
+            return viral_urls[:max_items]
 
-        deduped = {}
-        for item in viral_urls:
-            url = item.get("url")
-            if url and url not in deduped:
-                deduped[url] = item
-        viral_urls = list(deduped.values())
-        viral_urls.sort(key=lambda x: x['score'], reverse=True)
-        return viral_urls[:max_items]
+        if schema_failures >= X_SCHEMA_FAILURE_LIMIT:
+            progress_callback("X/Twikit degraded: KEY_BYTE / urls schema error.")
+
+        if discovery_mode == "mixed":
+            progress_callback("No se encontraron candidatos X/Nitter. Mixed mode: activando RSS/news fallback.")
+            rss_hits = await self._scan_news_rss(
+                hours_back=hours_back,
+                max_items=max_items,
+                progress_callback=progress_callback,
+                ignore_history=ignore_history
+            )
+            return rss_hits[:max_items]
+
+        progress_callback("No se encontraron tuits virales. Prueba renovar cookies o usar modo mixed/rss.")
+        return []
 
     def _is_schema_failure(self, exc: Exception) -> bool:
         msg = str(exc).lower()

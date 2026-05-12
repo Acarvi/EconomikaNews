@@ -69,24 +69,51 @@ def test_fallback_logging_does_not_reference_undefined_e():
 
 
 @pytest.mark.asyncio
-async def test_default_discovery_mode_uses_rss_not_x(monkeypatch):
+async def test_default_discovery_mode_uses_x_not_rss(monkeypatch):
     monkeypatch.delenv("ECONOMIKA_DISCOVERY_MODE", raising=False)
     monkeypatch.delenv("ECONOMIKA_ENABLE_X_SCOUT", raising=False)
     scout = ViralScout()
-    scout.load_news_sources = lambda: [{"name": "Test Economia", "url": "https://example.com/rss.xml"}]
+    scout.accounts = {}
 
-    with patch('core.viral_scout.Client') as mock_client_class:
-        with patch('core.viral_scout.httpx.AsyncClient', FakeRSSClient):
-            hits = await scout._scan_async(progress_callback=lambda _m: None, ignore_history=True)
+    with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+        with patch('config.cookie_utils.netscape_to_json'):
+            with patch('json.load', return_value={'ct0': 'dummy'}):
+                with patch('core.viral_scout.Client') as mock_client_class:
+                    with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])) as mock_rss:
+                        hits = await scout._scan_async(progress_callback=lambda _m: None, ignore_history=True)
 
-    mock_client_class.assert_not_called()
-    assert len(hits) == 1
-    assert hits[0]["source"] == "Test Economia"
+    mock_client_class.assert_called()
+    mock_rss.assert_not_called()
+    assert hits == []
 
 
 @pytest.mark.asyncio
-async def test_x_scout_disabled_flag_avoids_twikit(monkeypatch):
+async def test_default_x_scout_enabled(monkeypatch):
+    monkeypatch.delenv("ECONOMIKA_ENABLE_X_SCOUT", raising=False)
+    scout = ViralScout()
+
+    assert scout.get_discovery_mode() == "x"
+    assert scout.is_x_scout_enabled() is True
+
+
+@pytest.mark.asyncio
+async def test_x_scout_disabled_flag_does_not_use_rss_in_x_mode(monkeypatch):
     monkeypatch.setenv("ECONOMIKA_DISCOVERY_MODE", "x")
+    monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "false")
+    scout = ViralScout()
+
+    with patch('core.viral_scout.Client') as mock_client_class:
+        with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])) as mock_rss:
+            hits = await scout._scan_async(progress_callback=lambda _m: None, ignore_history=True)
+
+    mock_client_class.assert_not_called()
+    mock_rss.assert_not_called()
+    assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_x_scout_disabled_flag_uses_rss_only_in_mixed(monkeypatch):
+    monkeypatch.setenv("ECONOMIKA_DISCOVERY_MODE", "mixed")
     monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "false")
     scout = ViralScout()
     scout.load_news_sources = lambda: [{"name": "Test Economia", "url": "https://example.com/rss.xml"}]
@@ -161,7 +188,6 @@ async def test_circuit_breaker_stops_x_after_three_schema_errors(monkeypatch):
     monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "true")
     scout = ViralScout()
     scout.accounts = {"one": 1000, "two": 1000, "three": 1000, "four": 1000}
-    scout.load_news_sources = lambda: [{"name": "Test Economia", "url": "https://example.com/rss.xml"}]
     logs = []
 
     with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
@@ -173,14 +199,14 @@ async def test_circuit_breaker_stops_x_after_three_schema_errors(monkeypatch):
                     mock_client.search_user = AsyncMock(return_value=[])
                     with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
                         mock_nitter.return_value = []
-                        with patch('core.viral_scout.httpx.AsyncClient', FakeRSSClient):
+                        with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])) as mock_rss:
                             with patch('asyncio.sleep', return_value=None):
                                 hits = await scout._scan_async(progress_callback=lambda m: logs.append(m), ignore_history=True)
 
     assert mock_client.get_user_by_screen_name.call_count == 6
-    assert any("X/Twikit parece degradado tras 3 fallos de schema" in log for log in logs)
-    assert len(hits) == 1
-    assert hits[0]["source"] == "Test Economia"
+    assert any("X/Twikit degraded: KEY_BYTE / urls schema error." in log for log in logs)
+    mock_rss.assert_not_called()
+    assert hits == []
 
 
 def test_manual_urls_build_candidates_without_scout(monkeypatch):
@@ -196,8 +222,33 @@ def test_manual_urls_build_candidates_without_scout(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_scan_returns_news_fallback_when_x_paths_fail(monkeypatch):
+async def test_scan_returns_empty_when_x_paths_fail_in_x_mode(monkeypatch):
     monkeypatch.setenv("ECONOMIKA_DISCOVERY_MODE", "x")
+    monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "true")
+    with patch('core.viral_scout.Client') as mock_client_class:
+        mock_client = mock_client_class.return_value
+        mock_client.get_user_by_screen_name = AsyncMock(side_effect=Exception("Couldn't get KEY_BYTE indices"))
+        mock_client.search_user = AsyncMock(return_value=[])
+
+        scout = ViralScout()
+        scout.accounts = {"fail_user": 1000}
+
+        with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+            with patch('config.cookie_utils.netscape_to_json'):
+                with patch('core.viral_scout.json.load', return_value={'ct0': 'dummy'}):
+                    with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
+                        mock_nitter.return_value = []
+                        with patch.object(scout, '_scan_news_rss', AsyncMock(return_value=[])) as mock_rss:
+                            with patch('asyncio.sleep', return_value=None):
+                                hits = await scout._scan_async(progress_callback=lambda _m: None, ignore_history=True)
+
+        mock_rss.assert_not_called()
+        assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_scan_returns_news_fallback_when_x_paths_fail_in_mixed(monkeypatch):
+    monkeypatch.setenv("ECONOMIKA_DISCOVERY_MODE", "mixed")
     monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "true")
     with patch('core.viral_scout.Client') as mock_client_class:
         mock_client = mock_client_class.return_value
