@@ -1418,14 +1418,14 @@ def run_gui():
                     root.after(0, lambda: status_var.set("✅ Escaneo cloud completado. Pulsa 'Cloud' para cargar."))
                 else:
                     root.after(0, lambda: status_var.set(f"⚠️ Error cloud: {response.status_code}"))
-                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Scout"))
+                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Discovery"))
             except Exception as e:
                 root.after(0, lambda: status_var.set(f"❌ Error conexión cloud: {str(e)[:40]}"))
-                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Scout"))
+                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Discovery"))
         
         threading.Thread(target=scout_task, daemon=True).start()
 
-    btn_scout = create_modern_button(btn_row, "🔍 Scout", trigger_cloud_scan, "#9b59b6")
+    btn_scout = create_modern_button(btn_row, "🔍 Discovery", trigger_cloud_scan, "#9b59b6")
     btn_scout.pack(side="right")
     
     # Action Button (big red)
@@ -1527,7 +1527,7 @@ def run_gui():
         def scout_task():
             try:
                 scout = ViralScout()
-                status_manager.update(f"🚀 Iniciando Viral Scout ({hours}h, Sens: {sensitivity_var.get()})...")
+                status_manager.update(f"🚀 Iniciando Discovery RSS/News ({hours}h, Sens: {sensitivity_var.get()})...")
                 hits = scout.scan(hours_back=hours, min_ratio=sensitivity_var.get(), ignore_history=ignore_history, 
                                  must_have_media=must_have_media, progress_callback=status_manager.update)
                 
@@ -1540,7 +1540,7 @@ def run_gui():
                         input_text.delete('1.0', tk.END)
                         input_text.insert(tk.END, (current_text + "\n" if current_text else "") + new_urls + "\n")
                         viral_scout_cache = hits
-                        status_manager.update(f"✨ Encontrados {len(hits)} tweets virales!")
+                        status_manager.update(f"✨ Encontrados {len(hits)} candidatos de discovery!")
                         # REMOVED: Immediate mark_as_processed. We only mark when kept or rejected.
                     else:
                         status_manager.update(f"🤷 Sin resultados en las últimas {hours}h.")
@@ -1552,12 +1552,12 @@ def run_gui():
                             if new_hours:
                                 reprocess = messagebox.askyesno("Reprocesar", "¿Incluir tuits ya procesados?", parent=root)
                                 root.after(500, lambda: run_viral_scout(hours=new_hours, ignore_history=reprocess))
-                    btn_scout.config(state="normal", text="🔍 Viral Scout")
+                    btn_scout.config(state="normal", text="🔍 Discovery")
                 
                 root.after(0, handle_results)
             except Exception as e:
                 root.after(0, lambda: status_manager.update(f"❌ Error: {str(e)}"))
-                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Viral Scout"))
+                root.after(0, lambda: btn_scout.config(state="normal", text="🔍 Discovery"))
             
         threading.Thread(target=scout_task, daemon=True).start()
     

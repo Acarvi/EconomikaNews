@@ -63,6 +63,8 @@ HISTORY_FILE = os.path.join(BASE_DIR, "data", "processed_history.json")
 REJECTED_FILE = os.path.join(BASE_DIR, "data", "rejected_history.json")
 COOKIES_FILE = os.path.join(BASE_DIR, "config", "x.com_cookies.txt")
 NEWS_SOURCES_FILE = os.path.join(BASE_DIR, "config", "news_sources.json")
+DISCOVERY_MODES = {"manual", "rss", "x", "mixed"}
+X_SCHEMA_FAILURE_LIMIT = 3
 
 DEFAULT_NEWS_SOURCES = [
     {
@@ -92,7 +94,41 @@ class ViralScout:
         self.accounts = self.load_accounts()
         self.history = self.load_history(HISTORY_FILE)
         self.rejected = self.load_history(REJECTED_FILE)
-        self.client = Client('en-US')
+        self.client = None
+
+    def get_discovery_mode(self, manual_urls: Optional[List[str]] = None) -> str:
+        mode = os.environ.get("ECONOMIKA_DISCOVERY_MODE", "").strip().lower()
+        if not mode:
+            return "manual" if manual_urls else "rss"
+        return mode if mode in DISCOVERY_MODES else "rss"
+
+    def is_x_scout_enabled(self) -> bool:
+        return os.environ.get("ECONOMIKA_ENABLE_X_SCOUT", "").strip().lower() in {"1", "true", "yes", "on"}
+
+    def build_manual_candidates(self, urls: List[str]) -> List[Dict[str, Any]]:
+        candidates = []
+        seen_urls = set()
+        for url in urls:
+            clean_url = (url or "").strip()
+            if not clean_url or clean_url in seen_urls:
+                continue
+            seen_urls.add(clean_url)
+            candidate_id = f"manual-{hashlib.sha1(clean_url.encode('utf-8')).hexdigest()[:16]}"
+            candidates.append({
+                "url": clean_url,
+                "score": 1.0,
+                "reposts": 0,
+                "likes": 0,
+                "user": "manual",
+                "source": "manual",
+                "id": candidate_id,
+                "type": "MANUAL",
+                "is_video": False,
+                "media_url": None,
+                "thumbnail": None,
+                "description": clean_url
+            })
+        return candidates
 
     def load_accounts(self):
         if not os.path.exists(ACCOUNTS_FILE):
@@ -165,12 +201,57 @@ class ViralScout:
         Formula: (RTs * 4 + Likes) / (sqrt(Followers) * 2)
         Viral Threshold: > 2.0 (Endurecido de 1.0 a 2.0)
         """
+        discovery_mode = self.get_discovery_mode()
+        progress_callback(f"Discovery mode: {discovery_mode}")
+
+        if discovery_mode == "manual":
+            progress_callback("Manual discovery mode: usando solo URLs introducidas por el usuario.")
+            return []
+
+        if discovery_mode == "rss":
+            progress_callback("X scout disabled by default for MVP.")
+            progress_callback("Scanning RSS/news sources...")
+            return await self._scan_news_rss(
+                hours_back=hours_back,
+                max_items=max_items,
+                progress_callback=progress_callback,
+                ignore_history=ignore_history
+            )
+
+        if not self.is_x_scout_enabled():
+            progress_callback("X scout disabled by default for MVP.")
+            progress_callback("Scanning RSS/news sources...")
+            return await self._scan_news_rss(
+                hours_back=hours_back,
+                max_items=max_items,
+                progress_callback=progress_callback,
+                ignore_history=ignore_history
+            )
+
         # CRITICAL: Reload history to ensure we have the latest processed items
         if not ignore_history:
             self.history = self.load_history(HISTORY_FILE)
             self.rejected = self.load_history(REJECTED_FILE)
 
         viral_urls = []
+        schema_failures = 0
+
+        if discovery_mode == "mixed":
+            progress_callback("Scanning RSS/news sources...")
+            viral_urls.extend(
+                await self._scan_news_rss(
+                    hours_back=hours_back,
+                    max_items=max_items,
+                    progress_callback=progress_callback,
+                    ignore_history=ignore_history
+                )
+            )
+            if len(viral_urls) >= max_items:
+                viral_urls.sort(key=lambda x: x['score'], reverse=True)
+                return viral_urls[:max_items]
+            progress_callback("X Scout experimental enabled; scanning after RSS.")
+        else:
+            progress_callback("X Scout experimental enabled.")
         
         # Use get_cookies which handles both env var (cloud) and file (local)
         from config.cookie_utils import get_cookies
@@ -210,6 +291,10 @@ class ViralScout:
         progress_callback(f"📊 [SCOUT] Accounts to scan: {list(self.accounts.keys())}")
         
         for idx, (user_screen_name, _) in enumerate(self.accounts.items()):
+            if schema_failures >= X_SCHEMA_FAILURE_LIMIT:
+                progress_callback("X/Twikit parece degradado tras 3 fallos de schema. Saltando X scout y usando RSS fallback.")
+                break
+
             progress_callback(f"🔎 Scanning @{user_screen_name} ({idx+1}/{total_accounts})...")
             
             try:
@@ -253,6 +338,8 @@ class ViralScout:
 
                             if _is_recoverable_twikit_error(e):
                                 progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name}: {err_msg}")
+                                if self._is_schema_failure(e):
+                                    schema_failures += 1
                                 user_data = None # Mark as failed
                                 skip_twikit_for_account = True
                                 break
@@ -312,6 +399,8 @@ class ViralScout:
                             else:
                                 if _is_recoverable_twikit_error(e):
                                     progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name} (Tweets): {err_msg}")
+                                    if self._is_schema_failure(e):
+                                        schema_failures += 1
                                     tweets_failed_recoverably = True
                                     break
                                 else:
@@ -464,7 +553,7 @@ class ViralScout:
                 await asyncio.sleep(random.uniform(5, 12))
                 
         # Sort by score descending
-        if not viral_urls:
+        if not viral_urls or schema_failures >= X_SCHEMA_FAILURE_LIMIT:
             progress_callback("   Sin candidatos X/Nitter. Activando fallback RSS de noticias...")
             viral_urls.extend(
                 await self._scan_news_rss(
@@ -475,8 +564,24 @@ class ViralScout:
                 )
             )
 
+        deduped = {}
+        for item in viral_urls:
+            url = item.get("url")
+            if url and url not in deduped:
+                deduped[url] = item
+        viral_urls = list(deduped.values())
         viral_urls.sort(key=lambda x: x['score'], reverse=True)
-        return viral_urls
+        return viral_urls[:max_items]
+
+    def _is_schema_failure(self, exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return (
+            isinstance(exc, KeyError)
+            or "urls" in msg
+            or "key_byte" in msg
+            or "indices" in msg
+            or "couldn't get key_byte" in msg
+        )
 
     async def _scan_nitter_rss(self, user_screen_name, limit_date, min_ratio=2.0, progress_callback=print):
         """
@@ -583,18 +688,16 @@ class ViralScout:
         sources = self.load_news_sources()
         limit_date = datetime.now() - timedelta(hours=hours_back)
         hits = []
-        seen = set()
+        seen_urls = set()
         progress_callback(f"   RSS noticias: probando {len(sources)} fuentes configuradas...")
 
         headers = {
             "User-Agent": "EconomikaNoticias ViralScout/1.0"
         }
 
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        timeout = httpx.Timeout(10.0, connect=5.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=headers) as client:
             for source in sources:
-                if len(hits) >= max_items:
-                    break
-
                 if isinstance(source, str):
                     source_name = source
                     source_url = source
@@ -616,13 +719,14 @@ class ViralScout:
                         continue
 
                     for entry in entries:
-                        if len(hits) >= max_items:
-                            break
-
                         link = entry.get("link") or entry.get("id")
                         title = (entry.get("title") or "").strip()
                         if not link or not title:
                             continue
+                        clean_link = link.split("#")[0].strip()
+                        if clean_link in seen_urls:
+                            continue
+                        seen_urls.add(clean_link)
 
                         published = entry.get("published_parsed") or entry.get("updated_parsed")
                         if published:
@@ -630,10 +734,7 @@ class ViralScout:
                             if pub_dt < limit_date:
                                 continue
 
-                        candidate_id = f"news-{hashlib.sha1(link.encode('utf-8')).hexdigest()[:16]}"
-                        if candidate_id in seen:
-                            continue
-                        seen.add(candidate_id)
+                        candidate_id = f"news-{hashlib.sha1(clean_link.encode('utf-8')).hexdigest()[:16]}"
 
                         if not ignore_history and self.is_processed(candidate_id):
                             continue
@@ -650,21 +751,24 @@ class ViralScout:
                         score = round(max(2.0, recency_score), 2)
 
                         hits.append({
-                            'url': link,
+                            'url': clean_link,
                             'score': score,
                             'reposts': 0,
                             'likes': 0,
                             'user': source_name,
                             'source': source_name,
                             'id': candidate_id,
-                            'type': "NOTICIA",
+                            'type': "NEWS 📰",
                             'is_video': False,
                             'media_url': media_url,
-                            'thumbnail': media_url,
+                            'thumbnail': None,
                             'description': title if not description else f"{title} - {description}"
                         })
                 except Exception:
                     continue
+
+        hits.sort(key=lambda item: item.get("score", 0), reverse=True)
+        hits = hits[:max_items]
 
         if hits:
             progress_callback(f"   RSS noticias rescato {len(hits)} candidatos.")
