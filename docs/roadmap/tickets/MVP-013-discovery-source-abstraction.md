@@ -2,11 +2,11 @@
 
 ## Goal
 
-Introduce a small discovery source contract so manual links and RSS are reliable MVP inputs, while Twikit and Nitter become optional enrichers.
+Introduce a small discovery source contract so X/Twitter viral tweet scouting remains the primary MVP discovery path, while manual links and RSS/news are explicit secondary inputs.
 
 ## Why
 
-`ViralScout` currently mixes source scanning, scoring, fallback behavior, history and logging. This makes X/Twikit failures feel like product failures even when manual/RSS discovery could keep the MVP moving.
+`ViralScout` currently mixes source scanning, scoring, fallback behavior, history and logging. The product still centers on viral tweets from configured X accounts, but failures should be clear and bounded instead of silently replacing X with unrelated RSS/news candidates.
 
 ## Scope
 
@@ -25,8 +25,10 @@ class DiscoverySource:
   - `TwikitSource`
   - `NitterSource`
 - Source priority:
-  - Manual + RSS = reliable MVP.
-  - Twikit/Nitter = optional enrichers.
+  - X/Twitter viral tweets from configured accounts = primary MVP discovery.
+  - Manual URLs = user-provided explicit inputs.
+  - RSS/news = explicit secondary mode for backup/content research.
+  - Mixed mode = X first, RSS/news only if X returns no candidates.
 - Keep a compatibility adapter for current `ViralScout.scan(...)` callers.
 
 ## Non-goals
@@ -48,8 +50,9 @@ class DiscoverySource:
 
 ## Acceptance Criteria
 
-- Manual link discovery works without X cookies.
-- RSS discovery works without Twikit.
+- Default discovery mode runs X/Twitter Viral Scout.
+- Manual link discovery works without X cookies when selected.
+- RSS discovery works without Twikit when selected explicitly.
 - Twikit/Nitter errors are captured as source warnings, not global failures.
 - Existing GUI entry points still work.
 
@@ -62,11 +65,11 @@ pytest -q
 
 ## Implementation Notes
 
-- MVP discovery stable path is Manual URLs + RSS.
-- X/Twikit is experimental and disabled by default.
-- Nitter is best-effort only.
-- RSS fallback is now a first-class source, not emergency fallback.
+- Primary MVP discovery source: X/Twitter viral tweets from configured accounts.
+- RSS/news: explicit secondary mode, useful for backup/content research, not default.
+- Mixed mode: optional fallback where X runs first and RSS/news runs only if X returns no candidates.
+- Nitter is best-effort within the X discovery path.
 - Circuit breaker avoids wasting time when X schema is broken.
-- Defaults are safe: `ECONOMIKA_DISCOVERY_MODE=rss` when no manual URLs are provided, and `ECONOMIKA_ENABLE_X_SCOUT=false`.
-- To run X manually, set `ECONOMIKA_DISCOVERY_MODE=x` or `mixed` and `ECONOMIKA_ENABLE_X_SCOUT=true`.
+- Defaults: `ECONOMIKA_DISCOVERY_MODE=x` and `ECONOMIKA_ENABLE_X_SCOUT=true`.
+- To run RSS manually, set `ECONOMIKA_DISCOVERY_MODE=rss`.
 
