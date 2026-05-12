@@ -1,4 +1,3 @@
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,6 +9,7 @@ from services.discovery.x_sources import (
     BrowserXSource,
     TwikitXSource,
     calculate_viral_score,
+    parse_compact_metric,
     is_schema_failure,
 )
 
@@ -23,6 +23,19 @@ def test_recoverable_twikit_error_helper_detects_schema_errors():
 def test_score_calculation_uses_product_formula():
     score = calculate_viral_score(reposts=25, likes=900, followers=10000)
     assert score == pytest.approx(5.0)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("1,2 mil", 1200),
+        ("1.2K", 1200),
+        ("3 M", 3000000),
+        ("534", 534),
+    ],
+)
+def test_parse_compact_metric_variants(raw, expected):
+    assert parse_compact_metric(raw) == expected
 
 
 def test_twikit_source_normalizes_fake_tweet_to_candidate():
@@ -64,6 +77,33 @@ def test_browser_source_parser_extracts_status_urls_from_html():
     assert [candidate.id for candidate in candidates] == ["111", "222"]
     assert candidates[0].source == "browser"
     assert candidates[0].score == 0.1
+    assert candidates[0].score_source == "browser_no_metrics"
+
+
+def test_browser_source_parser_extracts_metrics_from_html():
+    html = """
+    <article>
+      <a href="/wallstwolverine/status/111">tweet</a>
+      <span>1.2K Likes</span>
+      <span>34 Reposts</span>
+      <time datetime="2026-05-12T12:00:00.000Z"></time>
+    </article>
+    """
+
+    candidates = BrowserXSource.parse_candidates_from_html(html, "wallstwolverine", followers_hint=10000)
+
+    assert len(candidates) == 1
+    assert candidates[0].reposts == 34
+    assert candidates[0].likes == 1200
+    assert candidates[0].score == pytest.approx(((34 * 4) + 1200) / (10000 ** 0.5 * 2))
+    assert candidates[0].timestamp == "2026-05-12T12:00:00.000Z"
+
+
+@pytest.mark.asyncio
+async def test_browser_source_handles_empty_page_without_crash():
+    source = BrowserXSource(html_fetcher=lambda _screen_name: "")
+    hits = await source.scan_accounts([XAccount(screen_name="wallstwolverine", followers_hint=1000)])
+    assert hits == []
 
 
 @pytest.mark.asyncio
@@ -100,10 +140,12 @@ async def test_auto_source_attempts_browser_after_twikit_schema_degraded(monkeyp
                         mock_nitter.return_value = []
                         with patch.object(scout, '_scan_browser_x_source', AsyncMock(return_value=[browser_hit])) as mock_browser:
                             with patch('asyncio.sleep', return_value=None):
-                                hits = await scout._scan_async(progress_callback=lambda _m: None, ignore_history=True)
+                                logs = []
+                                hits = await scout._scan_async(progress_callback=lambda m: logs.append(m), ignore_history=True)
 
     assert mock_client.get_user_by_screen_name.call_count == 6
     mock_browser.assert_awaited_once()
+    assert any("Twikit degraded; switching to BrowserXSource." in log for log in logs)
     assert hits == [browser_hit]
 
 
