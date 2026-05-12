@@ -60,3 +60,13 @@ pytest -q tests/test_viral_scout_resilience.py tests/test_fallback.py
 pytest -q
 ```
 
+## Implementation Notes
+
+- MVP discovery stable path is Manual URLs + RSS.
+- X/Twikit is experimental and disabled by default.
+- Nitter is best-effort only.
+- RSS fallback is now a first-class source, not emergency fallback.
+- Circuit breaker avoids wasting time when X schema is broken.
+- Defaults are safe: `ECONOMIKA_DISCOVERY_MODE=rss` when no manual URLs are provided, and `ECONOMIKA_ENABLE_X_SCOUT=false`.
+- To run X manually, set `ECONOMIKA_DISCOVERY_MODE=x` or `mixed` and `ECONOMIKA_ENABLE_X_SCOUT=true`.
+
