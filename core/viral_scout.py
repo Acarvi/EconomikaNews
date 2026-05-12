@@ -6,29 +6,20 @@ import re
 import random
 import hashlib
 from typing import List, Dict, Optional, Any
+from datetime import datetime, timedelta
 
-def _get_stat(obj: Any, keys: list, default: int = 0) -> int:
-    """Robustly extract a stat from an object or dict."""
-    for key in keys:
-        if isinstance(obj, dict):
-            if key in obj: return obj[key] or 0
-        else:
-            val = getattr(obj, key, None)
-            if val is not None: return val or 0
-    return default
+from services.discovery.models import XAccount
+from services.discovery.x_sources import (
+    BrowserXSource,
+    TwikitXSource,
+    get_stat as _get_stat,
+    is_recoverable_twikit_error as _source_is_recoverable_twikit_error,
+    is_schema_failure as _source_is_schema_failure,
+)
+
 
 def _is_recoverable_twikit_error(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return (
-        isinstance(exc, KeyError)
-        or "urls" in msg
-        or "key_byte" in msg
-        or "indices" in msg
-        or "couldn't get key_byte" in msg
-        or "404" in msg
-        or "403" in msg
-        or "lookup" in msg
-    )
+    return _source_is_recoverable_twikit_error(exc)
 import httpx
 # --- DEFINTIVE MONKEY PATCH FOR HTTPX COOKIE CONFLICT ---
 # This prevents the fatal 'Multiple cookies exist with name=twid' error.
@@ -52,7 +43,6 @@ except Exception as e:
 
 from twikit import Client
 from config.cookie_utils import netscape_to_dict
-from datetime import datetime, timedelta
 import feedparser
 import httpx
 
@@ -95,6 +85,7 @@ class ViralScout:
         self.history = self.load_history(HISTORY_FILE)
         self.rejected = self.load_history(REJECTED_FILE)
         self.client = None
+        self.twikit_source = TwikitXSource(processed_checker=self.is_processed)
 
     def get_discovery_mode(self, manual_urls: Optional[List[str]] = None) -> str:
         mode = os.environ.get("ECONOMIKA_DISCOVERY_MODE", "").strip().lower()
@@ -107,6 +98,16 @@ class ViralScout:
         if enabled is None:
             return True
         return enabled.strip().lower() in {"1", "true", "yes", "on"}
+
+    def get_x_source_mode(self) -> str:
+        mode = os.environ.get("ECONOMIKA_X_SOURCE", "twikit").strip().lower()
+        return mode if mode in {"twikit", "browser", "auto"} else "twikit"
+
+    def build_x_accounts(self) -> List[XAccount]:
+        return [
+            XAccount(screen_name=screen_name, followers_hint=followers_hint)
+            for screen_name, followers_hint in self.accounts.items()
+        ]
 
     def build_manual_candidates(self, urls: List[str]) -> List[Dict[str, Any]]:
         candidates = []
@@ -198,6 +199,33 @@ class ViralScout:
             self.rejected.append(tweet_id)
             self.save_list(REJECTED_FILE, self.rejected)
 
+    async def _scan_browser_x_source(self, max_items=20, progress_callback=print):
+        progress_callback("Scanning X via experimental BrowserXSource...")
+        source = BrowserXSource()
+        candidates = await source.scan_accounts(
+            self.build_x_accounts(),
+            max_items=max_items,
+            progress_callback=progress_callback,
+        )
+        return [candidate.to_dict() for candidate in candidates]
+
+    def _write_x_debug_dump(self, user_screen_name: str, err_msg: str, exc: Exception, progress_callback=print):
+        if os.environ.get("ECONOMIKA_DEBUG_X", "").strip().lower() not in {"1", "true", "yes", "on"}:
+            return
+        debug_dir = os.path.join(BASE_DIR, "debug")
+        os.makedirs(debug_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_user = re.sub(r"[^A-Za-z0-9_.-]", "_", user_screen_name)
+        debug_path = os.path.join(debug_dir, f"x_response_{safe_user}_{timestamp}.txt")
+        with open(debug_path, "w", encoding="utf-8") as f:
+            f.write(f"USER: {user_screen_name}\n")
+            f.write(f"ERROR: {err_msg}\n")
+            f.write(f"EXCEPTION TYPE: {type(exc).__name__}\n")
+            if hasattr(exc, 'response'):
+                f.write(f"RESPONSE STATUS: {exc.response.status_code}\n")
+                f.write(f"RESPONSE TEXT: {exc.response.text}\n")
+        progress_callback(f"   [DEBUG] Dump guardado en {debug_path}")
+
     async def _scan_async(self, hours_back=24, min_ratio=2.0, max_items=20, progress_callback=print, ignore_history=False, must_have_media=True):
         """
         Internal async scan using Twikit.
@@ -239,8 +267,13 @@ class ViralScout:
 
         viral_urls = []
         schema_failures = 0
+        x_source_mode = self.get_x_source_mode()
+
+        if x_source_mode == "browser":
+            return await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
 
         progress_callback("Scanning configured X accounts...")
+        progress_callback(f"X source: {x_source_mode}")
         
         # Use get_cookies which handles both env var (cloud) and file (local)
         from config.cookie_utils import get_cookies
@@ -319,15 +352,19 @@ class ViralScout:
                             await asyncio.sleep(5)
                         else:
                             # Final failure for this account - INVESTIGACIÓN FORENSE
-                            if user_screen_name.lower() == 'wallstwolverine':
-                                with open("debug_x_response.txt", "w", encoding="utf-8") as f:
+                            if user_screen_name.lower() == 'wallstwolverine' and os.environ.get("ECONOMIKA_DEBUG_X", "").strip().lower() in {"1", "true", "yes", "on"}:
+                                debug_dir = os.path.join(BASE_DIR, "debug")
+                                os.makedirs(debug_dir, exist_ok=True)
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                debug_path = os.path.join(debug_dir, f"x_response_{user_screen_name}_{timestamp}.txt")
+                                with open(debug_path, "w", encoding="utf-8") as f:
                                     f.write(f"USER: {user_screen_name}\n")
                                     f.write(f"ERROR: {err_msg}\n")
                                     f.write(f"EXCEPTION TYPE: {type(e).__name__}\n")
                                     if hasattr(e, 'response'):
                                         f.write(f"RESPONSE STATUS: {e.response.status_code}\n")
                                         f.write(f"RESPONSE TEXT: {e.response.text}\n")
-                                progress_callback(f"   🔍 [DEBUG] Dump guardado en debug_x_response.txt para @{user_screen_name}")
+                                progress_callback(f"   [DEBUG] Dump guardado en {debug_path}")
 
                             if _is_recoverable_twikit_error(e):
                                 progress_callback(f"   [WARN] Fallo scrapeando @{user_screen_name}: {err_msg}")
@@ -558,6 +595,10 @@ class ViralScout:
 
         if schema_failures >= X_SCHEMA_FAILURE_LIMIT:
             progress_callback("X/Twikit degraded: KEY_BYTE / urls schema error.")
+            if x_source_mode == "auto":
+                browser_hits = await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
+                if browser_hits:
+                    return browser_hits[:max_items]
 
         if discovery_mode == "mixed":
             progress_callback("No se encontraron candidatos X/Nitter. Mixed mode: activando RSS/news fallback.")
@@ -573,14 +614,7 @@ class ViralScout:
         return []
 
     def _is_schema_failure(self, exc: Exception) -> bool:
-        msg = str(exc).lower()
-        return (
-            isinstance(exc, KeyError)
-            or "urls" in msg
-            or "key_byte" in msg
-            or "indices" in msg
-            or "couldn't get key_byte" in msg
-        )
+        return _source_is_schema_failure(exc)
 
     async def _scan_nitter_rss(self, user_screen_name, limit_date, min_ratio=2.0, progress_callback=print):
         """

@@ -35,6 +35,15 @@ Current Viral Scout behavior is hard to reason about because one class manages c
 - A recoverable Twikit error does not abort discovery.
 - Nitter no-entry/403/DNS failures produce one concise warning per source/account.
 - RSS fallback remains available.
+
+## Implementation Notes
+
+- X is the primary product source: configured Spanish liberal/economy/politics accounts are scanned for viral tweets.
+- Twikit remains the current primary implementation, but it is fragile because private X schema changes can trigger `KEY_BYTE`, `urls` or `indices` failures.
+- `services.discovery.x_sources.TwikitXSource` now centralizes Twikit error classification, scoring and tweet normalization helpers so the implementation can be replaced incrementally.
+- `BrowserXSource` is an experimental fallback adapter. It can parse status links from X profile HTML and is selected only with `ECONOMIKA_X_SOURCE=browser` or after Twikit schema degradation with `ECONOMIKA_X_SOURCE=auto`.
+- RSS/news remains secondary and explicit. It is not the default product discovery source.
+- X debug dumps are opt-in with `ECONOMIKA_DEBUG_X=true` and go under ignored `debug/`.
 - Existing tests continue to pass.
 
 ## Validation Commands

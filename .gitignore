@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 downloads/
 logs/
+debug/
+debug_x_response.txt
 output/
 data/*.json
 config/config_api.json

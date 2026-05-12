@@ -72,4 +72,5 @@ pytest -q
 - Circuit breaker avoids wasting time when X schema is broken.
 - Defaults: `ECONOMIKA_DISCOVERY_MODE=x` and `ECONOMIKA_ENABLE_X_SCOUT=true`.
 - To run RSS manually, set `ECONOMIKA_DISCOVERY_MODE=rss`.
+- X source adapter selection is separate: `ECONOMIKA_X_SOURCE=twikit` by default, `browser` for the experimental browser parser, and `auto` to try BrowserXSource after Twikit schema degradation.
 
