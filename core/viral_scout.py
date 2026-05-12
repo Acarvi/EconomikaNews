@@ -86,6 +86,7 @@ class ViralScout:
         self.rejected = self.load_history(REJECTED_FILE)
         self.client = None
         self.twikit_source = TwikitXSource(processed_checker=self.is_processed)
+        self._last_browser_source = None
 
     def get_discovery_mode(self, manual_urls: Optional[List[str]] = None) -> str:
         mode = os.environ.get("ECONOMIKA_DISCOVERY_MODE", "").strip().lower()
@@ -210,6 +211,7 @@ class ViralScout:
             max_total_candidates=max_items,
             user_data_dir=user_data_dir,
         )
+        self._last_browser_source = source
         candidates = await source.scan_accounts(
             self.build_x_accounts(),
             max_items=max_items,
@@ -281,7 +283,8 @@ class ViralScout:
         if x_source_mode == "browser":
             progress_callback("X source: browser")
             progress_callback("Scanning configured X accounts...")
-            return await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
+            browser_hits = await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
+            return browser_hits
 
         progress_callback("Scanning configured X accounts...")
         progress_callback(f"X source: {x_source_mode}")
@@ -609,8 +612,12 @@ class ViralScout:
             if x_source_mode == "auto":
                 progress_callback("Twikit degraded; switching to BrowserXSource.")
                 browser_hits = await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
+                browser_source = getattr(self, "_last_browser_source", None)
                 if browser_hits:
                     return browser_hits[:max_items]
+                if browser_source and browser_source.last_unavailable_reason:
+                    progress_callback("Twikit degraded; BrowserXSource unavailable; no X candidates.")
+                    return []
 
         if discovery_mode == "mixed":
             progress_callback("No se encontraron candidatos X/Nitter. Mixed mode: activando RSS/news fallback.")

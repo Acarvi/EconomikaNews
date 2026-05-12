@@ -29,6 +29,8 @@ Twikit remains fragile and often breaks on schema changes such as `KEY_BYTE` and
 - Playwright is imported lazily.
 - Existing cookies from `config/x.com_cookies.txt`, `config/x.com_cookies.json` or a local `user_data_scraper/` profile can be reused when available.
 - Browser candidates without metrics still return with a low score and `score_source=browser_no_metrics`.
+- On Windows, browser extraction runs in a dedicated worker with a Proactor-compatible event loop when possible.
+- If the Windows browser runtime cannot start, the scout fails cleanly once and returns `[]` instead of spamming per-account tracebacks.
 
 ## Validation Commands
 
