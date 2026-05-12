@@ -42,6 +42,7 @@ Current Viral Scout behavior is hard to reason about because one class manages c
 - Twikit remains the current primary implementation, but it is fragile because private X schema changes can trigger `KEY_BYTE`, `urls` or `indices` failures.
 - `services.discovery.x_sources.TwikitXSource` now centralizes Twikit error classification, scoring and tweet normalization helpers so the implementation can be replaced incrementally.
 - `BrowserXSource` is an experimental fallback adapter. It can parse status links from X profile HTML and is selected only with `ECONOMIKA_X_SOURCE=browser` or after Twikit schema degradation with `ECONOMIKA_X_SOURCE=auto`.
+- `BrowserXSource` now performs real browser/profile extraction and can reuse local cookies or a local user-data profile when available.
 - RSS/news remains secondary and explicit. It is not the default product discovery source.
 - X debug dumps are opt-in with `ECONOMIKA_DEBUG_X=true` and go under ignored `debug/`.
 - Existing tests continue to pass.

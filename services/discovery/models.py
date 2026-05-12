@@ -16,6 +16,8 @@ class DiscoveryCandidate:
     media_url: Optional[str]
     thumbnail: Optional[str]
     description: str
+    score_source: str = "unknown"
+    timestamp: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)

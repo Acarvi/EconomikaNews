@@ -200,8 +200,16 @@ class ViralScout:
             self.save_list(REJECTED_FILE, self.rejected)
 
     async def _scan_browser_x_source(self, max_items=20, progress_callback=print):
-        progress_callback("Scanning X via experimental BrowserXSource...")
-        source = BrowserXSource()
+        progress_callback("Scanning X via BrowserXSource...")
+        timeout_ms = int(os.environ.get("ECONOMIKA_X_BROWSER_TIMEOUT_MS", "8000"))
+        max_tweets = int(os.environ.get("ECONOMIKA_X_BROWSER_MAX_TWEETS", "5"))
+        user_data_dir = os.environ.get("ECONOMIKA_X_BROWSER_USER_DATA_DIR")
+        source = BrowserXSource(
+            timeout_ms=timeout_ms,
+            max_tweets_per_account=max_tweets,
+            max_total_candidates=max_items,
+            user_data_dir=user_data_dir,
+        )
         candidates = await source.scan_accounts(
             self.build_x_accounts(),
             max_items=max_items,
@@ -248,7 +256,9 @@ class ViralScout:
                 ignore_history=ignore_history
             )
 
-        if not self.is_x_scout_enabled():
+        x_source_mode = self.get_x_source_mode()
+
+        if not self.is_x_scout_enabled() and x_source_mode != "browser":
             progress_callback("X Viral Scout disabled by ECONOMIKA_ENABLE_X_SCOUT=false.")
             if discovery_mode == "mixed":
                 progress_callback("Mixed mode: X disabled, scanning RSS/news fallback.")
@@ -267,9 +277,10 @@ class ViralScout:
 
         viral_urls = []
         schema_failures = 0
-        x_source_mode = self.get_x_source_mode()
 
         if x_source_mode == "browser":
+            progress_callback("X source: browser")
+            progress_callback("Scanning configured X accounts...")
             return await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
 
         progress_callback("Scanning configured X accounts...")
@@ -596,6 +607,7 @@ class ViralScout:
         if schema_failures >= X_SCHEMA_FAILURE_LIMIT:
             progress_callback("X/Twikit degraded: KEY_BYTE / urls schema error.")
             if x_source_mode == "auto":
+                progress_callback("Twikit degraded; switching to BrowserXSource.")
                 browser_hits = await self._scan_browser_x_source(max_items=max_items, progress_callback=progress_callback)
                 if browser_hits:
                     return browser_hits[:max_items]
