@@ -1,3 +1,4 @@
+import builtins
 from unittest.mock import AsyncMock, MagicMock, patch
 from types import SimpleNamespace
 
@@ -110,6 +111,28 @@ async def test_browser_source_handles_empty_page_without_crash():
 
 
 @pytest.mark.asyncio
+async def test_browser_source_missing_playwright_fails_cleanly(monkeypatch):
+    real_import = builtins.__import__
+
+    def _missing_playwright(name, *args, **kwargs):
+        if name == "playwright.async_api" or name.startswith("playwright."):
+            raise ModuleNotFoundError("No module named 'playwright'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _missing_playwright)
+
+    source = BrowserXSource()
+    logs = []
+    hits = await source.scan_accounts(
+        [XAccount(screen_name="wallstwolverine", followers_hint=1000)],
+        progress_callback=lambda msg: logs.append(msg),
+    )
+
+    assert hits == []
+    assert any("Playwright no instalado" in log for log in logs)
+
+
+@pytest.mark.asyncio
 async def test_browser_source_windows_notimplemented_fails_cleanly(monkeypatch):
     monkeypatch.setattr(x_sources.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(BrowserXSource, "_windows_worker_supported", lambda self: True)
@@ -118,6 +141,7 @@ async def test_browser_source_windows_notimplemented_fails_cleanly(monkeypatch):
         raise NotImplementedError("asyncio.create_subprocess_exec")
 
     source = BrowserXSource()
+    monkeypatch.setattr(source, "is_available", lambda: True)
     monkeypatch.setattr(source, "_fetch_profile_html", AsyncMock(side_effect=_boom))
 
     logs = []
