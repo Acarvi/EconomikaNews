@@ -4,6 +4,8 @@ import json
 import math
 import os
 import re
+import sys
+import threading
 from datetime import datetime
 from html import unescape
 from pathlib import Path
@@ -13,6 +15,8 @@ from .models import DiscoveryCandidate, XAccount
 
 
 SCHEMA_ERROR_TOKENS = ("urls", "key_byte", "indices", "couldn't get key_byte")
+WINDOWS_BROWSER_UNAVAILABLE_MESSAGE = "BrowserXSource unavailable on current Windows asyncio loop; use Proactor worker."
+WINDOWS_BROWSER_READY_MESSAGE = "BrowserXSource running in Windows Proactor worker."
 
 
 def get_stat(obj: Any, keys: Iterable[str], default: int = 0) -> int:
@@ -327,6 +331,80 @@ class BrowserXSource:
         self.max_tweets_per_account = max_tweets_per_account
         self.max_total_candidates = max_total_candidates
         self.user_data_dir = user_data_dir
+        self.last_unavailable_reason: Optional[str] = None
+        self._availability_checked = False
+        self._availability_result = False
+
+    def _mark_available(self) -> None:
+        self.last_unavailable_reason = None
+        self._availability_checked = True
+        self._availability_result = True
+
+    def _mark_unavailable(self, reason: str) -> None:
+        if not self.last_unavailable_reason:
+            self.last_unavailable_reason = reason
+        self._availability_checked = True
+        self._availability_result = False
+
+    def _windows_worker_supported(self) -> bool:
+        return hasattr(asyncio, "ProactorEventLoop") or hasattr(asyncio, "WindowsProactorEventLoopPolicy")
+
+    def is_available(self) -> bool:
+        if self.html_fetcher is not None:
+            self._mark_available()
+            return True
+
+        if self._availability_checked:
+            return self._availability_result
+
+        try:
+            from playwright.async_api import async_playwright  # noqa: F401
+        except Exception as exc:
+            self._mark_unavailable(f"BrowserXSource no disponible: Playwright no instalado ({exc}).")
+            return False
+
+        if sys.platform.startswith("win") and not self._windows_worker_supported():
+            self._mark_unavailable(WINDOWS_BROWSER_UNAVAILABLE_MESSAGE)
+            return False
+
+        self._mark_available()
+        return True
+
+    def _run_browser_worker(self, coro_factory: Callable[[], Any]) -> Any:
+        result = {"value": None, "error": None}
+
+        def runner() -> None:
+            loop = None
+            try:
+                if sys.platform.startswith("win") and hasattr(asyncio, "ProactorEventLoop"):
+                    loop = asyncio.ProactorEventLoop()
+                else:
+                    loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                if sys.platform.startswith("win"):
+                    result["ready"] = WINDOWS_BROWSER_READY_MESSAGE
+                result["value"] = loop.run_until_complete(coro_factory())
+            except Exception as exc:  # pragma: no cover - surfaced via caller state
+                result["error"] = exc
+            finally:
+                if loop is not None:
+                    try:
+                        loop.close()
+                    finally:
+                        asyncio.set_event_loop(None)
+
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        error = result.get("error")
+        if error is not None:
+            if isinstance(error, NotImplementedError) and sys.platform.startswith("win"):
+                self._mark_unavailable(WINDOWS_BROWSER_UNAVAILABLE_MESSAGE)
+            else:
+                self._mark_unavailable(f"BrowserXSource fallo en worker: {error}")
+            return []
+        return result.get("value")
 
     @staticmethod
     def parse_status_urls_from_html(html: str, screen_name: str) -> List[DiscoveryCandidate]:
@@ -378,13 +456,48 @@ class BrowserXSource:
         max_items: int = 20,
         progress_callback: Callable[[str], None] = print,
     ) -> List[DiscoveryCandidate]:
+        if not self.is_available():
+            if self.last_unavailable_reason:
+                progress_callback(self.last_unavailable_reason)
+            return []
+        hits = await asyncio.to_thread(
+            self._scan_accounts_sync,
+            accounts,
+            max_items,
+            progress_callback,
+        )
+        if self.last_unavailable_reason:
+            progress_callback(self.last_unavailable_reason)
+            return []
+        if sys.platform.startswith("win") and not self.last_unavailable_reason:
+            progress_callback(WINDOWS_BROWSER_READY_MESSAGE)
+        return hits
+
+    def _scan_accounts_sync(
+        self,
+        accounts: List[XAccount],
+        max_items: int,
+        progress_callback: Callable[[str], None],
+    ) -> List[DiscoveryCandidate]:
+        return self._run_browser_worker(
+            lambda: self._scan_accounts_async(accounts, max_items, progress_callback)
+        )
+
+    async def _scan_accounts_async(
+        self,
+        accounts: List[XAccount],
+        max_items: int,
+        progress_callback: Callable[[str], None],
+    ) -> List[DiscoveryCandidate]:
         hits: List[DiscoveryCandidate] = []
         for account in accounts:
-            if len(hits) >= max_items:
+            if len(hits) >= max_items or self.last_unavailable_reason:
                 break
             if account.followers_hint is None:
                 progress_callback(f"BrowserXSource: using fallback followers_hint=1000 for @{account.screen_name}.")
             html = await self._fetch_profile_html(account.screen_name, progress_callback)
+            if self.last_unavailable_reason:
+                break
             if not html:
                 continue
             candidates = self.parse_candidates_from_html(
@@ -440,8 +553,14 @@ class BrowserXSource:
                 if browser and browser is not context:
                     await browser.close()
                 return html
+        except NotImplementedError:
+            self._mark_unavailable(WINDOWS_BROWSER_UNAVAILABLE_MESSAGE)
+            return ""
         except Exception as exc:
-            progress_callback(f"BrowserXSource fallo para @{screen_name}: {exc}")
+            if sys.platform.startswith("win") and "NotImplementedError" in repr(exc):
+                self._mark_unavailable(WINDOWS_BROWSER_UNAVAILABLE_MESSAGE)
+                return ""
+            self._mark_unavailable(f"BrowserXSource fallo para @{screen_name}: {exc}")
             return ""
 
     async def _inject_cookies(self, context: Any, cookies_txt: Path, cookies_json: Path) -> None:

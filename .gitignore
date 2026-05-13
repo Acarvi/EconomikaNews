@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.pytest_cache/
 downloads/
 logs/
 debug/
@@ -9,8 +10,12 @@ data/*.json
 config/config_api.json
 config/accounts.json
 config/x.com_cookies*
+config/x.com_cookies*.json
+config/x.com_cookies*.txt
 user_data_scraper/
 .env
+.env.*
+!.env.example
 client_secrets.json
 youtube_token.pickle
 *.pickle

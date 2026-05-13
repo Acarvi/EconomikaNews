@@ -1,14 +1,18 @@
+import builtins
 from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
 
 import pytest
 
 import core.viral_scout as viral_scout
 from core.viral_scout import ViralScout, _is_recoverable_twikit_error
 from services.discovery.models import XAccount
+import services.discovery.x_sources as x_sources
 from services.discovery.x_sources import (
     BrowserXSource,
     TwikitXSource,
     calculate_viral_score,
+    WINDOWS_BROWSER_UNAVAILABLE_MESSAGE,
     parse_compact_metric,
     is_schema_failure,
 )
@@ -107,6 +111,53 @@ async def test_browser_source_handles_empty_page_without_crash():
 
 
 @pytest.mark.asyncio
+async def test_browser_source_missing_playwright_fails_cleanly(monkeypatch):
+    real_import = builtins.__import__
+
+    def _missing_playwright(name, *args, **kwargs):
+        if name == "playwright.async_api" or name.startswith("playwright."):
+            raise ModuleNotFoundError("No module named 'playwright'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _missing_playwright)
+
+    source = BrowserXSource()
+    logs = []
+    hits = await source.scan_accounts(
+        [XAccount(screen_name="wallstwolverine", followers_hint=1000)],
+        progress_callback=lambda msg: logs.append(msg),
+    )
+
+    assert hits == []
+    assert any("Playwright no instalado" in log for log in logs)
+
+
+@pytest.mark.asyncio
+async def test_browser_source_windows_notimplemented_fails_cleanly(monkeypatch):
+    monkeypatch.setattr(x_sources.sys, "platform", "win32", raising=False)
+    monkeypatch.setattr(BrowserXSource, "_windows_worker_supported", lambda self: True)
+
+    async def _boom(_screen_name, _progress_callback):
+        raise NotImplementedError("asyncio.create_subprocess_exec")
+
+    source = BrowserXSource()
+    monkeypatch.setattr(source, "is_available", lambda: True)
+    monkeypatch.setattr(source, "_fetch_profile_html", AsyncMock(side_effect=_boom))
+
+    logs = []
+    hits = await source.scan_accounts(
+        [
+            XAccount(screen_name="wallstwolverine", followers_hint=1000),
+            XAccount(screen_name="juanrallo", followers_hint=2000),
+        ],
+        progress_callback=lambda msg: logs.append(msg),
+    )
+
+    assert hits == []
+    assert logs == [WINDOWS_BROWSER_UNAVAILABLE_MESSAGE]
+
+
+@pytest.mark.asyncio
 async def test_auto_source_attempts_browser_after_twikit_schema_degraded(monkeypatch):
     monkeypatch.setenv("ECONOMIKA_DISCOVERY_MODE", "x")
     monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "true")
@@ -147,6 +198,35 @@ async def test_auto_source_attempts_browser_after_twikit_schema_degraded(monkeyp
     mock_browser.assert_awaited_once()
     assert any("Twikit degraded; switching to BrowserXSource." in log for log in logs)
     assert hits == [browser_hit]
+
+
+@pytest.mark.asyncio
+async def test_auto_source_reports_browser_unavailable_without_crash(monkeypatch):
+    monkeypatch.setenv("ECONOMIKA_DISCOVERY_MODE", "x")
+    monkeypatch.setenv("ECONOMIKA_ENABLE_X_SCOUT", "true")
+    monkeypatch.setenv("ECONOMIKA_X_SOURCE", "auto")
+
+    scout = ViralScout()
+    scout.accounts = {"one": 1000, "two": 1000, "three": 1000, "four": 1000}
+    scout._last_browser_source = SimpleNamespace(last_unavailable_reason=WINDOWS_BROWSER_UNAVAILABLE_MESSAGE)
+
+    with patch('config.cookie_utils.get_cookies', return_value={'ct0': 'dummy'}):
+        with patch('config.cookie_utils.netscape_to_json'):
+            with patch('core.viral_scout.json.load', return_value={'ct0': 'dummy'}):
+                with patch('core.viral_scout.Client') as mock_client_class:
+                    mock_client = mock_client_class.return_value
+                    mock_client.get_user_by_screen_name = AsyncMock(side_effect=Exception("Couldn't get KEY_BYTE indices"))
+                    with patch.object(ViralScout, '_scan_nitter_rss', new_callable=AsyncMock) as mock_nitter:
+                        mock_nitter.return_value = []
+                        with patch.object(scout, '_scan_browser_x_source', AsyncMock(return_value=[])) as mock_browser:
+                            with patch('asyncio.sleep', return_value=None):
+                                logs = []
+                                hits = await scout._scan_async(progress_callback=lambda m: logs.append(m), ignore_history=True)
+
+    assert mock_client.get_user_by_screen_name.call_count == 6
+    mock_browser.assert_awaited_once()
+    assert any("Twikit degraded; BrowserXSource unavailable; no X candidates." in log for log in logs)
+    assert hits == []
 
 
 def test_debug_dump_only_written_when_enabled(tmp_path, monkeypatch):

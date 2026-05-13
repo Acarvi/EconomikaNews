@@ -24,7 +24,7 @@ jobs:
           pip install pytest pytest-asyncio
 
       - name: Compile
-        run: python -m py_compile server.py main.py core/viral_scout.py core/publisher.py
+        run: python -m py_compile server.py main.py core/viral_scout.py core/publisher.py services/discovery/x_sources.py
 
       - name: Secret scan
         shell: bash

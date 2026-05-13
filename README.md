@@ -2,6 +2,50 @@
 
 Local editorial workstation for discovering economic/news candidates, generating reviewed short-form scripts, rendering vertical videos and sending publish intents to CentralPublishingHub.
 
+## Quick Start MVP
+
+1. Double click `EconomikaNoticias.bat`.
+2. The launcher checks CentralAIService and CentralPublishingHub.
+3. The GUI opens.
+4. Use manual URLs for reliable MVP flow.
+5. Use X Viral Scout for experimental tweet discovery.
+
+Manual URLs are the minimum reliable MVP path. X Viral Scout is the main product discovery direction, but it depends on X availability, configured accounts, and local cookies. RSS is explicitly secondary fallback discovery. BrowserXSource requires Playwright installed locally and is not required for CI.
+
+### X Source Modes
+
+Default:
+
+```powershell
+$env:ECONOMIKA_X_SOURCE="twikit"
+```
+
+Browser mode:
+
+```powershell
+$env:ECONOMIKA_X_SOURCE="browser"
+```
+
+Auto mode:
+
+```powershell
+$env:ECONOMIKA_X_SOURCE="auto"
+```
+
+### Services
+
+CentralAIService:
+
+```text
+D:\Scripts\CentralAIService
+```
+
+CentralPublishingHub:
+
+```text
+D:\Scripts\CentralPublishingHub
+```
+
 ## MVP Direction
 
 EconomikaNoticias is responsible for:
