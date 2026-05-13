@@ -1,0 +1,1017 @@
+﻿D:\Scripts\EconomikaNoticias\.env
+D:\Scripts\EconomikaNoticias\.gitignore
+D:\Scripts\EconomikaNoticias\debug_x_response.txt
+D:\Scripts\EconomikaNoticias\Dockerfile
+D:\Scripts\EconomikaNoticias\EconomikaNoticias.bat
+D:\Scripts\EconomikaNoticias\economika_noticias.bat
+D:\Scripts\EconomikaNoticias\main.py
+D:\Scripts\EconomikaNoticias\memory_log.md
+D:\Scripts\EconomikaNoticias\pytest.ini
+D:\Scripts\EconomikaNoticias\README.md
+D:\Scripts\EconomikaNoticias\requirements-server.txt
+D:\Scripts\EconomikaNoticias\requirements.txt
+D:\Scripts\EconomikaNoticias\server.py
+D:\Scripts\EconomikaNoticias\test.json
+D:\Scripts\EconomikaNoticias\test_health.py
+D:\Scripts\EconomikaNoticias\.agent\skills\skill_documentation.md
+D:\Scripts\EconomikaNoticias\.agent\skills\skill_run_tests.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\05_Fix_FFmpeg_Invalid_Timestamps\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\06_Refactor_Env_Management\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\07_Atomize_Generator_Pipeline\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\08_Environment_Selector\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\done\01_Fix_CentralAIService_Connection\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\done\02_Fix_Subtitler_Gemini_API_Key\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\done\03_Fix_SoX_and_Publisher_AttributeError\task.md
+D:\Scripts\EconomikaNoticias\.agent\tareas\done\04_Fix_Twikit_Scraper_404\task.md
+D:\Scripts\EconomikaNoticias\.github\workflows\ci.yml
+D:\Scripts\EconomikaNoticias\config\accounts.json
+D:\Scripts\EconomikaNoticias\config\accounts.json话题部
+D:\Scripts\EconomikaNoticias\config\config_api.json
+D:\Scripts\EconomikaNoticias\config\cookie_utils.py
+D:\Scripts\EconomikaNoticias\config\news_sources.json
+D:\Scripts\EconomikaNoticias\config\settings.py
+D:\Scripts\EconomikaNoticias\config\x.com_cookies.json
+D:\Scripts\EconomikaNoticias\config\x.com_cookies.txt
+D:\Scripts\EconomikaNoticias\config\__init__.py
+D:\Scripts\EconomikaNoticias\config\__pycache__\cookie_utils.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\config\__pycache__\settings.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\config\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\ai_handler.py
+D:\Scripts\EconomikaNoticias\core\downloader.py
+D:\Scripts\EconomikaNoticias\core\generator.py
+D:\Scripts\EconomikaNoticias\core\image_gen.py
+D:\Scripts\EconomikaNoticias\core\publisher.py
+D:\Scripts\EconomikaNoticias\core\scraper.py
+D:\Scripts\EconomikaNoticias\core\subtitler.py
+D:\Scripts\EconomikaNoticias\core\viral_scout.py
+D:\Scripts\EconomikaNoticias\core\youtube_uploader.py
+D:\Scripts\EconomikaNoticias\core\__init__.py
+D:\Scripts\EconomikaNoticias\core\downloads\2042765237481357325_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042787216444002362.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042812804487319807_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042881950533239002.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2042962119055085620.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042963214342685079.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2042970927047274561.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042978476857135484.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042980993821180260.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042988560693813578.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042991059873960348.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2042998609533374476.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043001126199660602.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043002317671223544.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043002317671223544_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043003644040380911.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043006159456518305.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043033842991116368.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043033938528968915.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043036358319489166.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043040187274383414.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043057208741572831.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043057208741572831_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043059255016661266.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043062120753876995.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043065667478331817.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043089629457330427.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043091841697112390.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043102446185050388.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043127610503204911.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043133485611667598.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043146914594488652.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043146914594488652_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043149557995889119.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043149557995889119_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043167714034827774.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043287687822479722.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043287687822479722_cfr.mp4
+D:\Scripts\EconomikaNoticias\core\downloads\2043294116839063760.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043312508073603344.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043314455426076685.jpg
+D:\Scripts\EconomikaNoticias\core\downloads\2043321656303624220.jpg
+D:\Scripts\EconomikaNoticias\core\output\economika_20260412_2043057208741572831_error.mp4
+D:\Scripts\EconomikaNoticias\core\output\economika_20260412_2043149557995889119_error.mp4
+D:\Scripts\EconomikaNoticias\core\output\temp_audio_0597e592.m4a
+D:\Scripts\EconomikaNoticias\core\output\temp_audio_0fad3576.m4a
+D:\Scripts\EconomikaNoticias\core\output\20260411_2042812804487319807_peru_candidato_propu\economika_20260411_2042812804487319807_peru_candidato_propu.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260411_2042881950533239002_islas_chagos_starmer\economika_20260411_2042881950533239002_islas_chagos_starmer.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260411_2042963214342685079_buques_hormuz_iran\economika_20260411_2042963214342685079_buques_hormuz_iran.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260411_2043002317671223544_homosexualidad_arma_\economika_20260411_2043002317671223544_homosexualidad_arma_.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260411_2043002317671223544_polemica_homofobia_p\economika_20260411_2043002317671223544_polemica_homofobia_p.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260412_2043089629457330427_error\economika_20260412_2043089629457330427_error.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260412_2043146914594488652_error\economika_20260412_2043146914594488652_error.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260412_2043167714034827774_error\economika_20260412_2043167714034827774_error.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260412_2043314455426076685_error\economika_20260412_2043314455426076685_error.mp4
+D:\Scripts\EconomikaNoticias\core\output\20260412_2043321656303624220_error\economika_20260412_2043321656303624220_error.mp4
+D:\Scripts\EconomikaNoticias\core\__pycache__\ai_handler.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\downloader.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\generator.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\hub_client.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\publisher.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\scraper.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\subtitler.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\viral_scout.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\youtube_uploader.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\core\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\data\processed_history.json
+D:\Scripts\EconomikaNoticias\data\rejected_history.json
+D:\Scripts\EconomikaNoticias\data\scheduled_posts.json
+D:\Scripts\EconomikaNoticias\data\__init__.py
+D:\Scripts\EconomikaNoticias\docs\ANALISIS_PROYECTO.md
+D:\Scripts\EconomikaNoticias\docs\DEVELOPER.md
+D:\Scripts\EconomikaNoticias\docs\GUIA_API_INSTAGRAM.md
+D:\Scripts\EconomikaNoticias\docs\GUIA_PAGO_GEMINI.md
+D:\Scripts\EconomikaNoticias\docs\GUIA_RENDER_DEPLOY.md
+D:\Scripts\EconomikaNoticias\docs\GUIA_YOUTUBE_SHORTS.md
+D:\Scripts\EconomikaNoticias\docs\RENDER_DEPLOY.md
+D:\Scripts\EconomikaNoticias\docs\TODO_List.md
+D:\Scripts\EconomikaNoticias\docs\USER_GUIDE.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\00_mvp_definition.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\01_current_state.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\02_target_architecture.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\03_execution_plan.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\04_open_risks.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\05_manual_e2e_checklist.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\BRANCH_CLEANUP_RECOMMENDATION.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\MVP_CURRENT_STATE.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-011-smoke-tests-and-ci.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-013-discovery-source-abstraction.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-014-viral-scout-cleanup.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-015-browser-x-source-extraction.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-015-manual-link-first-flow.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-016-central-ai-e2e-contract.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-017-render-contract-and-artifacts.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-018-publishing-hub-e2e.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-019-youtube-shorts-e2e.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-020-instagram-reel-story-e2e.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-021-local-state-sqlite.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-022-gui-thinning.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-023-run-scripts-and-healthchecks.md
+D:\Scripts\EconomikaNoticias\docs\roadmap\tickets\MVP-024-ci-warning-cleanup.md
+D:\Scripts\EconomikaNoticias\downloads\2038968952575897629.mp4
+D:\Scripts\EconomikaNoticias\downloads\2038972079488254016.mp4
+D:\Scripts\EconomikaNoticias\downloads\2038990999821664607.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039031720733811185.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039088595282342338.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039091892244120062.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039102637736444225.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039102727309959193.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039108703731802151_cfr.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039113292895936724.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039126847334596681_cfr.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039136158819696814.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039151761743630685.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039174811465757151.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039176957523378473.mp4
+D:\Scripts\EconomikaNoticias\downloads\2039292747320807854_cfr.mp4
+D:\Scripts\EconomikaNoticias\logs\20260317_102439_session.log
+D:\Scripts\EconomikaNoticias\logs\20260319_162642_session.log
+D:\Scripts\EconomikaNoticias\logs\20260319_214340_session.log
+D:\Scripts\EconomikaNoticias\logs\20260319_214553_session.log
+D:\Scripts\EconomikaNoticias\logs\20260319_214835_session.log
+D:\Scripts\EconomikaNoticias\logs\20260319_215507_session.log
+D:\Scripts\EconomikaNoticias\logs\20260319_215921_session.log
+D:\Scripts\EconomikaNoticias\logs\20260320_104422_session.log
+D:\Scripts\EconomikaNoticias\logs\20260320_124417_session.log
+D:\Scripts\EconomikaNoticias\logs\20260324_101119_session.log
+D:\Scripts\EconomikaNoticias\logs\20260324_125440_session.log
+D:\Scripts\EconomikaNoticias\logs\20260324_130531_session.log
+D:\Scripts\EconomikaNoticias\logs\20260324_181106_session.log
+D:\Scripts\EconomikaNoticias\logs\20260325_132606_session.log
+D:\Scripts\EconomikaNoticias\logs\20260325_151028_session.log
+D:\Scripts\EconomikaNoticias\logs\20260325_175755_session.log
+D:\Scripts\EconomikaNoticias\logs\20260326_125618_session.log
+D:\Scripts\EconomikaNoticias\logs\20260327_105325_session.log
+D:\Scripts\EconomikaNoticias\logs\20260327_140423_session.log
+D:\Scripts\EconomikaNoticias\logs\20260327_145833_session.log
+D:\Scripts\EconomikaNoticias\logs\20260327_155950_session.log
+D:\Scripts\EconomikaNoticias\logs\20260328_104140_session.log
+D:\Scripts\EconomikaNoticias\logs\20260329_164510_session.log
+D:\Scripts\EconomikaNoticias\logs\20260329_164546_session.log
+D:\Scripts\EconomikaNoticias\logs\20260329_190226_session.log
+D:\Scripts\EconomikaNoticias\logs\20260329_210751_session.log
+D:\Scripts\EconomikaNoticias\logs\20260329_213417_session.log
+D:\Scripts\EconomikaNoticias\logs\20260330_125517_session.log
+D:\Scripts\EconomikaNoticias\logs\20260401_123437_session.log
+D:\Scripts\EconomikaNoticias\logs\20260401_124925_session.log
+D:\Scripts\EconomikaNoticias\logs\20260401_141256_session.log
+D:\Scripts\EconomikaNoticias\logs\20260401_155114_session.log
+D:\Scripts\EconomikaNoticias\logs\20260401_161122_session.log
+D:\Scripts\EconomikaNoticias\logs\20260401_201744_session.log
+D:\Scripts\EconomikaNoticias\logs\20260402_112937_session.log
+D:\Scripts\EconomikaNoticias\logs\20260402_115141_session.log
+D:\Scripts\EconomikaNoticias\logs\20260402_115625_session.log
+D:\Scripts\EconomikaNoticias\logs\20260402_121315_session.log
+D:\Scripts\EconomikaNoticias\logs\20260402_131703_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_132637_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_132731_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_135519_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_141300_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_142003_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_143345_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_151030_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_151734_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_202202_session.log
+D:\Scripts\EconomikaNoticias\logs\20260404_203146_session.log
+D:\Scripts\EconomikaNoticias\logs\20260410_195505_session.log
+D:\Scripts\EconomikaNoticias\logs\20260410_200352_session.log
+D:\Scripts\EconomikaNoticias\logs\20260410_221019_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_133420_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_134820_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_135650_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_163332_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_163914_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_163941_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_170018_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_172231_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_192741_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_193318_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_194548_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_195201_session.log
+D:\Scripts\EconomikaNoticias\logs\20260411_202006_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_092653_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_104427_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_110306_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_125447_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_130103_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_160828_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_160904_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_165358_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_170010_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_172206_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_173324_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_190612_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_191325_session.log
+D:\Scripts\EconomikaNoticias\logs\20260412_191924_session.log
+D:\Scripts\EconomikaNoticias\logs\20260511_193601_session.log
+D:\Scripts\EconomikaNoticias\logs\20260511_201049_session.log
+D:\Scripts\EconomikaNoticias\logs\20260511_213712_session.log
+D:\Scripts\EconomikaNoticias\logs\20260512_162244_session.log
+D:\Scripts\EconomikaNoticias\logs\20260512_170239_session.log
+D:\Scripts\EconomikaNoticias\logs\20260512_173433_session.log
+D:\Scripts\EconomikaNoticias\logs\20260512_173808_session.log
+D:\Scripts\EconomikaNoticias\logs\20260512_174743_session.log
+D:\Scripts\EconomikaNoticias\logs\20260513_165037_session.log
+D:\Scripts\EconomikaNoticias\logs\publisher.log
+D:\Scripts\EconomikaNoticias\models\qwen3.5-4b\.cache\huggingface\.gitignore
+D:\Scripts\EconomikaNoticias\models\qwen3.5-4b\.cache\huggingface\download\wPaCkH-WbT7GsmxMKKrNZTV4nSM=.52373fe24473b1aa44333d318f578ae6bf04b49b.incomplete
+D:\Scripts\EconomikaNoticias\models\qwen3.5-9b\.cache\huggingface\.gitignore
+D:\Scripts\EconomikaNoticias\models\qwen3.5-9b\.cache\huggingface\download\wPaCkH-WbT7GsmxMKKrNZTV4nSM=.52373fe24473b1aa44333d318f578ae6bf04b49b.incomplete
+D:\Scripts\EconomikaNoticias\prompts\editorial_system.txt
+D:\Scripts\EconomikaNoticias\prompts\system_instruction.md
+D:\Scripts\EconomikaNoticias\scripts\diagnose_mvp.ps1
+D:\Scripts\EconomikaNoticias\scripts\start_economika.ps1
+D:\Scripts\EconomikaNoticias\services\central_ai_client.py
+D:\Scripts\EconomikaNoticias\services\publishing_hub_client.py
+D:\Scripts\EconomikaNoticias\services\api\__pycache__\main.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\creative\__pycache__\ai_handler.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\creative\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\discovery\models.py
+D:\Scripts\EconomikaNoticias\services\discovery\rss_sources.py
+D:\Scripts\EconomikaNoticias\services\discovery\x_sources.py
+D:\Scripts\EconomikaNoticias\services\discovery\__init__.py
+D:\Scripts\EconomikaNoticias\services\discovery\__pycache__\models.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\discovery\__pycache__\rss_sources.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\discovery\__pycache__\x_sources.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\discovery\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\distribution\__pycache__\publisher.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\distribution\__pycache__\youtube_uploader.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\distribution\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\gui\assets\music\breaking-news-intro-background-music-408079.mp3
+D:\Scripts\EconomikaNoticias\services\gui\__pycache__\main.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\gui\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\logs\publisher.log
+D:\Scripts\EconomikaNoticias\services\production\__pycache__\downloader.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\production\__pycache__\generator.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\production\__pycache__\subtitler.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\production\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\scout\__pycache__\scraper.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\scout\__pycache__\viral_scout.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\scout\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\utils\__pycache__\cleanup.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\utils\__pycache__\cookie_utils.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\utils\__pycache__\httpx_patch.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\utils\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\__pycache__\constants.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\__pycache__\logger.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\shared\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\__pycache__\central_ai_client.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\services\__pycache__\publishing_hub_client.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\tasks\09_Centralized_API_Key_Management.md
+D:\Scripts\EconomikaNoticias\tests\conftest.py
+D:\Scripts\EconomikaNoticias\tests\secret_test.py
+D:\Scripts\EconomikaNoticias\tests\test_emergency_fix.py
+D:\Scripts\EconomikaNoticias\tests\test_fallback.py
+D:\Scripts\EconomikaNoticias\tests\test_fallback.py话题部
+D:\Scripts\EconomikaNoticias\tests\test_funcionalidades_core.py
+D:\Scripts\EconomikaNoticias\tests\test_imports.py
+D:\Scripts\EconomikaNoticias\tests\test_mvp_operational_files.py
+D:\Scripts\EconomikaNoticias\tests\test_platform_normalization.py
+D:\Scripts\EconomikaNoticias\tests\test_publisher_hub_contract.py
+D:\Scripts\EconomikaNoticias\tests\test_publisher_payloads.py
+D:\Scripts\EconomikaNoticias\tests\test_security.py
+D:\Scripts\EconomikaNoticias\tests\test_server_datetime.py
+D:\Scripts\EconomikaNoticias\tests\test_settings_and_service_clients.py
+D:\Scripts\EconomikaNoticias\tests\test_smoke_imports.py
+D:\Scripts\EconomikaNoticias\tests\test_viral_scout_resilience.py
+D:\Scripts\EconomikaNoticias\tests\test_x_discovery_adapters.py
+D:\Scripts\EconomikaNoticias\tests\__pycache__\conftest.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_emergency_fix.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_fallback.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_funcionalidades_core.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_git_env_manager.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_imports.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_platform_normalization.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_publisher_payloads.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_security.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_server_datetime.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_settings_and_service_clients.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_smoke_imports.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_viral_scout_resilience.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tests\__pycache__\test_x_discovery_adapters.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tools\find_ig_id.py
+D:\Scripts\EconomikaNoticias\tools\list_gemini_models.py
+D:\Scripts\EconomikaNoticias\tools\simulate_yt_error.py
+D:\Scripts\EconomikaNoticias\tools\test_render_fix.py
+D:\Scripts\EconomikaNoticias\tools\test_token.py
+D:\Scripts\EconomikaNoticias\tools\__pycache__\test_render_fix.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\tools\__pycache__\test_token.cpython-313-pytest-8.3.4.pyc
+D:\Scripts\EconomikaNoticias\user_data_scraper\CrashpadMetrics-active.pma
+D:\Scripts\EconomikaNoticias\user_data_scraper\first_party_sets.db
+D:\Scripts\EconomikaNoticias\user_data_scraper\first_party_sets.db-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Last Browser
+D:\Scripts\EconomikaNoticias\user_data_scraper\Last Version
+D:\Scripts\EconomikaNoticias\user_data_scraper\Local State
+D:\Scripts\EconomikaNoticias\user_data_scraper\piid
+D:\Scripts\EconomikaNoticias\user_data_scraper\Variations
+D:\Scripts\EconomikaNoticias\user_data_scraper\BrowserMetrics\BrowserMetrics-69DCAF93-A28.pma
+D:\Scripts\EconomikaNoticias\user_data_scraper\component_crx_cache\metadata.json
+D:\Scripts\EconomikaNoticias\user_data_scraper\Crashpad\metadata
+D:\Scripts\EconomikaNoticias\user_data_scraper\Crashpad\settings.dat
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Account Web Data
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Account Web Data-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Affiliation Database
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Affiliation Database-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\BookmarkMergedSurfaceOrdering
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DIPS
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DIPS-wal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Favicons
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Favicons-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\heavy_ad_intervention_opt_out.db
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\heavy_ad_intervention_opt_out.db-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\History
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\History-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Login Data
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Login Data For Account
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Login Data For Account-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Login Data-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network Action Predictor
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network Action Predictor-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Preferences
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\PreferredApps
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\README
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Secure Preferences
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\ServerCertificate
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\ServerCertificate-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\SharedStorage
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\SharedStorage-wal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Shortcuts
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Shortcuts-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Top Sites
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Top Sites-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\trusted_vault.pb
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Web Data
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Web Data-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\adblock\additional_filters.txt
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\adblock\cookie_filters.txt
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\adblock\default_filters.txt
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\adblock\resources.json
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\AutofillAiModelCache\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\AutofillAiModelCache\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\AutofillStrikeDatabase\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\AutofillStrikeDatabase\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\BudgetDatabase\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\BudgetDatabase\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000002
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000003
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000004
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000006
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000007
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000008
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000009
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00000c
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00000d
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00000e
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00000f
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000010
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000011
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000012
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000013
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000014
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000015
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000016
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000017
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000018
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000019
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00001a
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00001b
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00001c
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00001d
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00001e
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00001f
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000020
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000021
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000022
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000023
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000024
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000025
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000026
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000027
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000028
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000029
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00002a
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00002b
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00002c
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00002d
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00002e
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00002f
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000030
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000031
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000032
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000033
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000034
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000035
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000036
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000037
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000038
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_000039
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\f_00003a
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\Cache_Data\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\No_Vary_Search\journal.baj
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Cache\No_Vary_Search\snapshot.baf
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\chrome_cart_db\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\chrome_cart_db\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\ClientCertificates\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\ClientCertificates\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\04c8f367471e4dd8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\0ade4c672779a851_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\0f07c7cfaa3938fd_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\16541258ddf4e4ea_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\1d7cb539b39e47d8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\1eedb7d02f8cb443_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\23e2f10938939f3f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\2560f5ab2c32b34b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\274f09de90fc84f4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\29c843cea15da48b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\2b052abcd4170d3a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\2d1c9122e32c85a4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\2dd1cdf1b1f81cb6_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\2e6417df367c48c9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\303b1c8f6af5c443_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\32a57f1f1952b258_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\3497d52835400439_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\35c8cfe80ec88ca0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\35e97855465af1c7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\38170b3847f55a44_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\3b88c377fa543bf0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\3f195b8f7ec96def_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\3f96b0e5844e5cc8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\40022c84381abcd8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\48ae4c1546287e32_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\4b33df142d633174_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\4c3706ac956406fe_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\4d31ba9bf2feaee0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\4f3920e4dfdd29bd_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\5025635ae86edc6d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\516fa7de6c0b9c2b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\522f203dac833749_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\52fe3f582fbbbff7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\54ff38226020bc23_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\56b19f764662dfac_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\59a3db609f9ff10e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\5cc682d259c4ffb4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\5dc90b1b36ab016a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\6030ef0a143aecd9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\61e9939108ee8873_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\6326540ca23053fb_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\68cbc2360914737d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\691da21bec2b5070_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\6a8a865243c32768_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\6a8fcf1aaa90aadc_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\6c187ed65b3be072_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\70806a48009c67d0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\74219478666c1d29_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\75a8b44dee488a24_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\78a807a1265e11e9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\78d129adc0c5e17e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\7a62eafb699c5633_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\7b41fe49477a8d9b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\80624e7f78097896_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\812d1d6a7cc5117b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\8817eb3bfa20b9f9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\8cb77f6340a952f6_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\8dcc1ef6bad1093a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\8f724ef71f650f1f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\8f77b0864a509900_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\932ebd6f698648a2_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\943ce34ea1d3ec79_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\96f176f2a145ecc5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\97f910af3d2c1d2a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\991f47ac81f8e248_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a2d235c6d0a10a83_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a35cee5cc02509b8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a5e0a8b27d800400_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a6ad0dbb5b808d00_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a7a8bffa7e256ec8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a8d8e0a40137268a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\a97973c770d44d57_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\aae1c9d76549f616_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\abe715d4adaadc12_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\adc2f22e4d6eb010_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\b1dbd6e65bb7f01e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\b2031d76842f9d2c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\b5f7eab1f4357b20_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\b792c7f7ad8fb5e2_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\b7fb722a6853ef72_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\b92976342316f421_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\ba43aee6e16f133c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\be96161d46296d1a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\c012baf82a485ced_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\c14ea2b919a94b9f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\c3a91bd86ebb860a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\c4dbe76c70be036f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\caafb7cb13f2214d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\d1e64fca630f10db_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\d65e5d2c0137d6c8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\d88aa0a12b5ef69b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\da332ba7df2abf8b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\dba50d6d8c159634_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\dd3e27ea0f73e928_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\e1564b722b5aaf5f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\e531e3037da6ad53_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\e84f69da3ee0d2dc_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\ecfc53edfb82070f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\edacbed8b96b87a9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\edf48ee58a5e9d02_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\ef0f502096542c79_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\f1e7417ccf2df2e8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\f224a3f7aee188ac_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\f438bdc12ee0c4be_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\f5b9361c5925feb9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\f7889489ac03a6a8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\f7dae18c902719a5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\fa91fac00df07c6e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\fd81b0e3ef2f4cba_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\js\index-dir\the-real-index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\wasm\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Code Cache\wasm\index-dir\the-real-index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\commerce_subscription_db\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\commerce_subscription_db\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnGraphiteCache\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnGraphiteCache\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnGraphiteCache\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnGraphiteCache\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnGraphiteCache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnWebGPUCache\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnWebGPUCache\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnWebGPUCache\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnWebGPUCache\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\DawnWebGPUCache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\discounts_db\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\discounts_db\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\discount_infos_db\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\discount_infos_db\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Rules\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Rules\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Rules\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Rules\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Rules\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Scripts\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Scripts\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Scripts\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Scripts\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension Scripts\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension State\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension State\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension State\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension State\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Extension State\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Feature Engagement Tracker\AvailabilityDB\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Feature Engagement Tracker\AvailabilityDB\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Feature Engagement Tracker\EventDB\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Feature Engagement Tracker\EventDB\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\Encryption\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\Encryption\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\Encryption\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\Encryption\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GCM Store\Encryption\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GPUCache\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GPUCache\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GPUCache\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GPUCache\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\GPUCache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\IndexedDB\https_www.perplexity.ai_0.indexeddb.blob\2\00\2
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\IndexedDB\https_www.perplexity.ai_0.indexeddb.leveldb\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\IndexedDB\https_www.perplexity.ai_0.indexeddb.leveldb\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\IndexedDB\https_www.perplexity.ai_0.indexeddb.leveldb\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\IndexedDB\https_www.perplexity.ai_0.indexeddb.leveldb\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\IndexedDB\https_www.perplexity.ai_0.indexeddb.leveldb\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Local Storage\leveldb\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Local Storage\leveldb\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Local Storage\leveldb\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Local Storage\leveldb\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Local Storage\leveldb\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Cookies
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Cookies-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Network Persistent State
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\NetworkDataMigrated
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Reporting and NEL
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Reporting and NEL-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\SCT Auditing Pending Reports
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Trust Tokens
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Network\Trust Tokens-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\parcel_tracking_db\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\parcel_tracking_db\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\PersistentOriginTrials\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\PersistentOriginTrials\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Safe Browsing Network\NetworkDataMigrated
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Safe Browsing Network\Safe Browsing Cookies
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Safe Browsing Network\Safe Browsing Cookies-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Segmentation Platform\SegmentInfoDB\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Segmentation Platform\SegmentInfoDB\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Segmentation Platform\SignalDB\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Segmentation Platform\SignalDB\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Segmentation Platform\SignalStorageConfigDB\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Segmentation Platform\SignalStorageConfigDB\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\index.txt
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\001afae24b0656d8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0046280401f0ffb4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0069c03b4c8dc420_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\01bccfd6201124a3_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\029e329f35ce342b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\040ee3ca05c060b2_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\06180145aa847151_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\07931f1d50ea84de_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0803f67eff6b9ab5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\08700bd99ae0660b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\090ab076e5efd053_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0a0f258ae54910da_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0a5b2d11f2cae538_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0ab53d063cbfe263_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\0d1d353a2a0cc9d7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\1071c76c60472c6f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\108f836e84ea6f82_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\11fcca8c7f13f0c5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\130d9edbbc2c15ae_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\14e8577e5d7e2ef5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\165c4d558a636013_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\16db1a91b18f7174_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\17da2efd84c90901_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\17efc171666fe71c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\188d14b9e5c23d96_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\19120c05f1be4cb7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\19295923d900c0bd_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\1ba8edb385078825_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\1bfe4180b8997548_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\1d8a5de2ebbc5648_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\1f6dd4b214c048c3_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\20b4874e1754c3d9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2348510a54e87e57_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\234f02e4cc50756a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\239644267c7f21a4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2466055f7e050c79_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\292a61fce33ed783_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\295681d47b8e2b1d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\29f57ab86931143a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2a8199af23f5fac0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2afe6f71ad951bc7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2dacb1e5458c7a2a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2ea458d4397a3eaf_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2ec5a2317b8115ec_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2f577cf22a809402_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\2f651935329a1df6_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3052cf18087df959_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\318d7234b2b4a489_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\32994e56b2e94050_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\37ecb9c4918a4b5d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\381491e6f09344c6_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\38eb35fda3a505a0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\394168a6268ac453_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3a2d1d9d21e3cf59_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3a6daa6bb79e6c3d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3a920e093576bf64_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3aa587d9a4dbee07_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3b3539ec2e1cf9bc_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3bc9dca55eb51c56_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3c45d16d9d0dd948_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3c49a4abfd1488c9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3c85b50c683763af_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3f31914a6506bf18_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\3fd708971ef9f9d0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\40c1367e9512dc5f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\422b8edff5529ee2_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\42cf04dfbb078b82_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\42f894b88d7b537c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\431f3dc761cf5a4f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\4357849fbcd1fe75_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\439f626303488e24_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\445760c2736d31af_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\45ee967321963e4e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\485054479656b87b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\4a6587f83e8089d1_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\4f82aa14144158fd_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\50773f8b10ac3741_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\51dd4ae6fe117f64_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\51df829e589d53ae_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5278a9bb17e70035_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\54f27c09fe463ed4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5592a6d1ea9340f7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\587e362ad39be0b3_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5969acb446d3181b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5bcef16ab4ab2f2e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5dfb3902d313df2e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5e5b47f3085dcc19_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5eda4b241a626491_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\5ee872c7ce07e8d4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6334ced51ae6ef76_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\64076886749e2528_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\64f1c29fde60df96_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\65accfcde26a96e0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6635a43a02aef339_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\67056a503516f6aa_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\67a5b2446d744867_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\67c2f7dbb8492d78_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\68d4903e47dd1418_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\68e6465f36147438_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\691a54d4508099df_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\69e3b4ecc8ee1ac8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6a3440ac4c12ee43_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6cd99f3fa183ce03_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6cdb56733812a342_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6d1f18b4471029bc_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\6d42a5cc2fe148d2_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\703cf8b360787905_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\72362ffbae1536b9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\7385b85d34f8f660_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\76b032c4b26c79df_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\79b43777cfc4acfd_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\7a702525298725cf_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\7af82dfa9fc1d78d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\7fe2ae4e9f76da27_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\808ee8470f5d1143_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\835d448915a55ef0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\8500317dcf34f21c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\85de0006e4df6f43_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\87802ce6b42eac0e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\87947d5cf019a3b8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\87b79e31abc3a541_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\8bd3e9ea9c1e4cbd_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\8c36a33a86c805a2_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\8fb866e55ff8bff5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\90ce38f2e6ae1a80_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\94df96f0d8742641_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\983913a7ed9ab89d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\986a1aa6bcad016f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\98a563f3aee1f912_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\98dd5f2e0e8f013c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9b96e1f5360fcc05_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9c2ebc29afd296ce_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9c43fa61e713cbea_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9d1437b4b33471d1_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9d9e4ff848d4202a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9dbc2268e23024b4_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\9fe662b0dfa405f1_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a0e247e336b72768_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a2909a5208c17055_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a2fb33825ce406c9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a338625c8d1563bc_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a3fd6d3e1aa6e58c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a4086eba57287fa6_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a417d1317712b835_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a442262372caffc8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a4cfdcd077a64080_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\a7cb49e95441c22a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\aa8e9226ea10e3b9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\ab975f97d3c90b81_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\ad3fdc50a373834c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\af4f6a3210a465fe_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\af6eba9c8f18e01c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\af7ff116c6831908_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\afb176c8b93b6a90_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b14093f5d652070a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b1f2c364909b8bfa_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b223e93d1700f202_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b2799a7ac71b101e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b3f4b3191201b926_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b6485eb79caa2be0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b6d2ab9ab498b17d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b7adcb06df4692d7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\b9997a4512c6dfeb_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\badfc6792209f199_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\bb57590d22bc2deb_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c04b500eed0354ed_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c0d422d9b57de114_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c2ee72c30031a3de_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c3962c6b575aafde_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c5f013433d67c4b1_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c61138a75eb88318_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c6a32b3d6bc00226_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c87d15dc71285d9d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c8901aa17d91e8bc_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c8b6d47a8f65a1ea_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\c9e5fe60bc8173cf_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\ccdd7fd9e3970e67_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\cd39bbdf4eca5b68_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\cfbb7038ec6e89cb_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d11e8aab1d664b61_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d1bff781054b66c5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d3281f3c773710c0_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d499e91e6539f629_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d51b7d5a07e9e78c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d59d36a5ea350340_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d77e387e0963afed_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d7801e3365f46af1_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d7ad78de73721427_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d7c539a06e8c687e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d98ad6c9f7d26dde_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d9cc3b1d45d1e19e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\d9deb2f54dda02ce_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\da16d141b4708cf9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\da3a2d34528de479_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\db1d340ea9e2aa71_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\db6034c3c1cf6c35_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\dd8f781ea1c1b15d_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\de46b8b941befc63_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\de5fbf7f348a4d0c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\def078f64ef45ffa_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\df0105253026b219_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\dfd26835e3427be8_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\dfec0b33c68c3015_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e00829d9364e0c0c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e0e6038bb11d3413_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e23e7d3a521d613f_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e243cfadfdc9cb0c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e284d261e5b7ec91_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e2dc90f4e149e4a9_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e4ba9a91aea1a888_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e4e90562548f7911_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e5412c66318788e5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e5ef24900bdf423c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e6647cda932247ed_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e7f24aee4db94410_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e801c6321fc92fe7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\e94d572bf722c027_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\ec1fb82180eccf4b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\ed4c28564288b58e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f0c6f07cbf90556b_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f0e5f731e9eca0b7_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f113bbcd085f0d62_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f199752852dd315c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f24703bb69943e49_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f3bb641f30adae09_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f408bd59cd0f583a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f567e1c2fda35f43_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f791ce60de5ad93c_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f7ae3e619460ed8e_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\f9f218e8a27f4a59_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\fc959af9dba75a67_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\fcc8097f60b4058a_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\ff98942c3dc75fd5_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\CacheStorage\d324cea85344c240641e02ac75d9ff5b961ca213\8494854b-5315-4774-b915-340e6f72abfb\index-dir\the-real-index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\Database\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\Database\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\Database\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\Database\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\Database\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\ScriptCache\2cc80dabc69f58b6_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\ScriptCache\2cc80dabc69f58b6_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\ScriptCache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Service Worker\ScriptCache\index-dir\the-real-index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Session Storage\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Session Storage\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Session Storage\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Session Storage\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Session Storage\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Sessions\Apps_13420544150117217
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Shared Dictionary\db
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Shared Dictionary\db-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Shared Dictionary\cache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Shared Dictionary\cache\index-dir\the-real-index
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\metadata\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\metadata\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\metadata\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\metadata\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\shared_proto_db\metadata\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Site Characteristics Database\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Site Characteristics Database\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Site Characteristics Database\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Site Characteristics Database\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Site Characteristics Database\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Sync Data\LevelDB\000003.log
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Sync Data\LevelDB\CURRENT
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Sync Data\LevelDB\LOCK
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Sync Data\LevelDB\LOG
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\Sync Data\LevelDB\MANIFEST-000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\WebStorage\QuotaManager
+D:\Scripts\EconomikaNoticias\user_data_scraper\Default\WebStorage\QuotaManager-journal
+D:\Scripts\EconomikaNoticias\user_data_scraper\GraphiteDawnCache\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\GraphiteDawnCache\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\GraphiteDawnCache\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\GraphiteDawnCache\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\GraphiteDawnCache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000001
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000002
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000003
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000004
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000005
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000006
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000007
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000008
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000009
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_00000a
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_00000b
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_00000c
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_00000d
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_00000e
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_00000f
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000010
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000011
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000012
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000013
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000014
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000015
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000016
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000017
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\f_000018
+D:\Scripts\EconomikaNoticias\user_data_scraper\GrShaderCache\index
+D:\Scripts\EconomikaNoticias\user_data_scraper\segmentation_platform\ukm_db
+D:\Scripts\EconomikaNoticias\user_data_scraper\segmentation_platform\ukm_db-wal
+D:\Scripts\EconomikaNoticias\user_data_scraper\ShaderCache\data_0
+D:\Scripts\EconomikaNoticias\user_data_scraper\ShaderCache\data_1
+D:\Scripts\EconomikaNoticias\user_data_scraper\ShaderCache\data_2
+D:\Scripts\EconomikaNoticias\user_data_scraper\ShaderCache\data_3
+D:\Scripts\EconomikaNoticias\user_data_scraper\ShaderCache\index
+D:\Scripts\EconomikaNoticias\utils\cleanup.py
+D:\Scripts\EconomikaNoticias\utils\network.py
+D:\Scripts\EconomikaNoticias\utils\__init__.py
+D:\Scripts\EconomikaNoticias\utils\__pycache__\cleanup.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\utils\__pycache__\git_env_manager.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\utils\__pycache__\log_sanitizer.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\utils\__pycache__\network.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\utils\__pycache__\security_audit.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\utils\__pycache__\__init__.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\_archive\README.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\00_reset_reason.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\01_product_intent_before_reset.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\02_publishing_contracts.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\03_instagram_meta_and_catbox_notes.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\04_youtube_shorts_notes.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\05_central_services_notes.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\06_env_vars_and_secrets.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\07_discovery_failures_twikit_nitter_playwright.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\08_launcher_and_local_ops.md
+D:\Scripts\EconomikaNoticias\_archive\essential_knowledge\09_open_questions_for_next_design_session.md
+D:\Scripts\EconomikaNoticias\_archive\inventories\git_files_before_wipe.txt
+D:\Scripts\EconomikaNoticias\_archive\inventories\worktree_files_before_wipe.txt
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\EconomikaNoticias.bat
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\main.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\README.md
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\server.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\.github\workflows\ci.yml
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\config\settings.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\core\publisher.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\core\viral_scout.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\docs\roadmap\BRANCH_CLEANUP_RECOMMENDATION.md
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\docs\roadmap\MVP_CURRENT_STATE.md
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\scripts\diagnose_mvp.ps1
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\scripts\start_economika.ps1
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\services\central_ai_client.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\services\publishing_hub_client.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\services\discovery\models.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\services\discovery\rss_sources.py
+D:\Scripts\EconomikaNoticias\_archive\old_code_snapshots\services\discovery\x_sources.py
+D:\Scripts\EconomikaNoticias\__pycache__\main.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\__pycache__\server.cpython-313.pyc
+D:\Scripts\EconomikaNoticias\__pycache__\test_health.cpython-313-pytest-8.3.4.pyc

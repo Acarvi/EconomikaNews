@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-server.txt
+          pip install pytest pytest-asyncio
+
+      - name: Compile
+        run: python -m py_compile server.py main.py core/viral_scout.py core/publisher.py services/discovery/x_sources.py
+
+      - name: Secret scan
+        shell: bash
+        run: |
+          PATTERN="AIz""a[0-9A-Za-z_-]{20,}|xo""xb-|gh""p_|gh""o_|OPENROUTER""_API_KEY=.*[^_here]|GEMINI""_API_KEY=AIz""a"
+          if git grep -n -E "$PATTERN" -- . ':!*.md' ':!.env.example'; then
+            echo "Potential secret found"
+            exit 1
+          fi
+
+      - name: Test
+        run: pytest -q
