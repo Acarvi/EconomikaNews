@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Clean post-wipe skeleton for Economica News."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "playwright>=1.52.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -12,7 +14,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["app", "app.discovery"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

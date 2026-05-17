@@ -30,6 +30,22 @@ python -m pytest
 python -m compileall app tests
 ```
 
+## Manual X Login
+
+Install Playwright browsers once in your local environment:
+
+```bash
+python -m playwright install chromium
+```
+
+Then open X with a persistent local browser profile:
+
+```bash
+python -m app.discovery.x_browser_source --login
+```
+
+This creates ignored local directories under `runtime/browser_profile` and `runtime/debug`. The browser profile may contain login state, so it must stay out of git.
+
 ## Commit Hygiene
 
 Do not commit `runtime/`, `.env`, browser profiles, tokens, cookies, outputs, or other local artifacts.
