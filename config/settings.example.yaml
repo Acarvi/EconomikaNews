@@ -1,0 +1,21 @@
+app:
+  language: es
+  timezone: Europe/Madrid
+discovery:
+  lookback_hours: 24
+  min_media_required: true
+scoring:
+  min_followers_default: 1000
+publishing:
+  publish_interval_minutes: 30
+  targets:
+    - instagram_reel
+    - youtube_shorts
+services:
+  central_ai_service_url: http://localhost:8080
+  central_publishing_hub_url: http://localhost:8000
+runtime:
+  db_path: runtime/app.db
+  debug_dir: runtime/debug
+  output_dir: runtime/output
+  browser_profile_dir: runtime/browser_profile

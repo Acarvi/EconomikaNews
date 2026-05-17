@@ -1,0 +1,9 @@
+accounts:
+  - handle: wallstwolverine
+    category: politica
+    weight: 1.0
+    followers_hint: null
+  - handle: juanrallo
+    category: economia
+    weight: 1.2
+    followers_hint: null
