@@ -38,13 +38,27 @@ Install Playwright browsers once in your local environment:
 python -m playwright install chromium
 ```
 
-Then open X with a persistent local browser profile:
+Safe isolated Playwright Chromium profile:
 
 ```bash
 python -m app.discovery.x_browser_source --login
 ```
 
-This creates ignored local directories under `runtime/browser_profile` and `runtime/debug`. The browser profile may contain login state, so it must stay out of git.
+Installed Chrome with the isolated runtime profile:
+
+```bash
+python -m app.discovery.x_browser_source --login --browser-channel chrome
+```
+
+Comet executable with an existing real profile:
+
+```bash
+python -m app.discovery.x_browser_source --login --executable-path "C:\Path\To\comet.exe" --user-data-dir "C:\Path\To\User Data" --i-understand-profile-risk
+```
+
+By default, this creates ignored local directories under `runtime/browser_profile` and `runtime/debug`. The browser profile may contain login state, so it must stay out of git.
+
+Using a real browser profile is allowed only for local manual POC. It must never be used in CI or committed. Do not run high-volume automation against a personal X account.
 
 ## Commit Hygiene
 
