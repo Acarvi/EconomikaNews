@@ -1,17 +1,35 @@
-# EconomikaNoticias
+# Economica News
 
-Project reset in progress.
+Economica News is a local-first rebuild of the EconomikaNews repository: a small product for discovering high-signal economic and political stories, scoring them, generating short-form media candidates, reviewing them, queueing approved posts, and handing publication to the central publishing service.
 
-The previous implementation was intentionally wiped after preserving essential knowledge in `_archive/`.
+## Current Status
 
-No MVP is currently defined.
+Post-wipe clean rebuild.
 
-Next step:
-A product/architecture design session to decide what to build.
+## MVP Flow
 
-See:
+discover -> score -> generate -> review -> queue -> publish
 
-- `_archive/essential_knowledge/`
-- `_archive/old_code_snapshots/`
-- `_archive/inventories/`
+## Technical Risk
 
+The biggest technical risk is X ingestion.
+
+## Architecture Rule
+
+Publishing belongs to CentralPublishingHub, not Economica News. This repository may prepare and queue publishing requests, but platform publishing logic must live in the central service.
+
+## First Phases
+
+- Phase 0: skeleton
+- Phase 1: X ingestion POC
+
+## Local Commands
+
+```bash
+python -m pytest
+python -m compileall app tests
+```
+
+## Commit Hygiene
+
+Do not commit `runtime/`, `.env`, browser profiles, tokens, cookies, outputs, or other local artifacts.
