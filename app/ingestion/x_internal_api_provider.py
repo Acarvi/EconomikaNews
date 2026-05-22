@@ -629,29 +629,48 @@ def _extract_media(tweet: dict[str, Any]) -> list[SourceMedia]:
     entities = _as_dict(tweet.get("extended_entities")) or _as_dict(tweet.get("entities"))
     for item in _as_list(entities.get("media")):
         media = _as_dict(item)
-        media_type = _first_str(media.get("type")) or "unknown"
-        if media_type == "photo":
-            media_type = "image"
-        elif media_type not in {"image", "video"}:
-            media_type = "unknown"
-
-        video_info = _as_dict(media.get("video_info"))
-        variants = _as_list(video_info.get("variants"))
-        video_url = _first_str(
-            *[
-                _as_dict(variant).get("url")
-                for variant in variants
-                if _as_dict(variant).get("url")
-            ]
-        )
+        media_type, media_url, preview_url = _media_details(media)
         media_items.append(
             SourceMedia(
                 media_type=media_type,
-                url=video_url or _first_str(media.get("media_url_https"), media.get("media_url")),
-                preview_url=_first_str(media.get("media_url_https"), media.get("media_url")),
+                url=media_url,
+                preview_url=preview_url,
             )
         )
     return media_items
+
+
+def _media_details(media: dict[str, Any]) -> tuple[str, str | None, str | None]:
+    raw_type = _first_str(media.get("type")) or "unknown"
+    preview_url = _first_str(media.get("media_url_https"), media.get("media_url"))
+    if raw_type == "photo":
+        return "image", preview_url, preview_url
+    if raw_type == "video":
+        return "video", _best_video_variant_url(media) or preview_url, preview_url
+    return "unknown", preview_url, preview_url
+
+
+def _best_video_variant_url(media: dict[str, Any]) -> str | None:
+    variants = _as_list(_as_dict(media.get("video_info")).get("variants"))
+    best_mp4_url = None
+    best_bitrate = -1
+    fallback_url = None
+    for item in variants:
+        variant = _as_dict(item)
+        url = _first_str(variant.get("url"))
+        if not url:
+            continue
+        if fallback_url is None:
+            fallback_url = url
+        content_type = (_first_str(variant.get("content_type")) or "").lower()
+        is_mp4 = "mp4" in content_type or ".mp4" in urlsplit(url).path.lower()
+        if not is_mp4:
+            continue
+        bitrate = _first_int(variant.get("bitrate")) or 0
+        if bitrate >= best_bitrate:
+            best_bitrate = bitrate
+            best_mp4_url = url
+    return best_mp4_url or fallback_url
 
 
 def _parse_datetime(value: str | None) -> datetime | None:

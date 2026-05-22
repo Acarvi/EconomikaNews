@@ -18,6 +18,7 @@ def main() -> int:
         action="store_true",
         help="Allow handle -> userId resolution via X_INTERNAL_USER_LOOKUP_TEMPLATE_URL.",
     )
+    parser.add_argument("--show-media", action="store_true")
     parser.add_argument("--print-json", action="store_true")
     args = parser.parse_args()
 
@@ -37,7 +38,10 @@ def main() -> int:
                     "resolved_user_id": resolved_user_id,
                     "post_count": len(result.posts),
                     "errors": result.errors,
-                    "posts": [_post_summary(post) for post in result.posts],
+                    "posts": [
+                        _post_summary(post, show_media=args.show_media)
+                        for post in result.posts
+                    ],
                 },
                 indent=2,
                 sort_keys=True,
@@ -72,14 +76,25 @@ def main() -> int:
     return 0
 
 
-def _post_summary(post: object) -> dict[str, object]:
-    return {
+def _post_summary(post: object, *, show_media: bool = False) -> dict[str, object]:
+    summary = {
         "post_id": getattr(post, "post_id"),
         "url": getattr(post, "url"),
         "text_prefix": getattr(post, "text")[:100],
         "media_count": len(getattr(post, "media")),
         "metrics": getattr(post, "metrics").__dict__,
     }
+    if show_media:
+        summary["media"] = [
+            {
+                "media_type": getattr(media, "media_type"),
+                "url": getattr(media, "url"),
+                "preview_url": getattr(media, "preview_url"),
+                "local_path": getattr(media, "local_path"),
+            }
+            for media in getattr(post, "media")
+        ]
+    return summary
 
 
 if __name__ == "__main__":

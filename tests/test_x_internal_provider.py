@@ -13,6 +13,7 @@ from app.ingestion.x_internal_api_provider import (
     redact_headers,
     redact_secrets,
 )
+from app.ingestion.models import SourceMedia
 from app.ingestion.x_internal_errors import XInternalErrorKind
 from app.ingestion.x_internal_timeline import (
     build_timeline_url,
@@ -600,8 +601,149 @@ def test_sample_json_parser_normalizes_tweet_like_payload() -> None:
     assert posts[0].media[0].media_type == "image"
 
 
+def test_image_media_extraction_sets_url_and_preview_url() -> None:
+    payload = _tweet_payload_with_media(
+        [
+            {
+                "type": "photo",
+                "media_url_https": "https://pbs.twimg.com/media/image.jpg",
+            }
+        ]
+    )
+
+    posts = normalize_x_internal_json(
+        payload,
+        account=SourceAccount(handle="fallback"),
+        captured_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+    )
+
+    assert posts[0].media[0].media_type == "image"
+    assert posts[0].media[0].url == "https://pbs.twimg.com/media/image.jpg"
+    assert posts[0].media[0].preview_url == "https://pbs.twimg.com/media/image.jpg"
+
+
+def test_video_media_extraction_chooses_highest_bitrate_mp4() -> None:
+    payload = _tweet_payload_with_media(
+        [
+            {
+                "type": "video",
+                "media_url_https": "https://pbs.twimg.com/media/preview.jpg",
+                "video_info": {
+                    "variants": [
+                        {
+                            "content_type": "application/x-mpegURL",
+                            "url": "https://video.twimg.com/path/playlist.m3u8",
+                        },
+                        {
+                            "bitrate": 832000,
+                            "content_type": "video/mp4",
+                            "url": "https://video.twimg.com/path/low.mp4",
+                        },
+                        {
+                            "bitrate": 2176000,
+                            "content_type": "video/mp4",
+                            "url": "https://video.twimg.com/path/high.mp4",
+                        },
+                    ]
+                },
+            }
+        ]
+    )
+
+    posts = normalize_x_internal_json(
+        payload,
+        account=SourceAccount(handle="fallback"),
+        captured_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+    )
+
+    assert posts[0].media[0].media_type == "video"
+    assert posts[0].media[0].url == "https://video.twimg.com/path/high.mp4"
+    assert posts[0].media[0].preview_url == "https://pbs.twimg.com/media/preview.jpg"
+
+
+def test_video_media_extraction_falls_back_without_mp4() -> None:
+    payload = _tweet_payload_with_media(
+        [
+            {
+                "type": "video",
+                "media_url_https": "https://pbs.twimg.com/media/preview.jpg",
+                "video_info": {
+                    "variants": [
+                        {
+                            "content_type": "application/x-mpegURL",
+                            "url": "https://video.twimg.com/path/playlist.m3u8",
+                        }
+                    ]
+                },
+            }
+        ]
+    )
+
+    posts = normalize_x_internal_json(
+        payload,
+        account=SourceAccount(handle="fallback"),
+        captured_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+    )
+
+    assert posts[0].media[0].media_type == "video"
+    assert posts[0].media[0].url == "https://video.twimg.com/path/playlist.m3u8"
+    assert posts[0].media[0].preview_url == "https://pbs.twimg.com/media/preview.jpg"
+
+
+def test_probe_summary_includes_media_only_when_requested() -> None:
+    from scripts.x_internal_probe import _post_summary
+
+    post = normalize_x_internal_json(
+        _tweet_payload_with_media(
+            [
+                {
+                    "type": "photo",
+                    "media_url_https": "https://pbs.twimg.com/media/image.jpg",
+                }
+            ]
+        ),
+        account=SourceAccount(handle="fallback"),
+        captured_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+    )[0]
+
+    assert "media" not in _post_summary(post)
+    summary = _post_summary(post, show_media=True)
+
+    assert summary["media"] == [
+        {
+            "media_type": "image",
+            "url": "https://pbs.twimg.com/media/image.jpg",
+            "preview_url": "https://pbs.twimg.com/media/image.jpg",
+            "local_path": None,
+        }
+    ]
+
+
+def test_download_target_path_builder() -> None:
+    from scripts.x_download_media_probe import build_media_target_path
+
+    target = build_media_target_path(
+        Path("runtime/downloads/x"),
+        "12345",
+        SourceMedia(
+            media_type="video",
+            url="https://video.twimg.com/path/high.mp4?tag=12",
+            preview_url=None,
+        ),
+        2,
+    )
+
+    assert target == Path("runtime/downloads/x/12345/video_2.mp4")
+
+
 def test_probe_script_module_importable() -> None:
     module = importlib.import_module("scripts.x_internal_probe")
+
+    assert module
+
+
+def test_download_media_probe_script_module_importable() -> None:
+    module = importlib.import_module("scripts.x_download_media_probe")
 
     assert module
 
@@ -633,6 +775,7 @@ def test_no_runtime_or_local_secret_files_tracked() -> None:
             "git",
             "ls-files",
             "runtime",
+            "runtime/downloads",
             "*/x_headers.json",
             "x_headers.json",
             ".env",
@@ -644,3 +787,26 @@ def test_no_runtime_or_local_secret_files_tracked() -> None:
     )
 
     assert result.stdout == ""
+
+
+def _tweet_payload_with_media(media: list[dict]) -> dict:
+    return {
+        "data": {
+            "tweet": {
+                "result": {
+                    "rest_id": "12345",
+                    "core": {
+                        "user_results": {
+                            "result": {"legacy": {"screen_name": "economika_dev"}}
+                        }
+                    },
+                    "legacy": {
+                        "id_str": "12345",
+                        "full_text": "A useful macro post with media.",
+                        "created_at": "Wed Jan 01 12:00:00 +0000 2026",
+                        "extended_entities": {"media": media},
+                    },
+                }
+            }
+        }
+    }
