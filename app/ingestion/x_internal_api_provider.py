@@ -24,6 +24,10 @@ from app.ingestion.x_internal_errors import (
     XInternalErrorKind,
     classify_http_error,
 )
+from app.ingestion.x_internal_timeline import (
+    build_timeline_url,
+    parse_timeline_url,
+)
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -51,6 +55,8 @@ class XInternalConfig:
     cookie_string: str | None
     user_agent: str | None
     timeline_url: str | None
+    timeline_template_url: str | None
+    user_id: str | None
     timeline_variables: str | None
     timeline_features: str | None
     headers_file: str | None
@@ -84,7 +90,15 @@ class XInternalApiProvider:
             if header_errors:
                 return _error_result(account, header_errors, self.provider_name, captured_at)
 
-        url = _build_timeline_url(config, account, lookback_hours)
+        try:
+            url = _build_timeline_url(config, account, lookback_hours)
+        except ValueError as exc:
+            return _error_result(
+                account,
+                [f"{XInternalErrorKind.INVALID_CONFIG}: {exc}"],
+                self.provider_name,
+                captured_at,
+            )
         headers = _build_headers(config, base_headers)
 
         try:
@@ -152,6 +166,10 @@ class XInternalApiProvider:
             cookie_string=_clean_env(self._env.get("X_COOKIE_STRING")),
             user_agent=_clean_env(self._env.get("X_USER_AGENT")),
             timeline_url=_clean_env(self._env.get("X_INTERNAL_TIMELINE_URL")),
+            timeline_template_url=_clean_env(
+                self._env.get("X_INTERNAL_TIMELINE_TEMPLATE_URL")
+            ),
+            user_id=_clean_env(self._env.get("X_INTERNAL_USER_ID")),
             timeline_variables=_clean_env(self._env.get("X_INTERNAL_TIMELINE_VARIABLES")),
             timeline_features=_clean_env(self._env.get("X_INTERNAL_TIMELINE_FEATURES")),
             headers_file=_clean_env(self._env.get("X_INTERNAL_HEADERS_FILE")),
@@ -160,15 +178,22 @@ class XInternalApiProvider:
     @staticmethod
     def _missing_config_errors(config: XInternalConfig) -> list[str]:
         missing: list[str] = []
+        uses_template = bool(config.timeline_template_url)
         if config.headers_file:
-            if not config.timeline_url:
+            if uses_template:
+                if not config.user_id:
+                    missing.append("X_INTERNAL_USER_ID")
+            elif not config.timeline_url:
                 missing.append("X_INTERNAL_TIMELINE_URL")
         else:
             if not config.auth_token:
                 missing.append("X_AUTH_TOKEN")
             if not config.ct0:
                 missing.append("X_CT0")
-            if not config.timeline_url:
+            if uses_template:
+                if not config.user_id:
+                    missing.append("X_INTERNAL_USER_ID")
+            elif not config.timeline_url:
                 missing.append("X_INTERNAL_TIMELINE_URL")
         if not missing:
             return []
@@ -374,8 +399,13 @@ def _build_timeline_url(
     account: SourceAccount,
     lookback_hours: int,
 ) -> str:
-    assert config.timeline_url is not None
     _ = account, lookback_hours
+    if config.timeline_template_url:
+        assert config.user_id is not None
+        template = parse_timeline_url(config.timeline_template_url)
+        return build_timeline_url(template, config.user_id)
+
+    assert config.timeline_url is not None
     parts = urlsplit(config.timeline_url)
     query: dict[str, str] = {}
     if parts.query:
