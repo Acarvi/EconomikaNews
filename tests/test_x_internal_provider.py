@@ -1,5 +1,7 @@
 import importlib
 import json
+import re
+import subprocess
 from pathlib import Path
 
 from app.ingestion import XInternalApiProvider as ExportedXInternalApiProvider
@@ -10,6 +12,7 @@ from app.ingestion.x_internal_api_provider import (
     redact_headers,
     redact_secrets,
 )
+from app.ingestion.x_internal_errors import XInternalErrorKind
 
 
 def test_provider_imports_and_name() -> None:
@@ -124,6 +127,7 @@ def test_missing_headers_file_returns_config_error_not_crash(tmp_path: Path) -> 
 
     assert result.posts == []
     assert "invalid_config" in result.errors[0]
+    assert result.errors[0].startswith(f"{XInternalErrorKind.INVALID_CONFIG}:")
     assert "does not exist" in result.errors[0]
 
 
@@ -329,3 +333,43 @@ def test_probe_script_module_importable() -> None:
     module = importlib.import_module("scripts.x_internal_probe")
 
     assert module
+
+
+def test_create_x_headers_file_module_importable() -> None:
+    module = importlib.import_module("scripts.create_x_headers_file")
+
+    assert module
+
+
+def test_create_x_probe_env_script_exists_without_real_secret_literals() -> None:
+    script = Path("scripts/create_x_probe_env.ps1")
+    text = script.read_text(encoding="utf-8")
+
+    assert script.exists()
+    assert 'X_INTERNAL_HEADERS_FILE = "runtime/secrets/x_headers.json"' in text
+    assert "Read-Host" in text
+    assert "python scripts\\x_internal_probe.py --handle wallstwolverine --lookback-hours 24 --print-json" in text
+    assert not re.search(r"auth_token\s*=", text, flags=re.IGNORECASE)
+    assert not re.search(r"ct0\s*=", text, flags=re.IGNORECASE)
+    assert not re.search(r"bearer\s+[A-Za-z0-9._~+/=-]{12,}", text, flags=re.IGNORECASE)
+    assert not re.search(r"cookie\s*[:=]", text, flags=re.IGNORECASE)
+    assert not re.search(r"authorization\s*[:=]", text, flags=re.IGNORECASE)
+
+
+def test_no_runtime_or_local_secret_files_tracked() -> None:
+    result = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "runtime",
+            "*/x_headers.json",
+            "x_headers.json",
+            ".env",
+            ".env.*",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout == ""

@@ -336,34 +336,34 @@ def _load_headers_file(headers_file: str | None) -> tuple[dict[str, str] | None,
     path = Path(headers_file)
     if not path.exists():
         return None, [
-            f"invalid_config: X_INTERNAL_HEADERS_FILE does not exist: {path}"
+            f"{XInternalErrorKind.INVALID_CONFIG}: X_INTERNAL_HEADERS_FILE does not exist: {path}"
         ]
     if not path.is_file():
         return None, [
-            f"invalid_config: X_INTERNAL_HEADERS_FILE is not a file: {path}"
+            f"{XInternalErrorKind.INVALID_CONFIG}: X_INTERNAL_HEADERS_FILE is not a file: {path}"
         ]
 
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
         return None, [
-            f"invalid_config: could not read X_INTERNAL_HEADERS_FILE: {exc}"
+            f"{XInternalErrorKind.INVALID_CONFIG}: could not read X_INTERNAL_HEADERS_FILE: {exc}"
         ]
     except json.JSONDecodeError as exc:
         return None, [
-            f"invalid_config: X_INTERNAL_HEADERS_FILE is not valid JSON: {exc}"
+            f"{XInternalErrorKind.INVALID_CONFIG}: X_INTERNAL_HEADERS_FILE is not valid JSON: {exc}"
         ]
 
     if not isinstance(payload, dict):
         return None, [
-            "invalid_config: X_INTERNAL_HEADERS_FILE must contain a JSON object"
+            f"{XInternalErrorKind.INVALID_CONFIG}: X_INTERNAL_HEADERS_FILE must contain a JSON object"
         ]
 
     headers: dict[str, str] = {}
     for key, value in payload.items():
         if not isinstance(key, str) or not isinstance(value, str):
             return None, [
-                "invalid_config: X_INTERNAL_HEADERS_FILE must map strings to strings"
+                f"{XInternalErrorKind.INVALID_CONFIG}: X_INTERNAL_HEADERS_FILE must map strings to strings"
             ]
         headers[key] = value
     return headers, []

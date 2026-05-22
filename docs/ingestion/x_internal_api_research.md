@@ -19,6 +19,7 @@ Optional env vars:
 - `X_BEARER_TOKEN`: bearer token copied from a legitimate web request, if required by the endpoint.
 - `X_COOKIE_STRING`: full cookie header. If omitted, the provider constructs a minimal cookie from `X_AUTH_TOKEN` and `X_CT0`.
 - `X_USER_AGENT`: browser user agent. If omitted, a conservative browser user agent is used.
+- `X_INTERNAL_HEADERS_FILE`: path to a local ignored JSON object of DevTools-captured headers.
 - `X_INTERNAL_TIMELINE_VARIABLES`: GraphQL `variables` query value if it is not already present in the copied URL.
 - `X_INTERNAL_TIMELINE_FEATURES`: GraphQL `features` query value if it is not already present in the copied URL.
 
@@ -41,6 +42,17 @@ If endpoint/query params are unknown, capture:
 - Non-secret headers needed for the request to succeed.
 - Response status and a redacted structural summary, not the raw payload.
 
+## Local workflow
+
+1. Capture a `UserTweets` request in DevTools Network while logged in locally.
+2. Create a local headers file with `python scripts/create_x_headers_file.py`.
+3. Run the probe with `powershell -ExecutionPolicy Bypass -File scripts/create_x_probe_env.ps1`.
+4. If successful, expect `post_count > 0` and `errors []`.
+
+`runtime/secrets/x_headers.json` must never be committed. Keep cookies, tokens, auth headers, and raw debug payloads out of chats, issues, PRs, logs, and committed files.
+
+Known limitation: the current request URL is tied to the captured `userId`/timeline URL. EN-022 should solve parameterized timeline requests before broader account coverage.
+
 ## Known failure modes
 
 - `401`: missing, expired, or invalid credentials.
@@ -51,20 +63,6 @@ If endpoint/query params are unknown, capture:
 - Changed `queryId` or `docId`.
 - Changed JSON schema.
 - Cloud IP blocking.
-
-## Validated local result
-
-Full headers-file mode was validated locally with secrets kept in `runtime/secrets/x_headers.json`, which must remain ignored. The probe returned 21 posts for one account, including text, post ids, urls, media counts, and engagement metrics. No browser automation or Playwright was used.
-
-This validates feasibility, not production robustness.
-
-Remaining risks:
-
-- `queryId`/`docId` may change.
-- Cookies may expire.
-- Request is currently tied to captured `userId`/timeline URL.
-- Multi-account scanning is not implemented.
-- Cloud IP behavior is untested.
 
 ## Safety
 
