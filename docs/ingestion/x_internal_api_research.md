@@ -22,6 +22,7 @@ Optional env vars:
 - `X_INTERNAL_HEADERS_FILE`: path to a local ignored JSON object of DevTools-captured headers.
 - `X_INTERNAL_TIMELINE_TEMPLATE_URL`: reusable captured `UserTweets` URL used for userId replacement.
 - `X_INTERNAL_USER_ID`: numeric X user id to inject into `X_INTERNAL_TIMELINE_TEMPLATE_URL`.
+- `X_INTERNAL_USER_LOOKUP_TEMPLATE_URL`: reusable captured `UserByScreenName` URL used for one-handle userId lookup.
 - `X_INTERNAL_TIMELINE_VARIABLES`: GraphQL `variables` query value if it is not already present in the copied URL.
 - `X_INTERNAL_TIMELINE_FEATURES`: GraphQL `features` query value if it is not already present in the copied URL.
 
@@ -66,7 +67,20 @@ $env:X_INTERNAL_USER_ID="123456789"
 python scripts\x_internal_probe.py --handle wallstwolverine --lookback-hours 24 --print-json
 ```
 
-Unknown query parameters from the captured URL are currently ignored during template rebuilding. Until EN-023, handle -> userId resolution is not implemented, so `X_INTERNAL_USER_ID` must be supplied manually.
+Unknown query parameters from the captured URL are currently ignored during template rebuilding. If not using the lookup flow below, `X_INTERNAL_USER_ID` must be supplied manually.
+
+## Handle to userId lookup
+
+To resolve one handle without manually setting `X_INTERNAL_USER_ID`, capture a `UserByScreenName` request from DevTools. Open the profile, open DevTools Network, filter for `UserByScreenName`, and copy the full request URL.
+
+```powershell
+$env:X_INTERNAL_HEADERS_FILE="runtime/secrets/x_headers.json"
+$env:X_INTERNAL_USER_LOOKUP_TEMPLATE_URL="https://x.com/i/api/graphql/<queryId>/UserByScreenName?variables=..."
+$env:X_INTERNAL_TIMELINE_TEMPLATE_URL="https://x.com/i/api/graphql/<queryId>/UserTweets?variables=..."
+python scripts\x_internal_probe.py --handle wallstwolverine --lookback-hours 24 --resolve-user-id --print-json
+```
+
+This still resolves one handle only. Multi-account scanning is EN-024.
 
 ## Known failure modes
 

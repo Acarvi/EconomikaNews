@@ -13,13 +13,20 @@ def main() -> int:
     )
     parser.add_argument("--handle", required=True)
     parser.add_argument("--lookback-hours", type=int, default=24)
+    parser.add_argument(
+        "--resolve-user-id",
+        action="store_true",
+        help="Allow handle -> userId resolution via X_INTERNAL_USER_LOOKUP_TEMPLATE_URL.",
+    )
     parser.add_argument("--print-json", action="store_true")
     args = parser.parse_args()
 
-    result = XInternalApiProvider().fetch_recent_posts(
+    provider = XInternalApiProvider()
+    result = provider.fetch_recent_posts(
         account=SourceAccount(handle=args.handle),
         lookback_hours=args.lookback_hours,
     )
+    resolved_user_id = provider.last_resolved_user_id if args.resolve_user_id else None
 
     if args.print_json:
         print(
@@ -27,6 +34,7 @@ def main() -> int:
                 {
                     "provider_name": result.provider_name,
                     "account": result.account.handle,
+                    "resolved_user_id": resolved_user_id,
                     "post_count": len(result.posts),
                     "errors": result.errors,
                     "posts": [_post_summary(post) for post in result.posts],
@@ -39,6 +47,8 @@ def main() -> int:
 
     print(f"provider: {result.provider_name}")
     print(f"account: {result.account.handle}")
+    if args.resolve_user_id:
+        print(f"resolved_user_id: {resolved_user_id}")
     print(f"posts: {len(result.posts)}")
     if result.errors:
         print("errors:")
