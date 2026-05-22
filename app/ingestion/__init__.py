@@ -9,6 +9,7 @@ from app.ingestion.models import (
     SourcePost,
 )
 from app.ingestion.provider import IngestionProvider
+from app.ingestion.x_internal_api_provider import XInternalApiProvider
 
 __all__ = [
     "EngagementMetrics",
@@ -18,4 +19,5 @@ __all__ = [
     "SourceAccount",
     "SourceMedia",
     "SourcePost",
+    "XInternalApiProvider",
 ]
