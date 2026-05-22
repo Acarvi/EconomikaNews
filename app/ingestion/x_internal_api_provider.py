@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
@@ -35,6 +36,11 @@ SECRET_ENV_VARS = (
     "X_BEARER_TOKEN",
     "X_COOKIE_STRING",
 )
+SENSITIVE_HEADER_KEYS = {
+    "authorization",
+    "cookie",
+    "x-csrf-token",
+}
 
 
 @dataclass(frozen=True)
@@ -43,10 +49,11 @@ class XInternalConfig:
     ct0: str | None
     bearer_token: str | None
     cookie_string: str | None
-    user_agent: str
+    user_agent: str | None
     timeline_url: str | None
     timeline_variables: str | None
     timeline_features: str | None
+    headers_file: str | None
 
 
 class XInternalApiProvider:
@@ -71,20 +78,32 @@ class XInternalApiProvider:
         if errors:
             return _error_result(account, errors, self.provider_name, captured_at)
 
+        base_headers = None
+        if config.headers_file:
+            base_headers, header_errors = _load_headers_file(config.headers_file)
+            if header_errors:
+                return _error_result(account, header_errors, self.provider_name, captured_at)
+
         url = _build_timeline_url(config, account, lookback_hours)
-        headers = _build_headers(config)
+        headers = _build_headers(config, base_headers)
 
         try:
             body = self._opener(Request(url, headers=headers, method="GET"), 30.0)
         except HTTPError as exc:
             response_body = _safe_decode(exc.read(4096))
             kind = classify_http_error(exc.code, response_body)
-            error = f"{kind}: X returned HTTP {exc.code}: {redact_secrets(response_body, self._env)[:240]}"
+            error = (
+                f"{kind}: X returned HTTP {exc.code}: "
+                f"{redact_secrets(response_body, self._env, headers)[:240]}"
+            )
             return _error_result(account, [error], self.provider_name, captured_at)
         except URLError as exc:
             return _error_result(
                 account,
-                [f"{XInternalErrorKind.NETWORK}: {redact_secrets(str(exc.reason), self._env)}"],
+                [
+                    f"{XInternalErrorKind.NETWORK}: "
+                    f"{redact_secrets(str(exc.reason), self._env, headers)}"
+                ],
                 self.provider_name,
                 captured_at,
             )
@@ -114,7 +133,7 @@ class XInternalApiProvider:
             shape = summarize_json_shape(payload)
             errors.append(
                 f"{XInternalErrorKind.UNKNOWN_SCHEMA}: no tweet-like structures found; "
-                f"redacted shape={redact_secrets(json.dumps(shape, sort_keys=True), self._env)}"
+                f"redacted shape={redact_secrets(json.dumps(shape, sort_keys=True), self._env, headers)}"
             )
 
         return IngestionResult(
@@ -131,21 +150,26 @@ class XInternalApiProvider:
             ct0=_clean_env(self._env.get("X_CT0")),
             bearer_token=_clean_env(self._env.get("X_BEARER_TOKEN")),
             cookie_string=_clean_env(self._env.get("X_COOKIE_STRING")),
-            user_agent=_clean_env(self._env.get("X_USER_AGENT")) or DEFAULT_USER_AGENT,
+            user_agent=_clean_env(self._env.get("X_USER_AGENT")),
             timeline_url=_clean_env(self._env.get("X_INTERNAL_TIMELINE_URL")),
             timeline_variables=_clean_env(self._env.get("X_INTERNAL_TIMELINE_VARIABLES")),
             timeline_features=_clean_env(self._env.get("X_INTERNAL_TIMELINE_FEATURES")),
+            headers_file=_clean_env(self._env.get("X_INTERNAL_HEADERS_FILE")),
         )
 
     @staticmethod
     def _missing_config_errors(config: XInternalConfig) -> list[str]:
-        missing = []
-        if not config.auth_token:
-            missing.append("X_AUTH_TOKEN")
-        if not config.ct0:
-            missing.append("X_CT0")
-        if not config.timeline_url:
-            missing.append("X_INTERNAL_TIMELINE_URL")
+        missing: list[str] = []
+        if config.headers_file:
+            if not config.timeline_url:
+                missing.append("X_INTERNAL_TIMELINE_URL")
+        else:
+            if not config.auth_token:
+                missing.append("X_AUTH_TOKEN")
+            if not config.ct0:
+                missing.append("X_CT0")
+            if not config.timeline_url:
+                missing.append("X_INTERNAL_TIMELINE_URL")
         if not missing:
             return []
         return [
@@ -153,21 +177,41 @@ class XInternalApiProvider:
         ]
 
 
-def redact_secrets(text: str, env: Mapping[str, str] | None = None) -> str:
+def redact_secrets(
+    text: str,
+    env: Mapping[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
+) -> str:
     redacted = text
     source = env if env is not None else os.environ
     for name in SECRET_ENV_VARS:
         value = _clean_env(source.get(name))
         if value:
             redacted = redacted.replace(value, "[REDACTED]")
+    for key, value in (headers or {}).items():
+        if key.lower() in SENSITIVE_HEADER_KEYS and value:
+            redacted = redacted.replace(value, "[REDACTED]")
 
     patterns = (
         r"(auth_token=)[^;\s]+",
         r"(ct0=)[^;\s]+",
         r"(Bearer\s+)[A-Za-z0-9._~+/=-]+",
+        r"((?:x-csrf-token|x-csrf-token:)\s*[=:]\s*)[^;,\s]+",
+        r"((?:cookie|cookie:)\s*[=:]\s*)[^,\r\n]+",
+        r"((?:authorization|authorization:)\s*[=:]\s*Bearer\s+)[^;,\s]+",
     )
     for pattern in patterns:
         redacted = re.sub(pattern, r"\1[REDACTED]", redacted, flags=re.IGNORECASE)
+    return redacted
+
+
+def redact_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    redacted = {}
+    for key, value in headers.items():
+        if key.lower() in SENSITIVE_HEADER_KEYS:
+            redacted[key] = "[REDACTED]"
+        else:
+            redacted[key] = redact_secrets(value, headers=headers)
     return redacted
 
 
@@ -252,20 +296,28 @@ def _post_from_node(
     )
 
 
-def _build_headers(config: XInternalConfig) -> dict[str, str]:
-    headers = {
-        "accept": "application/json, text/plain, */*",
-        "user-agent": config.user_agent,
-        "x-twitter-active-user": "yes",
-        "x-twitter-client-language": "en",
-    }
+def _build_headers(
+    config: XInternalConfig,
+    base_headers: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    if base_headers is not None:
+        headers = dict(base_headers)
+    else:
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "user-agent": config.user_agent or DEFAULT_USER_AGENT,
+            "x-twitter-active-user": "yes",
+            "x-twitter-client-language": "en",
+        }
     if config.bearer_token:
-        headers["authorization"] = f"Bearer {config.bearer_token}"
+        _set_header(headers, "authorization", f"Bearer {config.bearer_token}")
     if config.ct0:
-        headers["x-csrf-token"] = config.ct0
+        _set_header(headers, "x-csrf-token", config.ct0)
+    if config.user_agent:
+        _set_header(headers, "user-agent", config.user_agent)
 
-    cookie = config.cookie_string
-    if not cookie:
+    cookie = config.cookie_string or _get_header(headers, "cookie")
+    if not cookie and base_headers is None:
         cookie_parts = []
         if config.auth_token:
             cookie_parts.append(f"auth_token={config.auth_token}")
@@ -273,8 +325,48 @@ def _build_headers(config: XInternalConfig) -> dict[str, str]:
             cookie_parts.append(f"ct0={config.ct0}")
         cookie = "; ".join(cookie_parts)
     if cookie:
-        headers["cookie"] = cookie
+        _set_header(headers, "cookie", cookie)
     return headers
+
+
+def _load_headers_file(headers_file: str | None) -> tuple[dict[str, str] | None, list[str]]:
+    if not headers_file:
+        return None, []
+
+    path = Path(headers_file)
+    if not path.exists():
+        return None, [
+            f"invalid_config: X_INTERNAL_HEADERS_FILE does not exist: {path}"
+        ]
+    if not path.is_file():
+        return None, [
+            f"invalid_config: X_INTERNAL_HEADERS_FILE is not a file: {path}"
+        ]
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        return None, [
+            f"invalid_config: could not read X_INTERNAL_HEADERS_FILE: {exc}"
+        ]
+    except json.JSONDecodeError as exc:
+        return None, [
+            f"invalid_config: X_INTERNAL_HEADERS_FILE is not valid JSON: {exc}"
+        ]
+
+    if not isinstance(payload, dict):
+        return None, [
+            "invalid_config: X_INTERNAL_HEADERS_FILE must contain a JSON object"
+        ]
+
+    headers: dict[str, str] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            return None, [
+                "invalid_config: X_INTERNAL_HEADERS_FILE must map strings to strings"
+            ]
+        headers[key] = value
+    return headers, []
 
 
 def _build_timeline_url(
@@ -314,6 +406,23 @@ def _build_timeline_url(
 def _default_opener(request: Request, timeout: float) -> bytes:
     with urlopen(request, timeout=timeout) as response:
         return response.read()
+
+
+def _get_header(headers: Mapping[str, str], key: str) -> str | None:
+    lowered = key.lower()
+    for header_key, value in headers.items():
+        if header_key.lower() == lowered:
+            return value
+    return None
+
+
+def _set_header(headers: dict[str, str], key: str, value: str) -> None:
+    lowered = key.lower()
+    for header_key in list(headers):
+        if header_key.lower() == lowered:
+            headers[header_key] = value
+            return
+    headers[key] = value
 
 
 def _error_result(
