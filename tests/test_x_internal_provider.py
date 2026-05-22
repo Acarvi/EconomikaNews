@@ -3,6 +3,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from app.ingestion import XInternalApiProvider as ExportedXInternalApiProvider
 from app.ingestion.models import IngestionResult, SourceAccount
@@ -13,6 +14,77 @@ from app.ingestion.x_internal_api_provider import (
     redact_secrets,
 )
 from app.ingestion.x_internal_errors import XInternalErrorKind
+from app.ingestion.x_internal_timeline import (
+    build_timeline_url,
+    extract_user_id_from_timeline_url,
+    parse_timeline_url,
+)
+
+
+def _sample_timeline_url() -> str:
+    query = urlencode(
+        {
+            "variables": json.dumps(
+                {"userId": "111", "count": 20, "includePromotedContent": True}
+            ),
+            "features": json.dumps({"responsive_web_graphql_exclude_directive_enabled": True}),
+            "fieldToggles": json.dumps({"withArticlePlainText": False}),
+            "ignored": "kept-out-of-template",
+        }
+    )
+    return f"https://x.com/i/api/graphql/abc123/UserTweets?{query}"
+
+
+def _decoded_query_json(url: str, name: str) -> dict:
+    raw = parse_qs(urlsplit(url).query)[name][-1]
+    return json.loads(raw)
+
+
+def test_parse_timeline_url_decodes_graphql_query_params() -> None:
+    template = parse_timeline_url(_sample_timeline_url())
+
+    assert template.base_url == "https://x.com/i/api/graphql/abc123/UserTweets"
+    assert template.query_id == "abc123"
+    assert template.operation_name == "UserTweets"
+    assert template.variables["userId"] == "111"
+    assert template.variables["count"] == 20
+    assert template.features == {"responsive_web_graphql_exclude_directive_enabled": True}
+    assert template.field_toggles == {"withArticlePlainText": False}
+
+
+def test_build_timeline_url_replaces_user_id() -> None:
+    template = parse_timeline_url(_sample_timeline_url())
+
+    url = build_timeline_url(template, user_id="222")
+
+    assert _decoded_query_json(url, "variables")["userId"] == "222"
+    assert _decoded_query_json(url, "variables")["count"] == 20
+    assert _decoded_query_json(url, "features") == template.features
+    assert _decoded_query_json(url, "fieldToggles") == template.field_toggles
+    assert "ignored" not in parse_qs(urlsplit(url).query)
+
+
+def test_build_timeline_url_overrides_count() -> None:
+    template = parse_timeline_url(_sample_timeline_url())
+
+    url = build_timeline_url(template, user_id="222", count=50)
+
+    assert _decoded_query_json(url, "variables")["count"] == 50
+
+
+def test_extract_user_id_from_timeline_url() -> None:
+    assert extract_user_id_from_timeline_url(_sample_timeline_url()) == "111"
+
+
+def test_invalid_timeline_variables_json_raises_clear_error() -> None:
+    url = "https://x.com/i/api/graphql/abc123/UserTweets?variables=%7B"
+
+    try:
+        parse_timeline_url(url)
+    except ValueError as exc:
+        assert "invalid variables JSON" in str(exc)
+    else:
+        raise AssertionError("expected invalid variables JSON error")
 
 
 def test_provider_imports_and_name() -> None:
@@ -80,6 +152,67 @@ def test_headers_file_without_auth_env_reaches_injected_opener(tmp_path: Path) -
     assert captured["headers"]["referer"] == "https://x.com/wallstwolverine"
     assert captured["headers"]["x-csrf-token"] == "file-ct0"
     assert captured["headers"]["user-agent"] == "file-agent"
+
+
+def test_template_url_with_user_id_reaches_injected_opener() -> None:
+    captured = {}
+
+    def opener(request, timeout):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        return b'{"data":[]}'
+
+    provider = XInternalApiProvider(
+        env={
+            "X_AUTH_TOKEN": "auth-secret",
+            "X_CT0": "ct0-secret",
+            "X_INTERNAL_TIMELINE_TEMPLATE_URL": _sample_timeline_url(),
+            "X_INTERNAL_USER_ID": "999",
+        },
+        opener=opener,
+    )
+
+    provider.fetch_recent_posts(SourceAccount(handle="wallstwolverine"), 24)
+
+    assert captured["timeout"] == 30.0
+    assert captured["url"].startswith("https://x.com/i/api/graphql/abc123/UserTweets?")
+    assert _decoded_query_json(captured["url"], "variables")["userId"] == "999"
+
+
+def test_template_url_missing_user_id_returns_config_error() -> None:
+    provider = XInternalApiProvider(
+        env={
+            "X_AUTH_TOKEN": "auth-secret",
+            "X_CT0": "ct0-secret",
+            "X_INTERNAL_TIMELINE_TEMPLATE_URL": _sample_timeline_url(),
+        }
+    )
+
+    result = provider.fetch_recent_posts(SourceAccount(handle="wallstwolverine"), 24)
+
+    assert result.posts == []
+    assert "missing_config" in result.errors[0]
+    assert "X_INTERNAL_USER_ID" in result.errors[0]
+    assert "X_INTERNAL_TIMELINE_URL" not in result.errors[0]
+
+
+def test_invalid_template_url_returns_invalid_config_through_provider() -> None:
+    provider = XInternalApiProvider(
+        env={
+            "X_AUTH_TOKEN": "auth-secret",
+            "X_CT0": "ct0-secret",
+            "X_INTERNAL_TIMELINE_TEMPLATE_URL": (
+                "https://x.com/i/api/graphql/abc123/UserTweets?variables=%7B"
+            ),
+            "X_INTERNAL_USER_ID": "999",
+        }
+    )
+
+    result = provider.fetch_recent_posts(SourceAccount(handle="wallstwolverine"), 24)
+
+    assert result.posts == []
+    assert result.errors[0].startswith(f"{XInternalErrorKind.INVALID_CONFIG}:")
+    assert "invalid variables JSON" in result.errors[0]
 
 
 def test_no_headers_file_still_requires_auth_ct0_and_timeline() -> None:

@@ -20,6 +20,8 @@ Optional env vars:
 - `X_COOKIE_STRING`: full cookie header. If omitted, the provider constructs a minimal cookie from `X_AUTH_TOKEN` and `X_CT0`.
 - `X_USER_AGENT`: browser user agent. If omitted, a conservative browser user agent is used.
 - `X_INTERNAL_HEADERS_FILE`: path to a local ignored JSON object of DevTools-captured headers.
+- `X_INTERNAL_TIMELINE_TEMPLATE_URL`: reusable captured `UserTweets` URL used for userId replacement.
+- `X_INTERNAL_USER_ID`: numeric X user id to inject into `X_INTERNAL_TIMELINE_TEMPLATE_URL`.
 - `X_INTERNAL_TIMELINE_VARIABLES`: GraphQL `variables` query value if it is not already present in the copied URL.
 - `X_INTERNAL_TIMELINE_FEATURES`: GraphQL `features` query value if it is not already present in the copied URL.
 
@@ -51,7 +53,20 @@ If endpoint/query params are unknown, capture:
 
 `runtime/secrets/x_headers.json` must never be committed. Keep cookies, tokens, auth headers, and raw debug payloads out of chats, issues, PRs, logs, and committed files.
 
-Known limitation: the current request URL is tied to the captured `userId`/timeline URL. EN-022 should solve parameterized timeline requests before broader account coverage.
+Known limitation: handle -> userId resolution is not implemented. EN-023 should solve that before broader account coverage.
+
+## Parameterized timeline URL
+
+To reuse a captured `UserTweets` URL for a different X user id, set `X_INTERNAL_TIMELINE_TEMPLATE_URL` to the full DevTools URL and set `X_INTERNAL_USER_ID` to the desired numeric X user id. The provider parses the template URL, replaces `variables.userId`, and re-encodes `variables`, `features`, and `fieldToggles` before sending the request.
+
+```powershell
+$env:X_INTERNAL_HEADERS_FILE="runtime/secrets/x_headers.json"
+$env:X_INTERNAL_TIMELINE_TEMPLATE_URL="https://x.com/i/api/graphql/<queryId>/UserTweets?variables=..."
+$env:X_INTERNAL_USER_ID="123456789"
+python scripts\x_internal_probe.py --handle wallstwolverine --lookback-hours 24 --print-json
+```
+
+Unknown query parameters from the captured URL are currently ignored during template rebuilding. Until EN-023, handle -> userId resolution is not implemented, so `X_INTERNAL_USER_ID` must be supplied manually.
 
 ## Known failure modes
 
