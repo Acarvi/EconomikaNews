@@ -38,7 +38,7 @@ Install Playwright browsers once in your local environment:
 python -m playwright install chromium
 ```
 
-Safe isolated Playwright Chromium profile:
+Diagnostic / fallback-only Playwright Chromium login helper:
 
 ```bash
 python -m app.discovery.x_browser_source --login
@@ -57,6 +57,8 @@ python -m app.discovery.x_browser_source --login --executable-path "C:\Path\To\c
 ```
 
 By default, this creates ignored local directories under `runtime/browser_profile` and `runtime/debug`. The browser profile may contain login state, so it must stay out of git.
+
+The Playwright login helper is useful for diagnostics and fallback validation, but it is not the primary strategy if it requires closing the user's normal browser first. The intended primary ingestion path will likely use an active-browser extension or local bridge so Comet can stay open.
 
 Using a real browser profile is allowed only for local manual POC. It must never be used in CI or committed. Do not run high-volume automation against a personal X account.
 

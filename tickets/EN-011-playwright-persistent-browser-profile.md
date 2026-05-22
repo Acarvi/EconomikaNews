@@ -34,3 +34,9 @@ Add the foundation for a headed Playwright Chromium session that uses a persiste
 python -m compileall app tests
 python -m pytest
 ```
+
+## Outcome / Current finding
+
+- Playwright isolated profiles can hit X login loops.
+- Reusing a real profile may require shutting down the browser because of profile locks.
+- Therefore this remains a fallback and diagnostic foundation, not the required daily workflow.
