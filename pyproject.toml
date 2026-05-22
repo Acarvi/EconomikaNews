@@ -12,7 +12,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["app", "app.ingestion"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
