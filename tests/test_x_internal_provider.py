@@ -19,6 +19,11 @@ from app.ingestion.x_internal_timeline import (
     extract_user_id_from_timeline_url,
     parse_timeline_url,
 )
+from app.ingestion.x_internal_user_lookup import (
+    build_user_lookup_url,
+    extract_user_id_from_user_lookup_json,
+    parse_user_lookup_url,
+)
 
 
 def _sample_timeline_url() -> str:
@@ -33,6 +38,19 @@ def _sample_timeline_url() -> str:
         }
     )
     return f"https://x.com/i/api/graphql/abc123/UserTweets?{query}"
+
+
+def _sample_user_lookup_url(variable_name: str = "screen_name") -> str:
+    query = urlencode(
+        {
+            "variables": json.dumps(
+                {variable_name: "wallstwolverine", "withGrokTranslatedBio": True}
+            ),
+            "features": json.dumps({"responsive_web_profile_redirect_enabled": False}),
+            "fieldToggles": json.dumps({"withPayments": False}),
+        }
+    )
+    return f"https://x.com/i/api/graphql/lookup123/UserByScreenName?{query}"
 
 
 def _decoded_query_json(url: str, name: str) -> dict:
@@ -85,6 +103,56 @@ def test_invalid_timeline_variables_json_raises_clear_error() -> None:
         assert "invalid variables JSON" in str(exc)
     else:
         raise AssertionError("expected invalid variables JSON error")
+
+
+def test_parse_user_lookup_url_decodes_screen_name_template() -> None:
+    template = parse_user_lookup_url(_sample_user_lookup_url())
+
+    assert template.base_url == "https://x.com/i/api/graphql/lookup123/UserByScreenName"
+    assert template.query_id == "lookup123"
+    assert template.operation_name == "UserByScreenName"
+    assert template.variables["screen_name"] == "wallstwolverine"
+    assert template.features == {"responsive_web_profile_redirect_enabled": False}
+    assert template.field_toggles == {"withPayments": False}
+
+
+def test_build_user_lookup_url_replaces_screen_name() -> None:
+    template = parse_user_lookup_url(_sample_user_lookup_url())
+
+    url = build_user_lookup_url(template, "@economika_dev")
+
+    assert _decoded_query_json(url, "variables")["screen_name"] == "economika_dev"
+    assert _decoded_query_json(url, "variables")["withGrokTranslatedBio"] is True
+
+
+def test_build_user_lookup_url_supports_screen_name_camel_case() -> None:
+    template = parse_user_lookup_url(_sample_user_lookup_url("screenName"))
+
+    url = build_user_lookup_url(template, "@economika_dev")
+
+    assert _decoded_query_json(url, "variables")["screenName"] == "economika_dev"
+    assert "screen_name" not in _decoded_query_json(url, "variables")
+
+
+def test_extract_user_id_from_user_lookup_json_rest_id() -> None:
+    payload = {"data": {"user": {"result": {"rest_id": "12345"}}}}
+
+    assert extract_user_id_from_user_lookup_json(payload) == "12345"
+
+
+def test_extract_user_id_from_user_lookup_json_legacy_fallbacks() -> None:
+    assert (
+        extract_user_id_from_user_lookup_json(
+            {"data": {"user": {"result": {"legacy": {"id_str": "23456"}}}}}
+        )
+        == "23456"
+    )
+    assert (
+        extract_user_id_from_user_lookup_json(
+            {"data": {"user": {"result": {"legacy": {"user_id_str": "34567"}}}}}
+        )
+        == "34567"
+    )
 
 
 def test_provider_imports_and_name() -> None:
@@ -179,6 +247,60 @@ def test_template_url_with_user_id_reaches_injected_opener() -> None:
     assert _decoded_query_json(captured["url"], "variables")["userId"] == "999"
 
 
+def test_user_id_env_mode_still_wins_over_lookup_template() -> None:
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request.full_url)
+        return b'{"data":[]}'
+
+    provider = XInternalApiProvider(
+        env={
+            "X_AUTH_TOKEN": "auth-secret",
+            "X_CT0": "ct0-secret",
+            "X_INTERNAL_TIMELINE_TEMPLATE_URL": _sample_timeline_url(),
+            "X_INTERNAL_USER_ID": "999",
+            "X_INTERNAL_USER_LOOKUP_TEMPLATE_URL": _sample_user_lookup_url(),
+        },
+        opener=opener,
+    )
+
+    provider.fetch_recent_posts(SourceAccount(handle="wallstwolverine"), 24)
+
+    assert len(calls) == 1
+    assert "UserTweets" in calls[0]
+    assert _decoded_query_json(calls[0], "variables")["userId"] == "999"
+
+
+def test_provider_resolves_user_id_then_fetches_timeline() -> None:
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request.full_url)
+        if "UserByScreenName" in request.full_url:
+            return b'{"data":{"user":{"result":{"rest_id":"777"}}}}'
+        return b'{"data":[]}'
+
+    provider = XInternalApiProvider(
+        env={
+            "X_AUTH_TOKEN": "auth-secret",
+            "X_CT0": "ct0-secret",
+            "X_INTERNAL_TIMELINE_TEMPLATE_URL": _sample_timeline_url(),
+            "X_INTERNAL_USER_LOOKUP_TEMPLATE_URL": _sample_user_lookup_url(),
+        },
+        opener=opener,
+    )
+
+    provider.fetch_recent_posts(SourceAccount(handle="@economika_dev"), 24)
+
+    assert len(calls) == 2
+    assert "UserByScreenName" in calls[0]
+    assert _decoded_query_json(calls[0], "variables")["screen_name"] == "economika_dev"
+    assert "UserTweets" in calls[1]
+    assert _decoded_query_json(calls[1], "variables")["userId"] == "777"
+    assert provider.last_resolved_user_id == "777"
+
+
 def test_template_url_missing_user_id_returns_config_error() -> None:
     provider = XInternalApiProvider(
         env={
@@ -192,8 +314,24 @@ def test_template_url_missing_user_id_returns_config_error() -> None:
 
     assert result.posts == []
     assert "missing_config" in result.errors[0]
-    assert "X_INTERNAL_USER_ID" in result.errors[0]
+    assert "X_INTERNAL_USER_ID or X_INTERNAL_USER_LOOKUP_TEMPLATE_URL" in result.errors[0]
     assert "X_INTERNAL_TIMELINE_URL" not in result.errors[0]
+
+
+def test_lookup_template_without_timeline_template_returns_config_error() -> None:
+    provider = XInternalApiProvider(
+        env={
+            "X_AUTH_TOKEN": "auth-secret",
+            "X_CT0": "ct0-secret",
+            "X_INTERNAL_USER_LOOKUP_TEMPLATE_URL": _sample_user_lookup_url(),
+        }
+    )
+
+    result = provider.fetch_recent_posts(SourceAccount(handle="wallstwolverine"), 24)
+
+    assert result.posts == []
+    assert "missing_config" in result.errors[0]
+    assert "X_INTERNAL_TIMELINE_TEMPLATE_URL" in result.errors[0]
 
 
 def test_invalid_template_url_returns_invalid_config_through_provider() -> None:

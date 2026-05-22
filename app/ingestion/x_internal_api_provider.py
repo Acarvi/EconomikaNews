@@ -28,6 +28,11 @@ from app.ingestion.x_internal_timeline import (
     build_timeline_url,
     parse_timeline_url,
 )
+from app.ingestion.x_internal_user_lookup import (
+    build_user_lookup_url,
+    extract_user_id_from_user_lookup_json,
+    parse_user_lookup_url,
+)
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -57,6 +62,7 @@ class XInternalConfig:
     timeline_url: str | None
     timeline_template_url: str | None
     user_id: str | None
+    user_lookup_template_url: str | None
     timeline_variables: str | None
     timeline_features: str | None
     headers_file: str | None
@@ -72,6 +78,7 @@ class XInternalApiProvider:
     ) -> None:
         self._env = env if env is not None else os.environ
         self._opener = opener or _default_opener
+        self.last_resolved_user_id: str | None = None
 
     def fetch_recent_posts(
         self,
@@ -89,9 +96,26 @@ class XInternalApiProvider:
             base_headers, header_errors = _load_headers_file(config.headers_file)
             if header_errors:
                 return _error_result(account, header_errors, self.provider_name, captured_at)
+        headers = _build_headers(config, base_headers)
+
+        timeline_user_id = config.user_id
+        if config.timeline_template_url and timeline_user_id is None:
+            timeline_user_id, lookup_errors = self._resolve_user_id_with_config(
+                config,
+                account.handle,
+                headers,
+            )
+            if lookup_errors:
+                return _error_result(
+                    account,
+                    lookup_errors,
+                    self.provider_name,
+                    captured_at,
+                )
+        self.last_resolved_user_id = timeline_user_id
 
         try:
-            url = _build_timeline_url(config, account, lookback_hours)
+            url = _build_timeline_url(config, account, lookback_hours, timeline_user_id)
         except ValueError as exc:
             return _error_result(
                 account,
@@ -99,7 +123,6 @@ class XInternalApiProvider:
                 self.provider_name,
                 captured_at,
             )
-        headers = _build_headers(config, base_headers)
 
         try:
             body = self._opener(Request(url, headers=headers, method="GET"), 30.0)
@@ -170,10 +193,76 @@ class XInternalApiProvider:
                 self._env.get("X_INTERNAL_TIMELINE_TEMPLATE_URL")
             ),
             user_id=_clean_env(self._env.get("X_INTERNAL_USER_ID")),
+            user_lookup_template_url=_clean_env(
+                self._env.get("X_INTERNAL_USER_LOOKUP_TEMPLATE_URL")
+            ),
             timeline_variables=_clean_env(self._env.get("X_INTERNAL_TIMELINE_VARIABLES")),
             timeline_features=_clean_env(self._env.get("X_INTERNAL_TIMELINE_FEATURES")),
             headers_file=_clean_env(self._env.get("X_INTERNAL_HEADERS_FILE")),
         )
+
+    def resolve_user_id(self, handle: str) -> tuple[str | None, list[str]]:
+        config = self._config_from_env()
+        base_headers = None
+        if config.headers_file:
+            base_headers, header_errors = _load_headers_file(config.headers_file)
+            if header_errors:
+                return None, header_errors
+        headers = _build_headers(config, base_headers)
+        return self._resolve_user_id_with_config(config, handle, headers)
+
+    def _resolve_user_id_with_config(
+        self,
+        config: XInternalConfig,
+        handle: str,
+        headers: Mapping[str, str],
+    ) -> tuple[str | None, list[str]]:
+        if not config.user_lookup_template_url:
+            return None, [
+                f"{XInternalErrorKind.MISSING_CONFIG}: missing env var(s): "
+                "X_INTERNAL_USER_ID or X_INTERNAL_USER_LOOKUP_TEMPLATE_URL"
+            ]
+
+        try:
+            template = parse_user_lookup_url(config.user_lookup_template_url)
+            url = build_user_lookup_url(template, handle)
+            body = self._opener(Request(url, headers=dict(headers), method="GET"), 30.0)
+        except ValueError as exc:
+            return None, [f"{XInternalErrorKind.INVALID_CONFIG}: {exc}"]
+        except HTTPError as exc:
+            response_body = _safe_decode(exc.read(4096))
+            kind = classify_http_error(exc.code, response_body)
+            return None, [
+                f"{kind}: X user lookup returned HTTP {exc.code}: "
+                f"{redact_secrets(response_body, self._env, headers)[:240]}"
+            ]
+        except URLError as exc:
+            return None, [
+                f"{XInternalErrorKind.NETWORK}: "
+                f"{redact_secrets(str(exc.reason), self._env, headers)}"
+            ]
+
+        text = _safe_decode(body)
+        if _looks_challenge_like(text):
+            return None, [
+                f"{XInternalErrorKind.CHALLENGE}: challenge-like response returned by X user lookup"
+            ]
+
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            return None, [
+                f"{XInternalErrorKind.INVALID_JSON}: user lookup response was not JSON: {exc}"
+            ]
+
+        user_id = extract_user_id_from_user_lookup_json(payload)
+        if user_id is None:
+            shape = summarize_json_shape(payload)
+            return None, [
+                f"{XInternalErrorKind.UNKNOWN_SCHEMA}: no user id found in user lookup; "
+                f"redacted shape={redact_secrets(json.dumps(shape, sort_keys=True), self._env, headers)}"
+            ]
+        return user_id, []
 
     @staticmethod
     def _missing_config_errors(config: XInternalConfig) -> list[str]:
@@ -181,20 +270,34 @@ class XInternalApiProvider:
         uses_template = bool(config.timeline_template_url)
         if config.headers_file:
             if uses_template:
-                if not config.user_id:
-                    missing.append("X_INTERNAL_USER_ID")
+                if not config.user_id and not config.user_lookup_template_url:
+                    missing.append("X_INTERNAL_USER_ID or X_INTERNAL_USER_LOOKUP_TEMPLATE_URL")
             elif not config.timeline_url:
                 missing.append("X_INTERNAL_TIMELINE_URL")
+            if (
+                not config.user_id
+                and config.user_lookup_template_url
+                and not config.timeline_template_url
+                and not config.timeline_url
+            ):
+                missing.append("X_INTERNAL_TIMELINE_TEMPLATE_URL")
         else:
             if not config.auth_token:
                 missing.append("X_AUTH_TOKEN")
             if not config.ct0:
                 missing.append("X_CT0")
             if uses_template:
-                if not config.user_id:
-                    missing.append("X_INTERNAL_USER_ID")
+                if not config.user_id and not config.user_lookup_template_url:
+                    missing.append("X_INTERNAL_USER_ID or X_INTERNAL_USER_LOOKUP_TEMPLATE_URL")
             elif not config.timeline_url:
                 missing.append("X_INTERNAL_TIMELINE_URL")
+            if (
+                not config.user_id
+                and config.user_lookup_template_url
+                and not config.timeline_template_url
+                and not config.timeline_url
+            ):
+                missing.append("X_INTERNAL_TIMELINE_TEMPLATE_URL")
         if not missing:
             return []
         return [
@@ -398,12 +501,13 @@ def _build_timeline_url(
     config: XInternalConfig,
     account: SourceAccount,
     lookback_hours: int,
+    user_id: str | None = None,
 ) -> str:
     _ = account, lookback_hours
     if config.timeline_template_url:
-        assert config.user_id is not None
+        assert user_id is not None
         template = parse_timeline_url(config.timeline_template_url)
-        return build_timeline_url(template, config.user_id)
+        return build_timeline_url(template, user_id)
 
     assert config.timeline_url is not None
     parts = urlsplit(config.timeline_url)
