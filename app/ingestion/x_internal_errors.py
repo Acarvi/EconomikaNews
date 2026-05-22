@@ -5,6 +5,7 @@ from enum import StrEnum
 
 class XInternalErrorKind(StrEnum):
     MISSING_CONFIG = "missing_config"
+    INVALID_CONFIG = "invalid_config"
     UNAUTHORIZED = "unauthorized"
     FORBIDDEN = "forbidden"
     RATE_LIMITED = "rate_limited"
