@@ -82,6 +82,20 @@ python scripts\x_internal_probe.py --handle wallstwolverine --lookback-hours 24 
 
 This still resolves one handle only. Multi-account scanning is EN-024.
 
+## Media extraction and download probe
+
+Timeline responses can include image/video media under tweet entities. The provider exposes image URLs and video MP4 URLs when present, and the probe can optionally include media details in JSON output.
+
+Required local env vars are `X_INTERNAL_HEADERS_FILE`, `X_INTERNAL_TIMELINE_TEMPLATE_URL`, and either `X_INTERNAL_USER_LOOKUP_TEMPLATE_URL` or `X_INTERNAL_USER_ID`.
+
+```powershell
+python scripts\x_internal_probe.py --handle wallstwolverine --resolve-user-id --print-json --show-media
+python scripts\x_download_media_probe.py --handle wallstwolverine --resolve-user-id --limit-posts 3 --dry-run
+python scripts\x_download_media_probe.py --handle wallstwolverine --resolve-user-id --limit-posts 3
+```
+
+Downloads are written under `runtime/downloads/x` by default. `runtime/` is ignored and downloads must never be committed.
+
 ## Known failure modes
 
 - `401`: missing, expired, or invalid credentials.
