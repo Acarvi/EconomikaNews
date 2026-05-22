@@ -52,6 +52,20 @@ If endpoint/query params are unknown, capture:
 - Changed JSON schema.
 - Cloud IP blocking.
 
+## Validated local result
+
+Full headers-file mode was validated locally with secrets kept in `runtime/secrets/x_headers.json`, which must remain ignored. The probe returned 21 posts for one account, including text, post ids, urls, media counts, and engagement metrics. No browser automation or Playwright was used.
+
+This validates feasibility, not production robustness.
+
+Remaining risks:
+
+- `queryId`/`docId` may change.
+- Cookies may expire.
+- Request is currently tied to captured `userId`/timeline URL.
+- Multi-account scanning is not implemented.
+- Cloud IP behavior is untested.
+
 ## Safety
 
 Use low volume, read-only probing only. Do not take actions from this provider. Do not bypass captchas, challenges, account locks, login verification, rate limits, or other protections. This spike is for one-account research, not 500-account scanning.
