@@ -58,6 +58,12 @@ Open `http://127.0.0.1:8088`.
 Candidate review status is stored in SQLite. The candidate JSON file remains
 read-only.
 
+Export approved candidates:
+
+```bash
+python scripts\export_approved_candidates.py --db-path runtime\economika_news.db
+```
+
 ## Commit Hygiene
 
 Do not commit `runtime/`, `.env`, browser profiles, tokens, cookies, outputs, or other local artifacts.
