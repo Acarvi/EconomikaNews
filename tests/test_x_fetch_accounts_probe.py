@@ -308,3 +308,21 @@ def test_fetch_accounts_output_json_behavior(
             except OSError:
                 pass
 
+
+def test_example_accounts_config_file_valid() -> None:
+    config_path = Path("config/accounts.example.yaml")
+    assert config_path.exists(), "config/accounts.example.yaml does not exist"
+
+    with config_path.open("r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    assert isinstance(data, dict), "Config data is not a dict"
+    assert "accounts" in data, "Config data does not have top-level 'accounts' key"
+    assert isinstance(data["accounts"], list), "'accounts' is not a list"
+    assert len(data["accounts"]) > 0, "'accounts' list is empty"
+
+    first_account = data["accounts"][0]
+    assert isinstance(first_account, dict), "First account entry is not a dict"
+    assert "handle" in first_account, "First account is missing 'handle'"
+    assert "category" in first_account, "First account is missing 'category'"
+    assert "weight" in first_account, "First account is missing 'weight'"
