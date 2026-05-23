@@ -23,6 +23,9 @@ jobs:
       - name: Compile
         run: python -m compileall app tests scripts
 
+      - name: Prepare runtime test directory
+        run: mkdir -p runtime
+
       - name: Tests with coverage gate
         run: python -m pytest --cov=app --cov=scripts --cov-report=term-missing --cov-fail-under=75 -p no:cacheprovider --basetemp=runtime/pytest-tmp
 

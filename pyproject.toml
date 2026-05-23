@@ -19,7 +19,7 @@ packages = ["app", "app.config", "app.dashboard", "app.ingestion", "app.storage"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-p no:cacheprovider --basetemp=runtime/pytest-tmp"
+addopts = "-p no:cacheprovider"
 
 [tool.coverage.run]
 source = ["app", "scripts"]
