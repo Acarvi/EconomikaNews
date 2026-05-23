@@ -39,6 +39,8 @@ python -m pytest
 python -m compileall app tests
 ```
 
+Engineering quality standards: [`docs/engineering_quality.md`](docs/engineering_quality.md).
+
 ## Local Candidate Dashboard
 
 Generate candidate JSON:
