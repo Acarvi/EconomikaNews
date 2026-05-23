@@ -39,6 +39,22 @@ python -m pytest
 python -m compileall app tests
 ```
 
+## Local Candidate Dashboard
+
+Generate candidate JSON:
+
+```bash
+python scripts\x_fetch_accounts_probe.py --config runtime\config\x_internal.local.yaml --resolve-user-id --include-media --output-json
+```
+
+Start the read-only dashboard:
+
+```bash
+python scripts\run_dashboard.py
+```
+
+Open `http://127.0.0.1:8088`.
+
 ## Commit Hygiene
 
 Do not commit `runtime/`, `.env`, browser profiles, tokens, cookies, outputs, or other local artifacts.
