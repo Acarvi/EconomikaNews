@@ -14,7 +14,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app", "app.config", "app.ingestion", "app.storage"]
+packages = ["app", "app.config", "app.dashboard", "app.ingestion", "app.storage"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
