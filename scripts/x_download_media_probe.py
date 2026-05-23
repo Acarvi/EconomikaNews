@@ -4,10 +4,12 @@ import argparse
 import json
 import mimetypes
 import os
+import sys
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from app.config.runtime_config import apply_runtime_config_to_env, load_runtime_config
 from app.ingestion.models import SourceAccount, SourceMedia, SourcePost
 from app.ingestion.x_internal_api_provider import XInternalApiProvider
 
@@ -28,7 +30,19 @@ def main() -> int:
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--resolve-user-id", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--config",
+        help="Path to the runtime configuration YAML file.",
+    )
     args = parser.parse_args()
+
+    if args.config:
+        try:
+            config = load_runtime_config(Path(args.config))
+            apply_runtime_config_to_env(config)
+        except Exception as exc:
+            print(f"Error loading runtime config: {exc}", file=sys.stderr)
+            return 1
 
     provider = XInternalApiProvider()
     result = provider.fetch_recent_posts(

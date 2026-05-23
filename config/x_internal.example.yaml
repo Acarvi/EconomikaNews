@@ -1,0 +1,10 @@
+x_internal:
+  headers_file: runtime/secrets/x_headers.json
+  timeline_template_url: "PASTE_USER_TWEETS_TEMPLATE_URL_HERE"
+  user_lookup_template_url: "PASTE_USER_BY_SCREEN_NAME_TEMPLATE_URL_HERE"
+  user_id: null
+
+paths:
+  accounts_file: runtime/config/accounts.local.yaml
+  db_path: runtime/economika_news.db
+  output_json: runtime/outputs/x_candidates.json
