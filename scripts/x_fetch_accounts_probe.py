@@ -9,9 +9,14 @@ from typing import Any
 
 import yaml
 
+from app.config.runtime_config import load_runtime_config, apply_runtime_config_to_env
 from app.ingestion.models import SourceAccount
 from app.ingestion.x_internal_api_provider import XInternalApiProvider
 from app.storage.sqlite_seen_posts import get_seen_post_ids, upsert_seen_posts
+
+DEFAULT_ACCOUNTS_FILE = "config/accounts.example.yaml"
+DEFAULT_DB_PATH = "runtime/economika_news.db"
+DEFAULT_OUTPUT_JSON_PATH = "runtime/outputs/x_candidates.json"
 
 
 def main() -> int:
@@ -19,8 +24,12 @@ def main() -> int:
         description="Probe multiple X accounts sequentially and produce a candidates list."
     )
     parser.add_argument(
+        "--config",
+        help="Path to the runtime configuration YAML file.",
+    )
+    parser.add_argument(
         "--accounts-file",
-        default="config/accounts.example.yaml",
+        default=None,
         help="Path to the YAML accounts configuration file.",
     )
     parser.add_argument(
@@ -48,16 +57,16 @@ def main() -> int:
     parser.add_argument(
         "--output-json",
         nargs="?",
-        const="runtime/outputs/x_candidates.json",
+        const=DEFAULT_OUTPUT_JSON_PATH,
         default=None,
         help=(
             "Optional path to write the JSON candidate list to. "
-            "If flag is passed without value, defaults to 'runtime/outputs/x_candidates.json'."
+            "If flag is passed without value, defaults to config path or 'runtime/outputs/x_candidates.json'."
         ),
     )
     parser.add_argument(
         "--db-path",
-        default=os.environ.get("ECONOMIKA_DB_PATH", "runtime/economika_news.db"),
+        default=None,
         help="Path to the SQLite database for seen-posts caching.",
     )
     parser.add_argument(
@@ -77,8 +86,49 @@ def main() -> int:
         print("Error: --only-new requires cache enabled", file=sys.stderr)
         return 1
 
+    # Load runtime config if provided
+    config = None
+    if args.config:
+        try:
+            config = load_runtime_config(Path(args.config))
+            apply_runtime_config_to_env(config)
+        except Exception as exc:
+            print(f"Error loading runtime config: {exc}", file=sys.stderr)
+            return 1
+
+    # Resolve accounts_file
+    accounts_file = None
+    if args.accounts_file is not None:
+        accounts_file = args.accounts_file
+    elif config and config.paths.accounts_file:
+        accounts_file = config.paths.accounts_file
+    else:
+        accounts_file = DEFAULT_ACCOUNTS_FILE
+
+    # Resolve db_path
+    db_path = None
+    if args.db_path is not None:
+        db_path = args.db_path
+    elif os.environ.get("ECONOMIKA_DB_PATH"):
+        db_path = os.environ.get("ECONOMIKA_DB_PATH")
+    elif config and config.paths.db_path:
+        db_path = config.paths.db_path
+    else:
+        db_path = DEFAULT_DB_PATH
+
+    # Resolve output_json
+    output_json = None
+    if args.output_json is not None:
+        if args.output_json == DEFAULT_OUTPUT_JSON_PATH:
+            if config and config.paths.output_json:
+                output_json = config.paths.output_json
+            else:
+                output_json = DEFAULT_OUTPUT_JSON_PATH
+        else:
+            output_json = args.output_json
+
     # 1. Load accounts config
-    config_path = Path(args.accounts_file)
+    config_path = Path(accounts_file)
     if not config_path.exists():
         print(f"Error: Accounts configuration file not found: {config_path}", file=sys.stderr)
         return 1
@@ -194,24 +244,24 @@ def main() -> int:
     # 5. Seen-post cache integration
     cache_enabled = not args.no_cache
     if cache_enabled:
-        db_path_str = args.db_path
-        db_path = Path(db_path_str)
-        
+        db_path_str = db_path
+        db_path_obj = Path(db_path_str)
+
         # Check seen status
         post_ids = [c["post_id"] for c in sorted_candidates]
-        seen_ids = get_seen_post_ids(db_path, post_ids)
-        
+        seen_ids = get_seen_post_ids(db_path_obj, post_ids)
+
         # Mark is_new
         for c in sorted_candidates:
             c["is_new"] = c["post_id"] not in seen_ids
-            
+
         # Compute counts BEFORE applying --only-new filtering
         new_candidates = sum(1 for c in sorted_candidates if c["is_new"])
         already_seen_candidates = sum(1 for c in sorted_candidates if not c["is_new"])
-        
+
         # Upsert ALL candidates
-        upsert_seen_posts(db_path, sorted_candidates)
-        
+        upsert_seen_posts(db_path_obj, sorted_candidates)
+
         # Filter if --only-new is active
         if args.only_new:
             sorted_candidates = [c for c in sorted_candidates if c["is_new"]]
@@ -239,8 +289,8 @@ def main() -> int:
     print(output_str)
 
     # 6. Save if output path requested
-    if args.output_json:
-        output_path = Path(args.output_json)
+    if output_json:
+        output_path = Path(output_json)
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(output_str, encoding="utf-8")

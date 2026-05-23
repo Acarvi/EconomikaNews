@@ -2,8 +2,10 @@ import importlib
 import json
 import re
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
+from unittest.mock import MagicMock, patch
 
 from app.ingestion import XInternalApiProvider as ExportedXInternalApiProvider
 from app.ingestion.models import IngestionResult, SourceAccount
@@ -746,6 +748,80 @@ def test_download_media_probe_script_module_importable() -> None:
     module = importlib.import_module("scripts.x_download_media_probe")
 
     assert module
+
+
+def test_x_internal_probe_parses_config_without_breaking(tmp_path: Path) -> None:
+    from scripts.x_internal_probe import main
+
+    config_path = tmp_path / "x_internal.local.yaml"
+    config_path.write_text(
+        "x_internal:\n"
+        "  headers_file: runtime/secrets/x_headers.json\n"
+        "  timeline_template_url: timeline-template\n"
+        "  user_lookup_template_url: lookup-template\n",
+        encoding="utf-8",
+    )
+
+    mock_provider = MagicMock()
+    mock_provider.last_resolved_user_id = "123"
+    mock_provider.fetch_recent_posts.return_value = IngestionResult(
+        account=SourceAccount(handle="economika_dev"),
+        posts=[],
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+
+    with patch("scripts.x_internal_probe.XInternalApiProvider", return_value=mock_provider):
+        with patch(
+            "sys.argv",
+            [
+                "script",
+                "--handle",
+                "economika_dev",
+                "--config",
+                str(config_path),
+                "--print-json",
+            ],
+        ):
+            assert main() == 0
+
+
+def test_download_media_probe_parses_config_without_breaking(tmp_path: Path) -> None:
+    from scripts.x_download_media_probe import main
+
+    config_path = tmp_path / "x_internal.local.yaml"
+    config_path.write_text(
+        "x_internal:\n"
+        "  headers_file: runtime/secrets/x_headers.json\n"
+        "  timeline_template_url: timeline-template\n"
+        "  user_lookup_template_url: lookup-template\n",
+        encoding="utf-8",
+    )
+
+    mock_provider = MagicMock()
+    mock_provider.last_resolved_user_id = "123"
+    mock_provider.fetch_recent_posts.return_value = IngestionResult(
+        account=SourceAccount(handle="economika_dev"),
+        posts=[],
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+
+    with patch("scripts.x_download_media_probe.XInternalApiProvider", return_value=mock_provider):
+        with patch(
+            "sys.argv",
+            [
+                "script",
+                "--handle",
+                "economika_dev",
+                "--config",
+                str(config_path),
+                "--dry-run",
+            ],
+        ):
+            assert main() == 0
 
 
 def test_create_x_headers_file_module_importable() -> None:

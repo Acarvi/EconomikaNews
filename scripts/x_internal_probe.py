@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from pathlib import Path
 
+from app.config.runtime_config import load_runtime_config, apply_runtime_config_to_env
 from app.ingestion.models import SourceAccount
 from app.ingestion.x_internal_api_provider import XInternalApiProvider
 
@@ -20,7 +23,19 @@ def main() -> int:
     )
     parser.add_argument("--show-media", action="store_true")
     parser.add_argument("--print-json", action="store_true")
+    parser.add_argument(
+        "--config",
+        help="Path to the runtime configuration YAML file.",
+    )
     args = parser.parse_args()
+
+    if args.config:
+        try:
+            config = load_runtime_config(Path(args.config))
+            apply_runtime_config_to_env(config)
+        except Exception as exc:
+            print(f"Error loading runtime config: {exc}", file=sys.stderr)
+            return 1
 
     provider = XInternalApiProvider()
     result = provider.fetch_recent_posts(

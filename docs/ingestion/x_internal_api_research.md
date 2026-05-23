@@ -56,6 +56,36 @@ If endpoint/query params are unknown, capture:
 
 Known limitation: handle -> userId resolution is not implemented. EN-023 should solve that before broader account coverage.
 
+## Runtime local config
+
+The runtime local config keeps repeated X internal ingestion paths and template URLs in one ignored local YAML file, so a fresh PowerShell session does not require re-entering the same large environment variables. The committed example at `config/x_internal.example.yaml` contains placeholders only; the generated local file belongs under ignored `runtime/config/`.
+
+Create the local config interactively:
+
+```powershell
+python scripts\create_x_runtime_config.py
+```
+
+Run the multi-account probe with local config defaults:
+
+```powershell
+python scripts\x_fetch_accounts_probe.py --config runtime\config\x_internal.local.yaml --resolve-user-id --include-media --output-json
+```
+
+The same `--config` option also works for:
+
+- `scripts\x_internal_probe.py`
+- `scripts\x_download_media_probe.py`
+
+Precedence is:
+
+- CLI explicit args
+- Environment variables
+- Runtime config
+- Defaults
+
+For X internal environment values specifically, existing environment variables override the runtime config because the loader only sets missing variables.
+
 ## Parameterized timeline URL
 
 To reuse a captured `UserTweets` URL for a different X user id, set `X_INTERNAL_TIMELINE_TEMPLATE_URL` to the full DevTools URL and set `X_INTERNAL_USER_ID` to the desired numeric X user id. The provider parses the template URL, replaces `variables.userId`, and re-encodes `variables`, `features`, and `fieldToggles` before sending the request.

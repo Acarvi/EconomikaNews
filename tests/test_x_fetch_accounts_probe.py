@@ -41,6 +41,30 @@ def temp_config_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def runtime_config_file(tmp_path: Path, temp_config_file: Path) -> Path:
+    path = tmp_path / "x_internal.local.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "x_internal": {
+                    "headers_file": "runtime/secrets/x_headers.json",
+                    "timeline_template_url": "timeline-template",
+                    "user_lookup_template_url": "lookup-template",
+                    "user_id": None,
+                },
+                "paths": {
+                    "accounts_file": str(temp_config_file),
+                    "db_path": str(tmp_path / "configured.db"),
+                    "output_json": str(tmp_path / "configured_candidates.json"),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
 def mock_posts() -> dict[str, list[SourcePost]]:
     captured_at = datetime.now(UTC)
     media_item = SourceMedia(
@@ -151,7 +175,7 @@ def test_fetch_accounts_scoring_dedupe_and_sorting(
 
     mock_provider.fetch_recent_posts.side_effect = fetch_side_effect
 
-    argv = ["script", "--accounts-file", str(temp_config_file)]
+    argv = ["script", "--accounts-file", str(temp_config_file), "--no-cache"]
     with patch("sys.argv", argv):
         status = main()
 
@@ -211,7 +235,7 @@ def test_fetch_accounts_include_media(
         captured_at=datetime.now(UTC),
     )
 
-    argv = ["script", "--accounts-file", str(temp_config_file), "--include-media"]
+    argv = ["script", "--accounts-file", str(temp_config_file), "--include-media", "--no-cache"]
     with patch("sys.argv", argv):
         assert main() == 0
 
@@ -246,7 +270,7 @@ def test_fetch_accounts_output_json_behavior(
     )
 
     # Case 1: omitted flag => no file written
-    argv_omitted = ["script", "--accounts-file", str(temp_config_file)]
+    argv_omitted = ["script", "--accounts-file", str(temp_config_file), "--no-cache"]
     with patch("sys.argv", argv_omitted):
         assert main() == 0
 
@@ -262,6 +286,7 @@ def test_fetch_accounts_output_json_behavior(
         str(temp_config_file),
         "--output-json",
         str(custom_temp_path),
+        "--no-cache",
     ]
 
     with patch("sys.argv", argv_custom):
@@ -272,41 +297,131 @@ def test_fetch_accounts_output_json_behavior(
     assert file_content["provider_name"] == "x_internal_api"
     assert len(file_content["candidates"]) == 3
 
-    # Case 3: flag without value => const default path (runtime/outputs/x_candidates.json)
-    default_out_path = Path("runtime/outputs/x_candidates.json")
-    existed = default_out_path.exists()
-    backup_data = None
-    if existed:
-        backup_data = default_out_path.read_text(encoding="utf-8")
-        default_out_path.unlink()
-
-    try:
+    # Case 3: flag without value => module default path. Patch it to tmp_path so
+    # the test never writes real runtime output.
+    default_out_path = tmp_path / "default_candidates.json"
+    with patch("scripts.x_fetch_accounts_probe.DEFAULT_OUTPUT_JSON_PATH", str(default_out_path)):
         argv_no_val = [
             "script",
             "--accounts-file",
             str(temp_config_file),
             "--output-json",
+            "--no-cache",
         ]
         with patch("sys.argv", argv_no_val):
             assert main() == 0
 
-        assert default_out_path.exists()
-        file_content = json.loads(default_out_path.read_text(encoding="utf-8"))
-        assert file_content["provider_name"] == "x_internal_api"
-        assert len(file_content["candidates"]) == 3
-    finally:
-        # Clean up
-        if default_out_path.exists():
-            try:
-                default_out_path.unlink()
-            except OSError:
-                pass
-        if existed and backup_data is not None:
-            try:
-                default_out_path.parent.mkdir(parents=True, exist_ok=True)
-                default_out_path.write_text(backup_data, encoding="utf-8")
-            except OSError:
-                pass
+    assert default_out_path.exists()
+    file_content = json.loads(default_out_path.read_text(encoding="utf-8"))
+    assert file_content["provider_name"] == "x_internal_api"
+    assert len(file_content["candidates"]) == 3
+
+
+@patch("scripts.x_fetch_accounts_probe.XInternalApiProvider")
+def test_fetch_accounts_uses_config_paths(
+    mock_provider_cls: MagicMock,
+    runtime_config_file: Path,
+    mock_posts: dict[str, list[SourcePost]],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    mock_provider = MagicMock()
+    mock_provider_cls.return_value = mock_provider
+    mock_provider.provider_name = "x_internal_api"
+    mock_provider.fetch_recent_posts.side_effect = lambda account, lookback_hours: IngestionResult(
+        account=account,
+        posts=mock_posts.get(account.handle, []),
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+
+    with patch("sys.argv", ["script", "--config", str(runtime_config_file)]):
+        assert main() == 0
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["account_count"] == 2
+    assert payload["db_path"] == str(tmp_path / "configured.db")
+
+
+@patch("scripts.x_fetch_accounts_probe.XInternalApiProvider")
+def test_fetch_accounts_env_db_path_wins_over_config(
+    mock_provider_cls: MagicMock,
+    runtime_config_file: Path,
+    mock_posts: dict[str, list[SourcePost]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    mock_provider = MagicMock()
+    mock_provider_cls.return_value = mock_provider
+    mock_provider.provider_name = "x_internal_api"
+    mock_provider.fetch_recent_posts.side_effect = lambda account, lookback_hours: IngestionResult(
+        account=account,
+        posts=mock_posts.get(account.handle, []),
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+    env_db_path = tmp_path / "env.db"
+    monkeypatch.setenv("ECONOMIKA_DB_PATH", str(env_db_path))
+
+    with patch("sys.argv", ["script", "--config", str(runtime_config_file)]):
+        assert main() == 0
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["db_path"] == str(env_db_path)
+
+
+@patch("scripts.x_fetch_accounts_probe.XInternalApiProvider")
+def test_fetch_accounts_uses_config_output_json_when_flag_has_no_value(
+    mock_provider_cls: MagicMock,
+    runtime_config_file: Path,
+    mock_posts: dict[str, list[SourcePost]],
+) -> None:
+    mock_provider = MagicMock()
+    mock_provider_cls.return_value = mock_provider
+    mock_provider.provider_name = "x_internal_api"
+    mock_provider.fetch_recent_posts.side_effect = lambda account, lookback_hours: IngestionResult(
+        account=account,
+        posts=mock_posts.get(account.handle, []),
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+
+    with patch("sys.argv", ["script", "--config", str(runtime_config_file), "--output-json"]):
+        assert main() == 0
+
+    config_data = yaml.safe_load(runtime_config_file.read_text(encoding="utf-8"))
+    output_path = Path(config_data["paths"]["output_json"])
+    assert output_path.exists()
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["provider_name"] == "x_internal_api"
+
+
+@patch("scripts.x_fetch_accounts_probe.XInternalApiProvider")
+def test_fetch_accounts_still_works_without_config(
+    mock_provider_cls: MagicMock,
+    temp_config_file: Path,
+    mock_posts: dict[str, list[SourcePost]],
+) -> None:
+    mock_provider = MagicMock()
+    mock_provider_cls.return_value = mock_provider
+    mock_provider.provider_name = "x_internal_api"
+    mock_provider.fetch_recent_posts.side_effect = lambda account, lookback_hours: IngestionResult(
+        account=account,
+        posts=mock_posts.get(account.handle, []),
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+
+    argv = ["script", "--accounts-file", str(temp_config_file), "--no-cache"]
+    with patch("sys.argv", argv):
+        assert main() == 0
 
 
 def test_example_accounts_config_file_valid() -> None:
