@@ -136,7 +136,51 @@ Arguments:
 - `--include-media`: output media URLs/previews
 - `--output-json`: path to write JSON candidates list (defaults to `runtime/outputs/x_candidates.json` if flag is passed without argument)
 
-*Note: This is still sequential and not scheduled. EN-026 should add storage or queue.*
+*Note: This is sequential and not scheduled, but uses a local seen-posts database cache to keep track of processed posts.*
+
+## Seen-post cache
+
+To avoid reprocessing the same posts during repeated fetches, a minimal local SQLite seen-post cache is supported.
+
+### Storage and schema
+
+The default database is saved to `runtime/economika_news.db` but can be overridden by setting the `ECONOMIKA_DB_PATH` environment variable or using the `--db-path` CLI option.
+
+The database table `source_posts_seen` records:
+- `post_id` (TEXT PRIMARY KEY)
+- `source` (TEXT)
+- `account_handle` (TEXT)
+- `url` (TEXT)
+- `text_prefix` (TEXT)
+- `score` (REAL)
+- `media_count` (INTEGER)
+- `first_seen_at` (TEXT ISO-8601 UTC)
+- `last_seen_at` (TEXT ISO-8601 UTC)
+
+### Behavior and cache flags
+
+- **First Ingestion Run**: Checks the database, identifies all candidates as new, marks each with `"is_new": true`, and inserts them into the seen-post cache.
+- **Subsequent Ingestion Runs**: Finds pre-existing posts in the database, marks them `"is_new": false`, and updates their scores, media count, last seen timestamps, and other metadata while preserving their original `first_seen_at` timestamps.
+- `--only-new`: Filters the printed/saved candidates list to only output newly-discovered posts (where `"is_new": true`). The cache still records all fetched candidates to persist them, but only new posts are outputted.
+- `--no-cache`: Bypasses database initialization and updates completely. In this mode:
+  - Candidates do not receive the `"is_new"` field (it is omitted).
+  - Cache metrics in the top-level JSON output are set to `null`.
+  - Passing `--no-cache --only-new` is invalid and returns exit code 1.
+
+### Execution examples
+
+```powershell
+# Setup environment (headers and templates)
+$env:X_INTERNAL_HEADERS_FILE="runtime/secrets/x_headers.json"
+$env:X_INTERNAL_TIMELINE_TEMPLATE_URL="https://x.com/i/api/graphql/.../UserTweets?..."
+$env:X_INTERNAL_USER_LOOKUP_TEMPLATE_URL="https://x.com/i/api/graphql/.../UserByScreenName?..."
+
+# First run: Ingest, populate cache, all candidates marked new
+python scripts\x_fetch_accounts_probe.py --accounts-file runtime\config\accounts.local.yaml --resolve-user-id --include-media --output-json --db-path runtime/economika_news.db
+
+# Second run: Only output newly posted candidates, filtering out already-seen ones
+python scripts\x_fetch_accounts_probe.py --accounts-file runtime\config\accounts.local.yaml --resolve-user-id --only-new
+```
 
 ## Known failure modes
 

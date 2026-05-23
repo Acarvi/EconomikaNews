@@ -326,3 +326,133 @@ def test_example_accounts_config_file_valid() -> None:
     assert "handle" in first_account, "First account is missing 'handle'"
     assert "category" in first_account, "First account is missing 'category'"
     assert "weight" in first_account, "First account is missing 'weight'"
+
+
+@patch("scripts.x_fetch_accounts_probe.XInternalApiProvider")
+def test_fetch_accounts_seen_posts_cache_behavior(
+    mock_provider_cls: MagicMock,
+    temp_config_file: Path,
+    mock_posts: dict[str, list[SourcePost]],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Setup mock provider
+    mock_provider = MagicMock()
+    mock_provider_cls.return_value = mock_provider
+    mock_provider.provider_name = "x_internal_api"
+    mock_provider.fetch_recent_posts.side_effect = lambda account, lookback_hours: IngestionResult(
+        account=account,
+        posts=mock_posts.get(account.handle, []),
+        errors=[],
+        provider_name="x_internal_api",
+        captured_at=datetime.now(UTC),
+    )
+
+    db_file = tmp_path / "economika_news.db"
+    assert not db_file.exists()
+
+    # 1. First run: cache active, db_file gets created and populated. All candidates are new.
+    argv1 = [
+        "script",
+        "--accounts-file",
+        str(temp_config_file),
+        "--db-path",
+        str(db_file),
+    ]
+    with patch("sys.argv", argv1):
+        assert main() == 0
+
+    assert db_file.exists()
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    
+    assert payload["cache_enabled"] is True
+    assert payload["db_path"] == str(db_file)
+    assert payload["new_candidates"] == 3
+    assert payload["already_seen_candidates"] == 0
+
+    for c in payload["candidates"]:
+        assert c["is_new"] is True
+
+    # 2. Second run: same candidates. All should be recognized as already seen (is_new = False).
+    argv2 = [
+        "script",
+        "--accounts-file",
+        str(temp_config_file),
+        "--db-path",
+        str(db_file),
+    ]
+    with patch("sys.argv", argv2):
+        assert main() == 0
+
+    captured = capsys.readouterr()
+    payload2 = json.loads(captured.out)
+
+    assert payload2["cache_enabled"] is True
+    assert payload2["new_candidates"] == 0
+    assert payload2["already_seen_candidates"] == 3
+
+    for c in payload2["candidates"]:
+        assert c["is_new"] is False
+
+    # 3. Third run: with --only-new, candidates list is filtered to empty since all are seen.
+    argv3 = [
+        "script",
+        "--accounts-file",
+        str(temp_config_file),
+        "--db-path",
+        str(db_file),
+        "--only-new",
+    ]
+    with patch("sys.argv", argv3):
+        assert main() == 0
+
+    captured = capsys.readouterr()
+    payload3 = json.loads(captured.out)
+
+    assert payload3["cache_enabled"] is True
+    assert payload3["new_candidates"] == 0
+    assert payload3["already_seen_candidates"] == 3
+    assert len(payload3["candidates"]) == 0
+    assert payload3["unique_posts"] == 0
+
+    # 4. Fourth run: with --no-cache, does not touch DB, is_new is omitted, cache fields are null.
+    db_file_no_cache = tmp_path / "economika_news_no_cache.db"
+    assert not db_file_no_cache.exists()
+    argv4 = [
+        "script",
+        "--accounts-file",
+        str(temp_config_file),
+        "--db-path",
+        str(db_file_no_cache),
+        "--no-cache",
+    ]
+    with patch("sys.argv", argv4):
+        assert main() == 0
+
+    assert not db_file_no_cache.exists()
+
+    captured = capsys.readouterr()
+    payload4 = json.loads(captured.out)
+
+    assert payload4["cache_enabled"] is False
+    assert payload4["db_path"] is None
+    assert payload4["new_candidates"] is None
+    assert payload4["already_seen_candidates"] is None
+    for c in payload4["candidates"]:
+        assert "is_new" not in c
+
+    # 5. Invalid flags combination: --no-cache and --only-new together exits with 1.
+    argv5 = [
+        "script",
+        "--accounts-file",
+        str(temp_config_file),
+        "--no-cache",
+        "--only-new",
+    ]
+    with patch("sys.argv", argv5):
+        assert main() == 1
+
+    captured = capsys.readouterr()
+    assert "--only-new requires cache enabled" in captured.err
