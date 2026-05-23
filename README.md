@@ -47,13 +47,16 @@ Generate candidate JSON:
 python scripts\x_fetch_accounts_probe.py --config runtime\config\x_internal.local.yaml --resolve-user-id --include-media --output-json
 ```
 
-Start the read-only dashboard:
+Start the local dashboard:
 
 ```bash
-python scripts\run_dashboard.py
+python scripts\run_dashboard.py --db-path runtime\economika_news.db
 ```
 
 Open `http://127.0.0.1:8088`.
+
+Candidate review status is stored in SQLite. The candidate JSON file remains
+read-only.
 
 ## Commit Hygiene
 

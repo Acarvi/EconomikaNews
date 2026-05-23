@@ -1,8 +1,9 @@
 # Local Candidate Dashboard
 
-The local dashboard is a read-only HTML view over the candidate JSON written by
-the X accounts probe. It does not read runtime secrets, headers, config files, or
-database tables.
+The local dashboard is a simple local HTML view over the candidate JSON written by
+the X accounts probe. The candidate source JSON stays read-only. Human review state
+is stored separately in SQLite, so approving or rejecting a candidate does not
+modify `runtime/outputs/x_candidates.json`.
 
 ## Usage
 
@@ -15,7 +16,7 @@ database tables.
 2. Start the dashboard:
 
    ```bash
-   python scripts\run_dashboard.py
+   python scripts\run_dashboard.py --db-path runtime\economika_news.db
    ```
 
 3. Open:
@@ -31,5 +32,16 @@ different file:
 python scripts\run_dashboard.py --candidates-file path\to\x_candidates.json
 ```
 
-Available filters are `account`, `only_media=true`, `only_new=true`, and
-`min_score`.
+The review database defaults to `runtime/economika_news.db`.
+
+Available filters are `account`, `status=all|pending|approved|rejected`,
+`only_media=true`, `only_new=true`, and `min_score`.
+
+Each candidate row includes local review controls:
+
+- `Approve`
+- `Reject`
+- `Reset`
+
+Review actions write only to SQLite and use a `303` redirect back to the current
+dashboard view.
