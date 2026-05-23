@@ -1,2 +1,2 @@
-"""Local read-only dashboard for generated candidate posts."""
+"""Local dashboard for generated candidate posts and review state."""
 
