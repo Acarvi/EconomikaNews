@@ -45,3 +45,21 @@ Each candidate row includes local review controls:
 
 Review actions write only to SQLite and use a `303` redirect back to the current
 dashboard view.
+
+## Export Approved Candidates
+
+After reviewing in the dashboard, export only approved candidates:
+
+```bash
+python scripts\export_approved_candidates.py --db-path runtime\economika_news.db
+```
+
+This writes:
+
+```text
+runtime/outputs/approved_candidates.json
+```
+
+Only candidates with stored review status `approved` are exported. Pending
+(including implicit pending with no row) and rejected candidates are ignored.
+The source candidates JSON remains read-only.
