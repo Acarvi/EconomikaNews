@@ -96,6 +96,48 @@ python scripts\x_download_media_probe.py --handle wallstwolverine --resolve-user
 
 Downloads are written under `runtime/downloads/x` by default. `runtime/` is ignored and downloads must never be committed.
 
+## Multi-account fetch probe
+
+For practical scanning of multiple accounts, a config-driven probe fetches a set of configured handles sequentially, deduplicates posts, and ranks candidates by engagement.
+
+### Config format
+
+Configure accounts in a YAML file (e.g. `config/accounts.example.yaml`):
+
+```yaml
+accounts:
+  - handle: wallstwolverine
+    category: politics
+    weight: 1.0
+  - handle: example_account
+    category: economics
+    weight: 1.2
+```
+
+### Ingestion execution
+
+Run the multi-account fetch probe with:
+
+```powershell
+# Setup headers and templates as environment variables
+$env:X_INTERNAL_HEADERS_FILE="runtime/secrets/x_headers.json"
+$env:X_INTERNAL_TIMELINE_TEMPLATE_URL="https://x.com/i/api/graphql/.../UserTweets?..."
+$env:X_INTERNAL_USER_LOOKUP_TEMPLATE_URL="https://x.com/i/api/graphql/.../UserByScreenName?..."
+
+# Run the sequential scan
+python scripts\x_fetch_accounts_probe.py --accounts-file config/accounts.example.yaml --resolve-user-id --include-media --output-json
+```
+
+Arguments:
+- `--accounts-file`: path to the configuration file (default: `config/accounts.example.yaml`)
+- `--lookback-hours`: lookback window in hours (default: `24`)
+- `--limit-per-account`: limit of posts to retrieve per account (default: `20`)
+- `--resolve-user-id`: enable dynamic username to userId lookup
+- `--include-media`: output media URLs/previews
+- `--output-json`: path to write JSON candidates list (defaults to `runtime/outputs/x_candidates.json` if flag is passed without argument)
+
+*Note: This is still sequential and not scheduled. EN-026 should add storage or queue.*
+
 ## Known failure modes
 
 - `401`: missing, expired, or invalid credentials.
