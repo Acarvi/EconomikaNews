@@ -21,7 +21,22 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Compile
-        run: python -m compileall app tests
+        run: python -m compileall app tests scripts
 
-      - name: Test
-        run: python -m pytest
+      - name: Prepare runtime test directory
+        run: mkdir -p runtime
+
+      - name: Tests with coverage gate
+        run: python -m pytest --cov=app --cov=scripts --cov-report=term-missing --cov-fail-under=75 -p no:cacheprovider --basetemp=runtime/pytest-tmp
+
+      - name: Tracked secret/runtime artifact scan
+        run: |
+          tracked="$(git ls-files -- runtime x_headers.json .env .env.* *.db runtime/outputs/)"
+          if [ -n "$tracked" ]; then
+            echo "Tracked runtime/secrets artifacts detected:"
+            echo "$tracked"
+            exit 1
+          fi
+
+      - name: Tests (quick path)
+        run: python -m pytest -q tests
