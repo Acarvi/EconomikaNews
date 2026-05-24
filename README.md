@@ -36,7 +36,7 @@ Publishing belongs to CentralPublishingHub, not Economica News. This repository 
 
 ```bash
 python -m pytest
-python -m compileall app tests
+python -m compileall app tests scripts
 ```
 
 Engineering quality standards: [`docs/engineering_quality.md`](docs/engineering_quality.md).
@@ -65,6 +65,14 @@ Export approved candidates:
 ```bash
 python scripts\export_approved_candidates.py --db-path runtime\economika_news.db
 ```
+
+Build approved media bundles:
+
+```bash
+python scripts\build_approved_media_bundle.py
+```
+
+For more details on bundling, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md).
 
 ## Commit Hygiene
 
