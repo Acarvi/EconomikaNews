@@ -28,6 +28,14 @@ python scripts\build_approved_media_bundle.py
 
 The script reads `runtime/outputs/approved_candidates.json` by default and writes bundles under `runtime/approved/<post_id>/`.
 
+Build the approved bundle index:
+
+```powershell
+python scripts\build_approved_bundle_index.py
+```
+
+The index script scans `runtime/approved/<post_id>/metadata.json` bundle folders and writes `runtime/approved/index.json` for later render or publishing stages to consume without re-scanning bundle directories ad hoc.
+
 ## CLI Options
 
 - `--approved-file`: approved candidates JSON path. Default: `runtime/outputs/approved_candidates.json`.
@@ -153,6 +161,45 @@ The script prints JSON to stdout:
 
 Missing files and invalid top-level JSON return exit code `1` with a clear stderr message. Failed individual media downloads are recorded in metadata and summary errors, but a valid approved file still exits `0`.
 
+## Approved Bundle Index
+
+`scripts/build_approved_bundle_index.py` creates a stable JSON index from approved media bundle metadata:
+
+```text
+runtime/approved/<post_id>/metadata.json
+  -> scripts/build_approved_bundle_index.py
+  -> runtime/approved/index.json
+```
+
+Default command:
+
+```powershell
+python scripts\build_approved_bundle_index.py
+```
+
+CLI options:
+
+- `--bundles-dir`: approved bundle directory. Default: `runtime/approved`.
+- `--output-json`: index output path. Default: `runtime/approved/index.json`.
+- `--include-invalid`: include invalid bundle details in `invalid_bundles`.
+- `--pretty`: accepted for compatibility; output is formatted with two-space indentation.
+
+The script scans only direct child directories under `runtime/approved`. Files directly inside that directory, including `index.json`, are ignored as bundle candidates.
+
+Each valid bundle entry includes `post_id`, `account_handle`, `url`, `text_prefix`, `score`, `metrics`, review fields, metadata paths, normalized `media_files`, `bundle_errors`, and `ready_for_render`.
+
+`ready_for_render` is `true` when metadata is structurally valid, `review_status` is `approved`, `post_id` is present, and `bundle_errors` is empty. Metadata with `review_status` other than `approved` is treated as invalid and excluded from `bundles`. Metadata with download or bundle errors stays in `bundles` but has `ready_for_render: false`.
+
+`invalid_bundles` reports bundle folders with missing metadata, invalid JSON, missing `post_id`, non-approved `review_status`, or invalid `local_media` / `bundle_errors` shapes. By default the index records `invalid_bundle_count` but leaves `invalid_bundles` empty; pass `--include-invalid` to include those details in `runtime/approved/index.json`. The CLI summary always prints error messages to stdout.
+
+Valid bundles are sorted deterministically by score descending, `reviewed_at` descending, and `post_id` ascending. The index write is atomic:
+
+```text
+index.json.tmp -> index.json
+```
+
+If `runtime/approved` does not exist, the script creates an empty index with `bundle_count: 0` and exits `0`.
+
 ## Validation
 
 Use a temp directory outside the repository on Windows:
@@ -161,7 +208,7 @@ Use a temp directory outside the repository on Windows:
 python -m compileall app tests scripts
 python -m pytest --cov=app --cov=scripts --cov-report=term-missing --cov-fail-under=75 -p no:cacheprovider --basetemp="$env:TEMP\economika-pytest-tmp"
 python -m pytest -p no:cacheprovider --basetemp="$env:TEMP\economika-pytest-tmp"
-git ls-files -- runtime x_headers.json .env .env.* *.db runtime/outputs/
+git ls-files -- runtime x_headers.json .env .env.* *.db runtime/outputs/ runtime/approved/
 ```
 
-The repository must not commit runtime media, runtime outputs, local databases, or secret files.
+The repository must not commit runtime media, runtime outputs, generated indexes, local databases, or secret files.

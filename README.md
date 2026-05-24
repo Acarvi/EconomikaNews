@@ -72,7 +72,13 @@ Build approved media bundles:
 python scripts\build_approved_media_bundle.py
 ```
 
-For more details on bundling, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md).
+Build the approved bundle index:
+
+```bash
+python scripts\build_approved_bundle_index.py
+```
+
+For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md).
 
 ## Commit Hygiene
 
