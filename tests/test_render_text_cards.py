@@ -8,6 +8,8 @@ from unittest.mock import patch
 from PIL import Image
 
 from scripts.render_text_cards import (
+    build_signal_rows,
+    build_surface_reasons,
     extract_domain_or_handle,
     format_compact_number,
     infer_badge,
@@ -36,6 +38,7 @@ def _render_input(**overrides) -> dict:
             "metrics": {"views": 1000, "likes": 10, "reposts": 2, "replies": 1},
         },
         "media": {"has_media": False, "files": []},
+        "review": {"status": "approved", "reviewed_at": "2026-06-18T00:00:00Z", "review_note": ""},
         "render": {"ready": True},
     }
     payload.update(overrides)
@@ -226,6 +229,56 @@ def test_footer_domain_helper_prefers_x_handle():
 def test_footer_domain_helper_handles_missing_url():
     assert extract_domain_or_handle("", "economika") == "@economika"
     assert extract_domain_or_handle("", None) == "local"
+
+
+def test_surface_reasons_high_view_post():
+    payload = _render_input(engagement={"score": 1, "metrics": {"views": 1_000_000}})
+
+    assert "High-view post" in build_surface_reasons(payload)
+
+
+def test_surface_reasons_high_repost_velocity():
+    payload = _render_input(engagement={"score": 1, "metrics": {"reposts": 500}})
+
+    assert "High repost velocity" in build_surface_reasons(payload)
+
+
+def test_surface_reasons_high_discussion():
+    payload = _render_input(engagement={"score": 1, "metrics": {"replies": 500}})
+
+    assert "High discussion" in build_surface_reasons(payload)
+
+
+def test_surface_reasons_strong_engagement():
+    payload = _render_input(engagement={"score": 1, "metrics": {"likes": 5000}})
+
+    assert "Strong engagement" in build_surface_reasons(payload)
+
+
+def test_surface_reasons_fallback_editorial_candidate():
+    payload = _render_input(engagement={"score": 1, "metrics": {"views": 999, "likes": 10}})
+
+    assert build_surface_reasons(payload) == ["Approved editorial candidate"]
+
+
+def test_signal_rows_include_available_context():
+    payload = _render_input(
+        source="x",
+        account_handle="economika",
+        engagement={"score": 77.5, "metrics": {"views": 1000}},
+        media={"has_media": True, "files": [{"filename": "media_1.jpg"}]},
+        review={"status": "approved"},
+    )
+
+    rows = build_signal_rows(payload)
+
+    assert ("Account", "@economika") in rows
+    assert ("Source", "X") in rows
+    assert ("Score", "77.5") in rows
+    assert ("Metrics", "1.0K views") in rows
+    assert ("Media", "Attached (1)") in rows
+    assert ("Editorial status", "APPROVED") in rows
+    assert ("Post ID", "post-1") in rows
 
 
 def test_summary_json_printed_by_cli(tmp_path: Path, capsys):
