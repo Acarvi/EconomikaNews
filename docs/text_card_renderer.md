@@ -1,6 +1,6 @@
 # Text Card Renderer
 
-The text-card renderer is the first local rendering step. It reads render input JSON files and creates one static PNG news card for each ready post.
+The text-card renderer is the first local rendering step. It reads render input JSON files and creates one static PNG vertical news card for each ready post.
 
 ```text
 runtime/render_inputs/<post_id>.json
@@ -43,15 +43,19 @@ Missing input directories exit successfully with a zero summary. Invalid individ
 
 ## Scope
 
-This step produces static PNG cards only. It uses deterministic local layout, local render input JSON, and Pillow. It does not make network calls.
+This step produces static PNG cards only. It uses deterministic local layout, local render input JSON, and Pillow. It does not make network calls or change the render input contract.
 
-The card includes:
+The visual v2 layout uses a dark premium news-card style for the default `1080x1920` output. The card includes:
 
-- Source or account label.
-- Headline.
-- Body text when it differs from the headline.
-- Engagement metrics when available.
-- URL or post ID footer.
+- Clear `ECONOMIKA` branding at the top.
+- Source or account label as secondary context.
+- A deterministic badge: `BREAKING` when the headline/body contains that word, `X SIGNAL` for X-sourced posts, otherwise `NEWS`.
+- A dominant wrapped headline with safe truncation for long text.
+- Smaller body excerpt text when the body differs from the headline.
+- Engagement metrics rendered as separate chips for views, likes, reposts, and replies.
+- Compact metric formatting such as `999`, `1.0K`, `8.5K`, and `2.5M`.
+- A small score chip when `engagement.score` is present.
+- A clean footer containing `post_id` plus the source domain or account handle, avoiding long raw URLs.
 - A simple `Media attached: N` label when media is present.
 
 ## Out Of Scope
@@ -64,8 +68,9 @@ The card includes:
 - Scheduling.
 - Dashboard changes.
 - Media compositing.
+- Media downloading.
 - Custom committed fonts.
 
 ## Limitations
 
-The layout is intentionally basic. It does not composite attached images or videos yet, and it uses Pillow's available font fallback rather than committed font files. Generated files under `runtime/renders/` are runtime artifacts and must not be committed.
+The layout is still a local static PNG renderer. It does not composite attached images or videos, generate AI imagery, rewrite text, publish posts, or invoke video tooling such as ffmpeg/moviepy. It uses Pillow's available default/system font fallback rather than committed font files. Generated files under `runtime/renders/` are runtime artifacts and must not be committed.

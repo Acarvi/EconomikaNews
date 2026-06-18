@@ -6,18 +6,28 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from PIL import Image, ImageDraw, ImageFont
 
 
 BACKGROUND_COLORS = {
-    "dark": "#111827",
+    "dark": "#07111F",
 }
 TEXT_COLOR = "#F9FAFB"
-MUTED_TEXT_COLOR = "#CBD5E1"
-ACCENT_COLOR = "#38BDF8"
-PANEL_COLOR = "#1F2937"
+MUTED_TEXT_COLOR = "#A8B3C7"
+SUBTLE_TEXT_COLOR = "#728098"
+ACCENT_COLOR = "#42D3FF"
+BADGE_COLOR = "#F8C44F"
+PANEL_COLOR = "#101C2E"
+PANEL_BORDER_COLOR = "#263650"
 ERROR_PLACEHOLDER = "Untitled"
+METRIC_LABELS = {
+    "views": "Views",
+    "likes": "Likes",
+    "reposts": "Reposts",
+    "replies": "Replies",
+}
 
 
 def path_for_json(path: Path) -> str:
@@ -80,6 +90,63 @@ def _clean_text(value: Any, fallback: str = "") -> str:
     return " ".join(text.split()) or fallback
 
 
+def format_compact_number(value: Any) -> str:
+    try:
+        number = float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return _clean_text(value)
+
+    sign = "-" if number < 0 else ""
+    number = abs(number)
+    if number < 1000:
+        if number.is_integer():
+            return f"{sign}{int(number)}"
+        return f"{sign}{number:g}"
+    if number < 1_000_000:
+        return f"{sign}{number / 1000:.1f}K"
+    if number < 1_000_000_000:
+        return f"{sign}{number / 1_000_000:.1f}M"
+    return f"{sign}{number / 1_000_000_000:.1f}B"
+
+
+def extract_domain_or_handle(url: str, account_handle: str | None) -> str:
+    handle = _clean_text(account_handle).lstrip("@")
+    clean_url = _clean_text(url)
+
+    if clean_url:
+        parsed = urlparse(clean_url if "://" in clean_url else f"https://{clean_url}")
+        hostname = (parsed.hostname or "").lower()
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        if hostname in {"x.com", "twitter.com"} and handle:
+            return f"@{handle}"
+        if hostname:
+            return hostname
+
+    if handle:
+        return f"@{handle}"
+    return "local"
+
+
+def infer_badge(render_input: dict) -> str:
+    text = render_input.get("text", {})
+    if not isinstance(text, dict):
+        text = {}
+
+    combined_text = " ".join(
+        _clean_text(text.get(key)) for key in ("headline", "body") if _clean_text(text.get(key))
+    )
+    if "BREAKING" in combined_text.upper():
+        return "BREAKING"
+
+    source = _clean_text(render_input.get("source")).lower()
+    url = _clean_text(render_input.get("url")).lower()
+    if source == "x" or "://x.com/" in url or "://twitter.com/" in url:
+        return "X SIGNAL"
+
+    return "NEWS"
+
+
 def _ellipsize(text: str, font: ImageFont.FreeTypeFont | ImageFont.ImageFont, max_width: int) -> str:
     if _text_width(text, font) <= max_width:
         return text
@@ -140,33 +207,59 @@ def truncate_lines(lines: list[str], max_lines: int) -> list[str]:
     return truncated
 
 
-def _draw_lines(
+def draw_wrapped_text(
     draw: ImageDraw.ImageDraw,
     xy: tuple[int, int],
-    lines: list[str],
+    text: str,
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
     fill: str,
+    max_width: int,
+    max_lines: int,
     line_spacing: int,
 ) -> int:
     x, y = xy
     height = _line_height(font)
+    lines = truncate_lines(wrap_text(text, font, max_width), max_lines)
     for line in lines:
         draw.text((x, y), line, font=font, fill=fill)
         y += height + line_spacing
     return y
 
 
-def _metrics_line(render_input: dict) -> str:
+def draw_chip(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    *,
+    fill: str = PANEL_COLOR,
+    outline: str = PANEL_BORDER_COLOR,
+    text_fill: str = TEXT_COLOR,
+    radius: int = 12,
+) -> None:
+    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline)
+    left, top, right, bottom = box
+    text_width = _text_width(text, font)
+    text_height = _line_height(font)
+    draw.text(
+        (left + max(0, ((right - left) - text_width) // 2), top + max(0, ((bottom - top) - text_height) // 2) - 1),
+        text,
+        font=font,
+        fill=text_fill,
+    )
+
+
+def _metric_items(render_input: dict) -> list[tuple[str, str]]:
     metrics = render_input.get("engagement", {}).get("metrics", {})
     if not isinstance(metrics, dict):
         metrics = {}
 
-    parts = []
+    parts: list[tuple[str, str]] = []
     for key in ("views", "likes", "reposts", "replies"):
         value = metrics.get(key)
         if value is not None and value != "":
-            parts.append(f"{key}: {value}")
-    return " / ".join(parts)
+            parts.append((METRIC_LABELS[key], format_compact_number(value)))
+    return parts
 
 
 def _media_label(render_input: dict) -> str:
@@ -201,53 +294,124 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
     image = Image.new("RGB", (width, height), color=bg)
     draw = ImageDraw.Draw(image)
 
-    margin = max(48, width // 15)
+    margin = max(34, width // 16)
     max_width = width - (margin * 2)
-    top_font = _font(max(28, width // 30))
-    headline_font = _font(max(54, width // 13))
-    body_font = _font(max(34, width // 27))
-    small_font = _font(max(26, width // 36))
+    brand_font = _font(max(34, width // 24))
+    label_font = _font(max(22, width // 42))
+    headline_font = _font(max(48, width // 14))
+    body_font = _font(max(28, width // 32))
+    metric_font = _font(max(24, width // 38))
+    small_font = _font(max(22, width // 44))
 
-    source = _clean_text(render_input.get("account_handle") or render_input.get("source"), "local")
+    raw_account = _clean_text(render_input.get("account_handle"))
+    source = _clean_text(raw_account or render_input.get("source"), "local")
+    source_label = f"@{raw_account.lstrip('@')}" if raw_account else source
     headline = _clean_text(render_input.get("text", {}).get("headline"), ERROR_PLACEHOLDER)
     body = _clean_text(render_input.get("text", {}).get("body"))
-    url = _clean_text(render_input.get("url"))
+    footer_identity = extract_domain_or_handle(_clean_text(render_input.get("url")), source)
     post_id = _clean_text(render_input.get("post_id"))
+    badge = infer_badge(render_input)
 
     y = margin
-    draw.text((margin, y), source.upper(), font=top_font, fill=ACCENT_COLOR)
-    y += _line_height(top_font) + 70
+    draw.rectangle((0, 0, width, max(6, height // 180)), fill=ACCENT_COLOR)
 
-    headline_lines = truncate_lines(wrap_text(headline, headline_font, max_width), 8)
-    y = _draw_lines(draw, (margin, y), headline_lines, headline_font, TEXT_COLOR, 18)
+    brand = "ECONOMIKA"
+    draw.text((margin, y), brand, font=brand_font, fill=TEXT_COLOR)
+    brand_width = _text_width(brand, brand_font)
+    draw.text(
+        (margin + brand_width + 18, y + max(2, _line_height(brand_font) // 4)),
+        source_label.upper(),
+        font=label_font,
+        fill=MUTED_TEXT_COLOR,
+    )
+
+    chip_width = min(max(150, _text_width(badge, label_font) + 48), max_width // 2)
+    chip_height = max(36, _line_height(label_font) + 18)
+    draw_chip(
+        draw,
+        (width - margin - chip_width, y + 2, width - margin, y + 2 + chip_height),
+        badge,
+        label_font,
+        fill="#17263A",
+        outline="#39516C",
+        text_fill=BADGE_COLOR,
+        radius=chip_height // 2,
+    )
+    y += max(_line_height(brand_font), chip_height) + max(56, height // 26)
+
+    accent_x = margin
+    accent_y = y + 4
+    draw.rounded_rectangle((accent_x, accent_y, accent_x + 8, min(height - margin * 2, accent_y + 210)), radius=4, fill=ACCENT_COLOR)
+    text_x = margin + 28
+    text_width = width - text_x - margin
+
+    max_headline_lines = 7 if height >= 900 else 5
+    y = draw_wrapped_text(draw, (text_x, y), headline, headline_font, TEXT_COLOR, text_width, max_headline_lines, max(10, height // 150))
 
     body_to_draw = body if body and body != headline else ""
     if body_to_draw:
-        y += 50
-        body_lines = truncate_lines(wrap_text(body_to_draw, body_font, max_width), 12)
-        y = _draw_lines(draw, (margin, y), body_lines, body_font, MUTED_TEXT_COLOR, 14)
+        y += max(28, height // 60)
+        max_body_lines = 6 if height >= 900 else 3
+        y = draw_wrapped_text(
+            draw,
+            (text_x, y),
+            body_to_draw,
+            body_font,
+            MUTED_TEXT_COLOR,
+            text_width,
+            max_body_lines,
+            max(8, height // 180),
+        )
 
     media_label = _media_label(render_input)
-    metrics = _metrics_line(render_input)
-    label_lines = [line for line in (media_label, metrics) if line]
-    if label_lines:
-        y += 60
-        box_height = (len(label_lines) * (_line_height(small_font) + 14)) + 28
-        draw.rounded_rectangle(
-            (margin, y, width - margin, y + box_height),
-            radius=10,
-            fill=PANEL_COLOR,
-            outline="#334155",
-        )
-        label_y = y + 18
-        for line in label_lines:
-            draw.text((margin + 24, label_y), _ellipsize(line, small_font, max_width - 48), font=small_font, fill=TEXT_COLOR)
-            label_y += _line_height(small_font) + 14
+    metric_items = _metric_items(render_input)
+    score = render_input.get("engagement", {}).get("score")
+    chips: list[tuple[str, str]] = metric_items.copy()
+    if score is not None and score != "":
+        chips.append(("Score", format_compact_number(score)))
 
-    footer = url or f"post_id: {post_id}"
+    if chips or media_label:
+        y += max(44, height // 32)
+        chip_gap = max(10, width // 90)
+        chip_height = max(70, _line_height(metric_font) + _line_height(small_font) + 30)
+        columns = 2 if width < 760 else 4
+        chip_width = (max_width - (chip_gap * (columns - 1))) // columns
+        chip_y = y
+        for index, (label, value) in enumerate(chips):
+            row = index // columns
+            col = index % columns
+            left = margin + col * (chip_width + chip_gap)
+            top = chip_y + row * (chip_height + chip_gap)
+            draw.rounded_rectangle(
+                (left, top, left + chip_width, top + chip_height),
+                radius=14,
+                fill=PANEL_COLOR,
+                outline=PANEL_BORDER_COLOR,
+            )
+            draw.text((left + 18, top + 13), label.upper(), font=small_font, fill=SUBTLE_TEXT_COLOR)
+            draw.text((left + 18, top + 13 + _line_height(small_font) + 7), value, font=metric_font, fill=TEXT_COLOR)
+
+        rows = (len(chips) + columns - 1) // columns if chips else 0
+        y = chip_y + rows * chip_height + max(0, rows - 1) * chip_gap
+
+        if media_label:
+            y += chip_gap
+            draw_chip(
+                draw,
+                (margin, y, width - margin, y + chip_height // 2),
+                media_label,
+                small_font,
+                fill="#132235",
+                outline=PANEL_BORDER_COLOR,
+                text_fill=MUTED_TEXT_COLOR,
+                radius=12,
+            )
+
+    footer = f"{post_id} / {footer_identity}"
     footer = _ellipsize(footer, small_font, max_width)
     footer_y = height - margin - _line_height(small_font)
-    draw.text((margin, footer_y), footer, font=small_font, fill=MUTED_TEXT_COLOR)
+    draw.line((margin, footer_y - 24, width - margin, footer_y - 24), fill="#1B2A3E", width=2)
+    draw.text((margin, footer_y), footer, font=small_font, fill=SUBTLE_TEXT_COLOR)
 
     return image
 
