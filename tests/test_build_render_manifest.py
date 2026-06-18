@@ -9,6 +9,7 @@ from PIL import Image
 
 from scripts.build_render_manifest import (
     build_render_manifest,
+    collect_manifest_errors,
     main,
     write_manifest_atomically,
 )
@@ -206,6 +207,17 @@ def test_include_invalid_controls_invalid_render_details(tmp_path: Path):
     assert detailed["invalid_renders"][0]["render_dir"].endswith("renders/post-1")
 
 
+def test_collect_manifest_errors_includes_invalid_and_render_errors(tmp_path: Path):
+    (tmp_path / "renders" / "missing-card").mkdir(parents=True)
+    _write_png(tmp_path / "renders" / "missing-input" / "card.png")
+
+    manifest = build_render_manifest(tmp_path / "renders", tmp_path / "render_inputs", include_invalid=True)
+
+    errors = collect_manifest_errors(manifest)
+    assert any(error.endswith("missing-card: card.png missing") for error in errors)
+    assert "missing-input: Render input missing" in errors
+
+
 def test_atomic_write_uses_tmp_replace(tmp_path: Path):
     output_json = tmp_path / "renders" / "manifest.json"
 
@@ -239,6 +251,73 @@ def test_cli_summary_printed(tmp_path: Path, capsys):
     assert summary["render_count"] == 1
     assert summary["invalid_render_count"] == 0
     assert summary["errors"] == []
+
+
+def test_cli_summary_includes_invalid_render_errors_when_excluded_from_manifest(tmp_path: Path, capsys):
+    (tmp_path / "renders" / "post-1").mkdir(parents=True)
+    output_json = tmp_path / "renders" / "manifest.json"
+    args = [
+        "build_render_manifest.py",
+        "--renders-dir",
+        str(tmp_path / "renders"),
+        "--render-inputs-dir",
+        str(tmp_path / "render_inputs"),
+        "--output-json",
+        str(output_json),
+    ]
+
+    with patch("sys.argv", args):
+        assert main() == 0
+
+    summary = json.loads(capsys.readouterr().out)
+    manifest = json.loads(output_json.read_text(encoding="utf-8"))
+    assert summary["errors"][0].endswith("post-1: card.png missing")
+    assert manifest["invalid_render_count"] == 1
+    assert manifest["invalid_renders"] == []
+
+
+def test_cli_summary_includes_render_errors_when_render_input_missing(tmp_path: Path, capsys):
+    _write_png(tmp_path / "renders" / "post-1" / "card.png")
+    output_json = tmp_path / "renders" / "manifest.json"
+    args = [
+        "build_render_manifest.py",
+        "--renders-dir",
+        str(tmp_path / "renders"),
+        "--render-inputs-dir",
+        str(tmp_path / "render_inputs"),
+        "--output-json",
+        str(output_json),
+    ]
+
+    with patch("sys.argv", args):
+        assert main() == 0
+
+    summary = json.loads(capsys.readouterr().out)
+    manifest = json.loads(output_json.read_text(encoding="utf-8"))
+    assert summary["errors"] == ["post-1: Render input missing"]
+    assert manifest["renders"][0]["ready_for_publish"] is False
+    assert manifest["renders"][0]["render_errors"] == ["Render input missing"]
+
+
+def test_cli_include_invalid_true_writes_invalid_details(tmp_path: Path, capsys):
+    (tmp_path / "renders" / "post-1").mkdir(parents=True)
+    output_json = tmp_path / "renders" / "manifest.json"
+    args = [
+        "build_render_manifest.py",
+        "--renders-dir",
+        str(tmp_path / "renders"),
+        "--output-json",
+        str(output_json),
+        "--include-invalid",
+    ]
+
+    with patch("sys.argv", args):
+        assert main() == 0
+
+    summary = json.loads(capsys.readouterr().out)
+    manifest = json.loads(output_json.read_text(encoding="utf-8"))
+    assert summary["errors"][0].endswith("post-1: card.png missing")
+    assert manifest["invalid_renders"][0]["error"] == "card.png missing"
 
 
 def test_cli_write_failure_returns_exit_code_1(tmp_path: Path, capsys):

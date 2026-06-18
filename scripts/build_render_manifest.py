@@ -180,6 +180,33 @@ def build_render_manifest(renders_dir: Path, render_inputs_dir: Path, include_in
     }
 
 
+def collect_manifest_errors(manifest: dict) -> list[str]:
+    errors = []
+
+    invalid_renders = manifest.get("invalid_renders", [])
+    if isinstance(invalid_renders, list):
+        for invalid in invalid_renders:
+            if not isinstance(invalid, dict):
+                continue
+            render_dir = invalid.get("render_dir") or ""
+            error = invalid.get("error") or "Invalid render"
+            errors.append(f"{render_dir}: {error}" if render_dir else str(error))
+
+    renders = manifest.get("renders", [])
+    if isinstance(renders, list):
+        for render in renders:
+            if not isinstance(render, dict) or render.get("ready_for_publish") is True:
+                continue
+            post_id = render.get("post_id") or ""
+            render_errors = render.get("render_errors", [])
+            if not isinstance(render_errors, list):
+                continue
+            for error in render_errors:
+                errors.append(f"{post_id}: {error}" if post_id else str(error))
+
+    return errors
+
+
 def write_manifest_atomically(payload: dict, output_json: Path) -> None:
     output_json.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = output_json.with_name(f"{output_json.name}.tmp")
@@ -199,7 +226,10 @@ def main() -> int:
     renders_dir = Path(args.renders_dir)
     render_inputs_dir = Path(args.render_inputs_dir)
     output_json = Path(args.output_json)
-    manifest = build_render_manifest(renders_dir, render_inputs_dir, include_invalid=args.include_invalid)
+    manifest = build_render_manifest(renders_dir, render_inputs_dir, include_invalid=True)
+    errors = collect_manifest_errors(manifest)
+    if not args.include_invalid:
+        manifest["invalid_renders"] = []
 
     summary = {
         "renders_dir": path_for_json(renders_dir),
@@ -207,7 +237,7 @@ def main() -> int:
         "output_json": path_for_json(output_json),
         "render_count": manifest["render_count"],
         "invalid_render_count": manifest["invalid_render_count"],
-        "errors": [],
+        "errors": errors,
     }
 
     try:
