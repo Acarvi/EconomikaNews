@@ -8,6 +8,9 @@ from unittest.mock import patch
 from PIL import Image
 
 from scripts.render_text_cards import (
+    extract_domain_or_handle,
+    format_compact_number,
+    infer_badge,
     iter_render_input_files,
     main,
     render_all_cards,
@@ -189,6 +192,40 @@ def test_media_has_media_still_renders_card(tmp_path: Path):
     summary = render_all_cards(tmp_path / "render_inputs", tmp_path / "renders", width=320, height=480)
 
     assert summary["cards_rendered"] == 1
+
+
+def test_compact_number_formatting():
+    assert format_compact_number(999) == "999"
+    assert format_compact_number(1000) == "1.0K"
+    assert format_compact_number(8466) == "8.5K"
+    assert format_compact_number(2533071) == "2.5M"
+
+
+def test_badge_inference_breaking_text():
+    payload = _render_input(text={"headline": "BREAKING: rates move", "body": ""}, source="rss")
+
+    assert infer_badge(payload) == "BREAKING"
+
+
+def test_badge_inference_x_source():
+    payload = _render_input(text={"headline": "Rates move", "body": ""}, source="x")
+
+    assert infer_badge(payload) == "X SIGNAL"
+
+
+def test_badge_inference_fallback_news():
+    payload = _render_input(text={"headline": "Rates move", "body": ""}, source="rss", url="https://example.com/story")
+
+    assert infer_badge(payload) == "NEWS"
+
+
+def test_footer_domain_helper_prefers_x_handle():
+    assert extract_domain_or_handle("https://x.com/economika/status/1", "economika") == "@economika"
+
+
+def test_footer_domain_helper_handles_missing_url():
+    assert extract_domain_or_handle("", "economika") == "@economika"
+    assert extract_domain_or_handle("", None) == "local"
 
 
 def test_summary_json_printed_by_cli(tmp_path: Path, capsys):

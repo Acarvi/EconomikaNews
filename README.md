@@ -84,7 +84,7 @@ Build render input contract files:
 python scripts\build_render_inputs.py
 ```
 
-Render local static text cards:
+Render local static visual text cards:
 
 ```bash
 python scripts\render_text_cards.py
