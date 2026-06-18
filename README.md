@@ -90,7 +90,13 @@ Render local static text cards:
 python scripts\render_text_cards.py
 ```
 
-For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md).
+Build the render manifest:
+
+```bash
+python scripts\build_render_manifest.py
+```
+
+For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md).
 
 ## Commit Hygiene
 
