@@ -56,6 +56,15 @@ If metadata is missing or invalid, the video is still included with `ready_for_u
 
 If `video.mp4` is missing or empty, the video directory is counted as invalid and excluded from `videos` by default. Use `--include-invalid` to include invalid video details in the manifest.
 
+## Source Provenance
+
+The manifest preserves source provenance for manual review and captioning:
+
+- `source_account_handle`
+- `source_url`
+
+The builder prefers top-level values from `video_metadata.json`. For older metadata files, it falls back to `source_manifest_entry.account_handle` and `source_manifest_entry.url`. If provenance is unavailable, these fields are written as empty strings.
+
 ## Scope
 
 This step reads local MP4 file stats and local metadata JSON only. It does not decode full videos in tests and does not make network calls.
@@ -82,6 +91,8 @@ Publishing is not implemented yet. Upload APIs, scheduling, AI generation, text-
       "width": 1080,
       "height": 1920,
       "source_card_path": "runtime/renders/post-1/card.png",
+      "source_account_handle": "juanrallo",
+      "source_url": "https://x.com/juanrallo/status/2057499359705813029",
       "ready_for_upload": true,
       "video_errors": []
     }
