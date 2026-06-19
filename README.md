@@ -108,7 +108,13 @@ Build the video manifest:
 python scripts\build_video_manifest.py
 ```
 
-For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md).
+Build local manual-upload publish queue packets:
+
+```bash
+python scripts\build_publish_queue.py
+```
+
+For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md). For local publish queue packets, see [`docs/publish_queue.md`](docs/publish_queue.md).
 
 ## Commit Hygiene
 
