@@ -28,6 +28,12 @@ METRIC_LABELS = {
     "reposts": "Reposts",
     "replies": "Replies",
 }
+SURFACE_REASON_THRESHOLDS = (
+    ("views", 1_000_000, "High-view post"),
+    ("reposts", 500, "High repost velocity"),
+    ("replies", 500, "High discussion"),
+    ("likes", 5000, "Strong engagement"),
+)
 
 
 def path_for_json(path: Path) -> str:
@@ -109,6 +115,13 @@ def format_compact_number(value: Any) -> str:
     return f"{sign}{number / 1_000_000_000:.1f}B"
 
 
+def _metric_number(value: Any) -> float:
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def extract_domain_or_handle(url: str, account_handle: str | None) -> str:
     handle = _clean_text(account_handle).lstrip("@")
     clean_url = _clean_text(url)
@@ -145,6 +158,67 @@ def infer_badge(render_input: dict) -> str:
         return "X SIGNAL"
 
     return "NEWS"
+
+
+def _metrics(render_input: dict) -> dict:
+    engagement = render_input.get("engagement", {})
+    if not isinstance(engagement, dict):
+        return {}
+    metrics = engagement.get("metrics", {})
+    return metrics if isinstance(metrics, dict) else {}
+
+
+def build_surface_reasons(render_input: dict) -> list[str]:
+    metrics = _metrics(render_input)
+    reasons = [
+        label
+        for key, threshold, label in SURFACE_REASON_THRESHOLDS
+        if _metric_number(metrics.get(key)) >= threshold
+    ]
+    return reasons or ["Approved editorial candidate"]
+
+
+def build_signal_rows(render_input: dict) -> list[tuple[str, str]]:
+    account = _clean_text(render_input.get("account_handle")).lstrip("@")
+    source = _clean_text(render_input.get("source"), "local")
+    engagement = render_input.get("engagement", {})
+    if not isinstance(engagement, dict):
+        engagement = {}
+    media = render_input.get("media", {})
+    if not isinstance(media, dict):
+        media = {}
+    review = render_input.get("review", {})
+    if not isinstance(review, dict):
+        review = {}
+
+    rows: list[tuple[str, str]] = []
+    rows.append(("Account", f"@{account}" if account else source))
+    rows.append(("Source", source.upper()))
+
+    score = engagement.get("score")
+    if score is not None and score != "":
+        rows.append(("Score", format_compact_number(score)))
+
+    metric_parts = [
+        f"{format_compact_number(value)} {label.lower()}"
+        for label, value in _metric_items(render_input)
+    ]
+    if metric_parts:
+        rows.append(("Metrics", " / ".join(metric_parts)))
+
+    files = media.get("files")
+    media_count = len(files) if isinstance(files, list) else 0
+    rows.append(("Media", f"Attached ({media_count})" if media.get("has_media") else "Text only"))
+
+    review_status = _clean_text(review.get("status"))
+    if review_status:
+        rows.append(("Editorial status", review_status.upper()))
+
+    post_id = _clean_text(render_input.get("post_id"))
+    if post_id:
+        rows.append(("Post ID", post_id))
+
+    return rows
 
 
 def _ellipsize(text: str, font: ImageFont.FreeTypeFont | ImageFont.ImageFont, max_width: int) -> str:
@@ -249,10 +323,43 @@ def draw_chip(
     )
 
 
+def draw_panel(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    *,
+    fill: str = "#0D1828",
+    outline: str = PANEL_BORDER_COLOR,
+    radius: int = 18,
+) -> None:
+    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline)
+
+
+def draw_key_value_rows(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    rows: list[tuple[str, str]],
+    label_font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    value_font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    *,
+    max_rows: int = 6,
+) -> None:
+    left, top, right, bottom = box
+    row_gap = max(8, (bottom - top) // 42)
+    y = top
+    label_width = max(72, min((right - left) // 2, max((_text_width(label, label_font) for label, _ in rows), default=0) + 12))
+    line_height = max(_line_height(label_font), _line_height(value_font))
+
+    for label, value in rows[:max_rows]:
+        if y + line_height > bottom:
+            break
+        draw.text((left, y), label.upper(), font=label_font, fill=SUBTLE_TEXT_COLOR)
+        clean_value = _ellipsize(_clean_text(value), value_font, max(1, right - left - label_width))
+        draw.text((left + label_width, y), clean_value, font=value_font, fill=TEXT_COLOR)
+        y += line_height + row_gap
+
+
 def _metric_items(render_input: dict) -> list[tuple[str, str]]:
-    metrics = render_input.get("engagement", {}).get("metrics", {})
-    if not isinstance(metrics, dict):
-        metrics = {}
+    metrics = _metrics(render_input)
 
     parts: list[tuple[str, str]] = []
     for key in ("views", "likes", "reposts", "replies"):
@@ -302,6 +409,7 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
     body_font = _font(max(28, width // 32))
     metric_font = _font(max(24, width // 38))
     small_font = _font(max(22, width // 44))
+    micro_font = _font(max(18, width // 52))
 
     raw_account = _clean_text(render_input.get("account_handle"))
     source = _clean_text(raw_account or render_input.get("source"), "local")
@@ -312,6 +420,7 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
     post_id = _clean_text(render_input.get("post_id"))
     badge = infer_badge(render_input)
 
+    footer_y = height - margin - _line_height(small_font)
     y = margin
     draw.rectangle((0, 0, width, max(6, height // 180)), fill=ACCENT_COLOR)
 
@@ -345,13 +454,15 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
     text_x = margin + 28
     text_width = width - text_x - margin
 
-    max_headline_lines = 7 if height >= 900 else 5
+    lower_panel_height = min(max(170, height // 4), max(120, footer_y - margin - 120))
+    lower_panel_top = max(margin + 120, footer_y - 32 - lower_panel_height)
+    max_headline_lines = 6 if height >= 900 else 4
     y = draw_wrapped_text(draw, (text_x, y), headline, headline_font, TEXT_COLOR, text_width, max_headline_lines, max(10, height // 150))
 
     body_to_draw = body if body and body != headline else ""
     if body_to_draw:
         y += max(28, height // 60)
-        max_body_lines = 6 if height >= 900 else 3
+        max_body_lines = 4 if height >= 900 else 2
         y = draw_wrapped_text(
             draw,
             (text_x, y),
@@ -371,11 +482,21 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
         chips.append(("Score", format_compact_number(score)))
 
     if chips or media_label:
-        y += max(44, height // 32)
+        y += max(36, height // 36)
+        middle_anchor = int(height * 0.43)
+        metrics_available_bottom = lower_panel_top - max(24, height // 72)
+        if y < middle_anchor and metrics_available_bottom > middle_anchor:
+            y = middle_anchor
         chip_gap = max(10, width // 90)
-        chip_height = max(70, _line_height(metric_font) + _line_height(small_font) + 30)
+        chip_height = max(66, _line_height(metric_font) + _line_height(small_font) + 28)
         columns = 2 if width < 760 else 4
         chip_width = (max_width - (chip_gap * (columns - 1))) // columns
+        chip_rows = (len(chips) + columns - 1) // columns if chips else 0
+        metrics_height = chip_rows * chip_height + max(0, chip_rows - 1) * chip_gap
+        if media_label:
+            metrics_height += chip_gap + chip_height // 2
+        if y + metrics_height > metrics_available_bottom:
+            y = max(margin, metrics_available_bottom - metrics_height)
         chip_y = y
         for index, (label, value) in enumerate(chips):
             row = index // columns
@@ -391,7 +512,7 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
             draw.text((left + 18, top + 13), label.upper(), font=small_font, fill=SUBTLE_TEXT_COLOR)
             draw.text((left + 18, top + 13 + _line_height(small_font) + 7), value, font=metric_font, fill=TEXT_COLOR)
 
-        rows = (len(chips) + columns - 1) // columns if chips else 0
+        rows = chip_rows
         y = chip_y + rows * chip_height + max(0, rows - 1) * chip_gap
 
         if media_label:
@@ -407,9 +528,81 @@ def build_card_image(render_input: dict, width: int, height: int, background: st
                 radius=12,
             )
 
+    panel_gap = max(16, height // 96)
+    if y + panel_gap > lower_panel_top:
+        lower_panel_top = min(footer_y - 32 - lower_panel_height, y + panel_gap)
+    lower_panel_top = max(margin + 120, lower_panel_top)
+    lower_panel_bottom = min(footer_y - 32, lower_panel_top + lower_panel_height)
+    draw_panel(draw, (margin, lower_panel_top, width - margin, lower_panel_bottom))
+
+    panel_pad = max(18, width // 42)
+    panel_left = margin + panel_pad
+    panel_right = width - margin - panel_pad
+    panel_top = lower_panel_top + panel_pad
+    panel_bottom = lower_panel_bottom - panel_pad
+    panel_title_font = small_font
+    draw.text((panel_left, panel_top), "POST SIGNAL", font=panel_title_font, fill=ACCENT_COLOR)
+    approved_label = ""
+    review = render_input.get("review", {})
+    if isinstance(review, dict) and _clean_text(review.get("status")).lower() == "approved":
+        approved_label = "Editorial status: APPROVED"
+        approved_width = min(_text_width(approved_label, micro_font) + 34, max(120, panel_right - panel_left))
+        draw_chip(
+            draw,
+            (panel_right - approved_width, panel_top - 4, panel_right, panel_top + max(32, _line_height(micro_font) + 16)),
+            approved_label,
+            micro_font,
+            fill="#173024",
+            outline="#315F46",
+            text_fill="#9BE7B2",
+            radius=14,
+        )
+
+    section_top = panel_top + _line_height(panel_title_font) + max(18, height // 90)
+    reasons = build_surface_reasons(render_input)
+    reason_label = "WHY THIS SURFACED"
+    draw.text((panel_left, section_top), reason_label, font=micro_font, fill=SUBTLE_TEXT_COLOR)
+    reason_y = section_top + _line_height(micro_font) + max(10, height // 160)
+    reason_gap = max(8, width // 110)
+    chip_x = panel_left
+    chip_h = max(32, _line_height(micro_font) + 16)
+    max_reason_y = reason_y
+    for reason in reasons[:4]:
+        reason_text = _ellipsize(reason, micro_font, panel_right - panel_left)
+        reason_w = min(_text_width(reason_text, micro_font) + 30, panel_right - panel_left)
+        if chip_x + reason_w > panel_right:
+            chip_x = panel_left
+            reason_y += chip_h + reason_gap
+        if reason_y + chip_h > panel_bottom:
+            break
+        draw_chip(
+            draw,
+            (chip_x, reason_y, chip_x + reason_w, reason_y + chip_h),
+            reason_text,
+            micro_font,
+            fill="#132235",
+            outline="#29415F",
+            text_fill=TEXT_COLOR,
+            radius=chip_h // 2,
+        )
+        chip_x += reason_w + reason_gap
+        max_reason_y = max(max_reason_y, reason_y + chip_h)
+
+    rows_top = max_reason_y + max(18, height // 90)
+    if rows_top < panel_bottom:
+        signal_title = "SOURCE SIGNAL"
+        draw.text((panel_left, rows_top), signal_title, font=micro_font, fill=SUBTLE_TEXT_COLOR)
+        draw_key_value_rows(
+            draw,
+            (panel_left, rows_top + _line_height(micro_font) + max(10, height // 160), panel_right, panel_bottom),
+            build_signal_rows(render_input),
+            micro_font,
+            small_font,
+            max_rows=6 if height >= 900 else 4,
+        )
+
     footer = f"{post_id} / {footer_identity}"
     footer = _ellipsize(footer, small_font, max_width)
-    footer_y = height - margin - _line_height(small_font)
     draw.line((margin, footer_y - 24, width - margin, footer_y - 24), fill="#1B2A3E", width=2)
     draw.text((margin, footer_y), footer, font=small_font, fill=SUBTLE_TEXT_COLOR)
 
