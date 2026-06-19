@@ -126,7 +126,13 @@ Run the complete local artifact pipeline:
 python scripts\run_local_pipeline.py --overwrite
 ```
 
-For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md). For local publish queue packets, see [`docs/publish_queue.md`](docs/publish_queue.md). For the generated publish queue manifest, see [`docs/publish_queue_manifest.md`](docs/publish_queue_manifest.md). For one-command local orchestration, see [`docs/local_pipeline_runner.md`](docs/local_pipeline_runner.md).
+Generate the local pipeline health report:
+
+```bash
+py scripts\build_pipeline_report.py
+```
+
+For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md). For local publish queue packets, see [`docs/publish_queue.md`](docs/publish_queue.md). For the generated publish queue manifest, see [`docs/publish_queue_manifest.md`](docs/publish_queue_manifest.md). For one-command local orchestration, see [`docs/local_pipeline_runner.md`](docs/local_pipeline_runner.md). For the Markdown health report, see [`docs/pipeline_report.md`](docs/pipeline_report.md).
 
 ## Commit Hygiene
 

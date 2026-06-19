@@ -44,6 +44,16 @@ The command prints one final JSON object containing timestamps, elapsed time, ov
 
 The runner exits `0` only when every non-skipped stage succeeds. It exits `1` after any stage or summary-file write failure.
 
+## Health Report
+
+After running the pipeline, generate a compact local health report:
+
+```powershell
+py scripts\build_pipeline_report.py
+```
+
+See [`pipeline_report.md`](pipeline_report.md) for runner-summary integration and report readiness rules.
+
 ## Publishing Boundary
 
 The final local handoff remains `runtime/publish_queue/`. Manual upload starts from the packet directories and `runtime/publish_queue/manifest.json`. The runner has no TikTok, Instagram, or YouTube API integration, OAuth, browser automation, or scheduling behavior.
