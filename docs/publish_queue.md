@@ -46,6 +46,14 @@ CLI options:
 
 By default, only video manifest entries with `ready_for_upload: true` are packaged.
 
+After building packets, build the queue manifest:
+
+```powershell
+python scripts\build_publish_queue_manifest.py
+```
+
+The manifest is written to `runtime/publish_queue/manifest.json` and indexes packet readiness, source provenance, target platforms, caption length, and a normalized caption preview.
+
 ## Caption
 
 Captions are deterministic and use existing metadata only. The script does not summarize articles, rewrite text with an LLM, invent claims, or call AI services.
