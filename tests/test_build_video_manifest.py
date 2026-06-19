@@ -93,8 +93,63 @@ def test_valid_video_and_matching_metadata_creates_manifest_entry(tmp_path: Path
     assert entry["width"] == 1080
     assert entry["height"] == 1920
     assert entry["source_card_path"] == "runtime/renders/post-1/card.png"
+    assert entry["source_account_handle"] == ""
+    assert entry["source_url"] == ""
     assert entry["ready_for_upload"] is True
     assert entry["video_errors"] == []
+
+
+def test_video_manifest_preserves_top_level_source_provenance(tmp_path: Path):
+    video = tmp_path / "videos" / "post-1" / "video.mp4"
+    _write_video(video)
+    _write_json(
+        tmp_path / "videos" / "post-1" / "video_metadata.json",
+        _metadata(
+            video,
+            source_account_handle="juanrallo",
+            source_url="https://x.com/juanrallo/status/2057499359705813029",
+        ),
+    )
+
+    entry = build_video_manifest(tmp_path / "videos")["videos"][0]
+
+    assert entry["source_account_handle"] == "juanrallo"
+    assert entry["source_url"] == "https://x.com/juanrallo/status/2057499359705813029"
+
+
+def test_video_manifest_falls_back_to_nested_source_manifest_provenance(tmp_path: Path):
+    video = tmp_path / "videos" / "post-1" / "video.mp4"
+    _write_video(video)
+    _write_json(
+        tmp_path / "videos" / "post-1" / "video_metadata.json",
+        _metadata(
+            video,
+            source_manifest_entry={
+                "post_id": "post-1",
+                "account_handle": "juanrallo",
+                "url": "https://x.com/juanrallo/status/2057499359705813029",
+            },
+        ),
+    )
+
+    entry = build_video_manifest(tmp_path / "videos")["videos"][0]
+
+    assert entry["source_account_handle"] == "juanrallo"
+    assert entry["source_url"] == "https://x.com/juanrallo/status/2057499359705813029"
+
+
+def test_older_metadata_without_source_provenance_still_works(tmp_path: Path):
+    video = tmp_path / "videos" / "post-1" / "video.mp4"
+    metadata = _metadata(video)
+    metadata.pop("source_manifest_entry")
+    _write_video(video)
+    _write_json(tmp_path / "videos" / "post-1" / "video_metadata.json", metadata)
+
+    entry = build_video_manifest(tmp_path / "videos")["videos"][0]
+
+    assert entry["ready_for_upload"] is True
+    assert entry["source_account_handle"] == ""
+    assert entry["source_url"] == ""
 
 
 def test_missing_video_counted_invalid(tmp_path: Path):

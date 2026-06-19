@@ -104,6 +104,8 @@ def test_ready_video_creates_packet_files(tmp_path: Path):
     assert metadata["video_path"] == (packet_dir / "video.mp4").as_posix()
     assert metadata["caption_path"] == (packet_dir / "caption.txt").as_posix()
     assert metadata["source_video_path"] == source_video.as_posix()
+    assert metadata["source_account_handle"] == "economika"
+    assert metadata["source_url"] == "https://x.com/economika/status/1"
     assert metadata["platforms"] == list(ALLOWED_PLATFORMS)
     assert metadata["packet_ready"] is True
     assert metadata["packet_errors"] == []
@@ -132,9 +134,54 @@ def test_missing_account_handle_uses_unknown_source(tmp_path: Path):
 
 def test_source_handle_appears_in_caption(tmp_path: Path):
     source_video = tmp_path / "videos" / "post-1" / "video.mp4"
-    caption = build_caption(_video_entry(source_video, source_manifest_entry={"account_handle": "juanrallo"}))
+    caption = build_caption(_video_entry(source_video, source_account_handle="juanrallo", source_manifest_entry={}))
 
     assert "Fuente: @juanrallo" in caption
+
+
+def test_caption_includes_url_line_when_source_url_exists(tmp_path: Path):
+    source_video = tmp_path / "videos" / "post-1" / "video.mp4"
+    caption = build_caption(
+        _video_entry(
+            source_video,
+            source_account_handle="juanrallo",
+            source_url="https://x.com/juanrallo/status/2057499359705813029",
+            source_manifest_entry={},
+        )
+    )
+
+    assert "Fuente: @juanrallo" in caption
+    assert "URL: https://x.com/juanrallo/status/2057499359705813029" in caption
+
+
+def test_caption_omits_url_line_when_missing(tmp_path: Path):
+    source_video = tmp_path / "videos" / "post-1" / "video.mp4"
+    caption = build_caption(_video_entry(source_video, source_manifest_entry={}))
+
+    assert "URL:" not in caption
+
+
+def test_packet_metadata_includes_source_provenance(tmp_path: Path):
+    source_video = tmp_path / "videos" / "post-1" / "video.mp4"
+    manifest = tmp_path / "manifest.json"
+    _write_video(source_video)
+    _write_json(
+        manifest,
+        _manifest(
+            _video_entry(
+                source_video,
+                source_account_handle="juanrallo",
+                source_url="https://x.com/juanrallo/status/2057499359705813029",
+                source_manifest_entry={},
+            )
+        ),
+    )
+
+    build_publish_queue(manifest, tmp_path / "queue", list(ALLOWED_PLATFORMS))
+
+    metadata = json.loads((tmp_path / "queue" / "post-1" / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["source_account_handle"] == "juanrallo"
+    assert metadata["source_url"] == "https://x.com/juanrallo/status/2057499359705813029"
 
 
 def test_not_ready_video_skipped_by_default(tmp_path: Path):

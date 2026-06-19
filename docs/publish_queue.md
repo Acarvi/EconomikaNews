@@ -54,11 +54,13 @@ The caption includes:
 
 - A short Economika line.
 - Source handle when present, otherwise `Fuente: desconocida`.
+- Source URL when present.
 - Post ID.
-- Source URL only if it is present in the manifest entry metadata.
 - Deterministic hashtags: `#Economika #Economia #Politica #Shorts`.
 
 Captions are kept under 500 characters.
+
+Publish packet metadata includes `source_account_handle` and `source_url` from the video manifest entry. These values are carried forward for manual review and captioning only; the script still performs no platform publishing and no AI caption generation.
 
 ## Scope
 

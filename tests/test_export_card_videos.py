@@ -30,13 +30,15 @@ def _write_png(path: Path, size: tuple[int, int] = (64, 96)) -> None:
     Image.new("RGB", size, color="#111827").save(path, format="PNG")
 
 
-def _render(card_path: Path, post_id: str = "post-1", ready: bool = True) -> dict:
-    return {
+def _render(card_path: Path, post_id: str = "post-1", ready: bool = True, **overrides) -> dict:
+    render = {
         "post_id": post_id,
         "card_path": card_path.as_posix(),
         "ready_for_publish": ready,
         "render_errors": [] if ready else ["not ready"],
     }
+    render.update(overrides)
+    return render
 
 
 def _manifest(*renders: dict) -> dict:
@@ -105,6 +107,8 @@ def test_ready_render_exports_video_and_metadata_with_fake_writer(tmp_path: Path
     assert video.read_bytes() == b"fake mp4"
     assert metadata["post_id"] == "post-1"
     assert metadata["source_card_path"] == card.as_posix()
+    assert metadata["source_account_handle"] == ""
+    assert metadata["source_url"] == ""
     assert metadata["video_path"] == video.as_posix()
     assert metadata["duration_seconds"] == 2
     assert metadata["fps"] == 12
@@ -112,6 +116,24 @@ def test_ready_render_exports_video_and_metadata_with_fake_writer(tmp_path: Path
     assert metadata["height"] == 96
     assert metadata["ready_for_upload"] is True
     assert metadata["video_errors"] == []
+
+
+def test_video_metadata_includes_source_provenance_from_render_manifest(tmp_path: Path):
+    card = tmp_path / "renders" / "post-1" / "card.png"
+    _write_png(card)
+    render = _render(
+        card,
+        account_handle="juanrallo",
+        url="https://x.com/juanrallo/status/2057499359705813029",
+    )
+
+    result = export_video_for_render(render, tmp_path / "videos", writer=_fake_writer)
+
+    metadata = json.loads((tmp_path / "videos" / "post-1" / "video_metadata.json").read_text(encoding="utf-8"))
+    assert result["written"] is True
+    assert metadata["source_account_handle"] == "juanrallo"
+    assert metadata["source_url"] == "https://x.com/juanrallo/status/2057499359705813029"
+    assert metadata["source_manifest_entry"] == render
 
 
 def test_not_ready_render_skipped_by_default(tmp_path: Path):

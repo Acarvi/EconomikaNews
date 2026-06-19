@@ -93,26 +93,43 @@ def _source_manifest(video_entry: dict) -> dict:
 
 
 def _source_label(video_entry: dict) -> str:
+    handle = _source_account_handle(video_entry)
+    if handle:
+        return f"@{handle.lstrip('@')}"
+    return "desconocida"
+
+
+def _source_account_handle(video_entry: dict) -> str:
+    handle = _clean_text(video_entry.get("source_account_handle"))
+    if handle:
+        return handle
     source = _source_manifest(video_entry)
     for key in ("account_handle", "source_handle", "handle"):
         handle = _clean_text(source.get(key) or video_entry.get(key))
         if handle:
-            return f"@{handle.lstrip('@')}"
-    return "desconocida"
+            return handle
+    return ""
+
+
+def _source_url(video_entry: dict) -> str:
+    url = _clean_text(video_entry.get("source_url"))
+    if url:
+        return url
+    source = _source_manifest(video_entry)
+    return _clean_text(source.get("url") or video_entry.get("url"))
 
 
 def build_caption(video_entry: dict) -> str:
     post_id = _clean_text(video_entry.get("post_id"), "desconocido")
-    source = _source_manifest(video_entry)
-    url = _clean_text(source.get("url") or video_entry.get("url"))
+    url = _source_url(video_entry)
     lines = [
         "ECONOMIKA - senal detectada.",
         "",
         f"Fuente: {_source_label(video_entry)}",
-        f"Post ID: {post_id}",
     ]
     if url:
-        lines.append(f"Fuente original: {url}")
+        lines.append(f"URL: {url}")
+    lines.append(f"Post ID: {post_id}")
     lines.extend(
         [
             "",
@@ -176,6 +193,8 @@ def build_packet_metadata(
         "caption_path": path_for_json(caption_path),
         "source_video_path": path_for_json(source_video_path),
         "source_video_manifest_entry": video_entry,
+        "source_account_handle": _source_account_handle(video_entry),
+        "source_url": _source_url(video_entry),
         "platforms": platforms,
         "packet_ready": packet_ready,
         "packet_errors": packet_errors,

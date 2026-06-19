@@ -45,6 +45,8 @@ CLI options:
 
 By default, only manifest entries with `ready_for_publish: true` are exported. With `--include-not-ready`, not-ready renders can still be converted for inspection, but their metadata keeps `ready_for_upload: false`.
 
+When the render manifest entry includes source provenance, the exporter carries it into `video_metadata.json` as `source_account_handle` and `source_url`. Missing provenance is written as an empty string; the exporter does not invent source values.
+
 ## Scope
 
 This step makes one simple MP4 per render by repeating the static `card.png` for `duration_seconds * fps` frames. It preserves the source card dimensions, normally `1080x1920`, and writes no audio track.
@@ -57,6 +59,8 @@ The script uses local files only. It does not make network calls, publish posts,
 {
   "post_id": "post-1",
   "source_card_path": "runtime/renders/post-1/card.png",
+  "source_account_handle": "juanrallo",
+  "source_url": "https://x.com/juanrallo/status/2057499359705813029",
   "source_manifest_entry": {},
   "video_path": "runtime/videos/post-1/video.mp4",
   "duration_seconds": 6,

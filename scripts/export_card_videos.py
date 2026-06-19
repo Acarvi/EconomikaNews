@@ -120,6 +120,12 @@ def _render_error(post_id: str, message: str) -> str:
     return f"{post_id}: {message}" if post_id else message
 
 
+def _clean_provenance(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def export_video_for_render(
     render: dict,
     output_dir: Path,
@@ -191,6 +197,8 @@ def export_video_for_render(
         metadata = {
             "post_id": post_id,
             "source_card_path": path_for_json(card_path),
+            "source_account_handle": _clean_provenance(render.get("account_handle")),
+            "source_url": _clean_provenance(render.get("url")),
             "source_manifest_entry": render,
             "video_path": path_for_json(video_path),
             "duration_seconds": duration_seconds,

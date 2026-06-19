@@ -52,6 +52,24 @@ def _positive_int(value: Any) -> bool:
         return False
 
 
+def _clean_provenance(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _source_manifest(metadata: dict) -> dict:
+    source = metadata.get("source_manifest_entry")
+    return source if isinstance(source, dict) else {}
+
+
+def _metadata_provenance(metadata: dict, top_level_key: str, nested_key: str) -> str:
+    top_level = _clean_provenance(metadata.get(top_level_key))
+    if top_level:
+        return top_level
+    return _clean_provenance(_source_manifest(metadata).get(nested_key))
+
+
 def summarize_video(video_dir: Path) -> tuple[dict | None, dict | None]:
     post_id = video_dir.name
     video_path = video_dir / "video.mp4"
@@ -140,6 +158,8 @@ def summarize_video(video_dir: Path) -> tuple[dict | None, dict | None]:
         "width": width,
         "height": height,
         "source_card_path": metadata.get("source_card_path"),
+        "source_account_handle": _metadata_provenance(metadata, "source_account_handle", "account_handle"),
+        "source_url": _metadata_provenance(metadata, "source_url", "url"),
         "ready_for_upload": ready_for_upload,
         "video_errors": video_errors,
     }
