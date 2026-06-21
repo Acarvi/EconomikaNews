@@ -36,3 +36,5 @@ Missing and invalid input files do not crash report generation. Their status is 
 This report is for local, manual operational review. It does not call TikTok, Instagram, or YouTube APIs; perform OAuth or browser automation; schedule posts; or claim that any packet was published. Manual upload continues from `runtime/publish_queue/`.
 
 Generated files under `runtime/reports/` are runtime artifacts and must not be committed.
+
+For normal daily operation, [`daily_workflow.md`](daily_workflow.md) runs the pipeline and this report together. The individual report command remains available for debugging and targeted regeneration.
