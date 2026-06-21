@@ -54,6 +54,8 @@ py scripts\build_pipeline_report.py
 
 See [`pipeline_report.md`](pipeline_report.md) for runner-summary integration and report readiness rules.
 
+For normal daily operation, [`daily_workflow.md`](daily_workflow.md) wraps the pipeline and report in one command. This individual runner remains available for stage-level debugging.
+
 ## Publishing Boundary
 
 The final local handoff remains `runtime/publish_queue/`. Manual upload starts from the packet directories and `runtime/publish_queue/manifest.json`. The runner has no TikTok, Instagram, or YouTube API integration, OAuth, browser automation, or scheduling behavior.
