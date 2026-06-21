@@ -1,0 +1,38 @@
+# Local Pipeline Health Report
+
+The local pipeline health report turns generated manifests into a compact Markdown operations view. It reports readiness, artifact counts, errors and warnings, source provenance, packet paths, caption previews, and a manual upload checklist.
+
+## Usage
+
+Generate a report from the standard local manifests:
+
+```powershell
+py scripts\build_pipeline_report.py
+```
+
+To include the pipeline runner outcome:
+
+```powershell
+py scripts\run_local_pipeline.py --overwrite --summary-json runtime\reports\latest_pipeline_summary.json
+py scripts\build_pipeline_report.py --pipeline-summary runtime\reports\latest_pipeline_summary.json
+```
+
+The default Markdown output is:
+
+```text
+runtime/reports/latest_pipeline_report.md
+```
+
+Use `--output-json PATH` to also write the machine-readable report summary. Both output formats are written atomically through adjacent `.tmp` files.
+
+## Readiness
+
+`overall_ready` is true only when the publish queue manifest is valid, at least one packet is ready for manual upload, and the report has no errors. Missing or invalid render and video manifests are warnings when ready publish packets remain available. A missing or invalid publish queue manifest, invalid publish packets, packet errors, no ready packets, or failed pipeline stages makes the report not ready.
+
+Missing and invalid input files do not crash report generation. Their status is recorded in the Markdown and JSON summaries.
+
+## Local Boundary
+
+This report is for local, manual operational review. It does not call TikTok, Instagram, or YouTube APIs; perform OAuth or browser automation; schedule posts; or claim that any packet was published. Manual upload continues from `runtime/publish_queue/`.
+
+Generated files under `runtime/reports/` are runtime artifacts and must not be committed.
