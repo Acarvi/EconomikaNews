@@ -91,3 +91,5 @@ Each packet entry includes source provenance, platform list, file size, caption 
 This is a local manual-upload manifest only. Publishing is not implemented. The script does not call TikTok, Instagram, or YouTube APIs; perform OAuth; automate browsers; schedule posts; generate AI captions; add audio/subtitles/animations; change the dashboard; write to a database; or use cloud storage.
 
 Generated manifests and packets under `runtime/publish_queue/` are runtime artifacts and must not be committed.
+
+After manually uploading a packet, use [`update_publish_status.py`](manual_publish_status.md) to record its result per platform. The local tracker reads this manifest to supply untracked `pending` combinations and validate post/platform pairs; it does not change the manifest or publish content.

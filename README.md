@@ -140,7 +140,19 @@ Run the pipeline, generate its health report, and open the local review paths:
 py scripts\run_daily_workflow.py --overwrite --open-report --open-publish-queue
 ```
 
-For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md). For local publish queue packets, see [`docs/publish_queue.md`](docs/publish_queue.md). For the generated publish queue manifest, see [`docs/publish_queue_manifest.md`](docs/publish_queue_manifest.md). For one-command local orchestration, see [`docs/local_pipeline_runner.md`](docs/local_pipeline_runner.md). For the Markdown health report, see [`docs/pipeline_report.md`](docs/pipeline_report.md). For daily operation, see [`docs/daily_workflow.md`](docs/daily_workflow.md).
+## Manual Publish Tracking
+
+After uploading a queue packet by hand, record and review its local per-platform status:
+
+```powershell
+py scripts\update_publish_status.py mark --post-id 2057499359705813029 --platform tiktok --status published --external-url "https://..." --notes "Uploaded manually"
+py scripts\update_publish_status.py list --format text
+py scripts\update_publish_status.py summary --format text
+```
+
+The tracker is local only and does not call platform publishing APIs. See [`docs/manual_publish_status.md`](docs/manual_publish_status.md).
+
+For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md). For local publish queue packets, see [`docs/publish_queue.md`](docs/publish_queue.md). For the generated publish queue manifest, see [`docs/publish_queue_manifest.md`](docs/publish_queue_manifest.md). For manual publish tracking, see [`docs/manual_publish_status.md`](docs/manual_publish_status.md). For one-command local orchestration, see [`docs/local_pipeline_runner.md`](docs/local_pipeline_runner.md). For the Markdown health report, see [`docs/pipeline_report.md`](docs/pipeline_report.md). For daily operation, see [`docs/daily_workflow.md`](docs/daily_workflow.md).
 
 ## Commit Hygiene
 
