@@ -150,7 +150,7 @@ py scripts\update_publish_status.py list --format text
 py scripts\update_publish_status.py summary --format text
 ```
 
-The tracker is local only and does not call platform publishing APIs. See [`docs/manual_publish_status.md`](docs/manual_publish_status.md).
+The tracker is local only and does not call platform publishing APIs. See [`docs/manual_publish_status.md`](docs/manual_publish_status.md). Publish statuses are automatically read by the local pipeline health report to update its checklists and summaries.
 
 For more details on bundling, the index, metadata schema, and CLI options, see [`docs/approved_media_bundle.md`](docs/approved_media_bundle.md). For renderer input JSON files, see [`docs/render_input_contract.md`](docs/render_input_contract.md). For static PNG text cards, see [`docs/text_card_renderer.md`](docs/text_card_renderer.md). For the generated render manifest, see [`docs/render_manifest.md`](docs/render_manifest.md). For local MP4 video export, see [`docs/video_export.md`](docs/video_export.md). For the generated video manifest, see [`docs/video_manifest.md`](docs/video_manifest.md). For local publish queue packets, see [`docs/publish_queue.md`](docs/publish_queue.md). For the generated publish queue manifest, see [`docs/publish_queue_manifest.md`](docs/publish_queue_manifest.md). For manual publish tracking, see [`docs/manual_publish_status.md`](docs/manual_publish_status.md). For one-command local orchestration, see [`docs/local_pipeline_runner.md`](docs/local_pipeline_runner.md). For the Markdown health report, see [`docs/pipeline_report.md`](docs/pipeline_report.md). For daily operation, see [`docs/daily_workflow.md`](docs/daily_workflow.md).
 

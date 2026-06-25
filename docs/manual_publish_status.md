@@ -38,6 +38,16 @@ py scripts\update_publish_status.py summary --format text
 
 The summary counts each status by platform and reports the total queueable packet/platform combinations from the manifest when it is available. Untracked queue combinations count as `pending`.
 
+## Integration with Pipeline Report
+
+The pipeline report builder (`build_pipeline_report.py`) automatically integrates manual publish statuses:
+- It reads the status file (default: `runtime/publish_status/status.json`) by default.
+- Shows status tables in the packet section and integrates status details (`external_url`, `notes`, `updated_at`) directly.
+- Keeps the manual upload checklist up-to-date (checked for `published` or `skipped`, retry prompt for `failed`).
+- Computes overall publish completion counts and flags (`publish_complete`, `publish_pending_count`, `publish_failed_count`).
+
+See [`pipeline_report.md`](pipeline_report.md) for more details.
+
 ## Local Output and Boundary
 
 The default status file is:

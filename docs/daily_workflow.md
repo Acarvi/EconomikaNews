@@ -39,7 +39,7 @@ py scripts\update_publish_status.py mark --post-id <post_id> --platform tiktok -
 py scripts\update_publish_status.py summary --format text
 ```
 
-The status tracker writes only to local `runtime/publish_status/status.json`. See [`manual_publish_status.md`](manual_publish_status.md) for statuses, filters, and strict manifest validation.
+The status tracker writes only to local `runtime/publish_status/status.json`. See [`manual_publish_status.md`](manual_publish_status.md) for statuses, filters, and strict manifest validation. The pipeline health report (`build_pipeline_report.py`) automatically reads this status file and integrates it into the report's tables and upload checklist.
 
 No TikTok, Instagram, or YouTube APIs, OAuth, browser automation, scheduling, or cloud storage are implemented. Generated runtime files must not be committed.
 

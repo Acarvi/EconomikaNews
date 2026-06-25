@@ -110,8 +110,8 @@ def test_markdown_includes_ready_paths_and_manual_upload_checklist(tmp_path: Pat
     assert "runtime/publish_queue/post-1/video.mp4" in markdown
     assert "runtime/publish_queue/post-1/caption.txt" in markdown
     assert "Review video:" in markdown
-    assert "Upload manually to: tiktok, youtube_shorts" in markdown
-    assert "Confirm published externally" in markdown
+    assert "Upload manually to: tiktok" in markdown
+    assert "Upload manually to: youtube_shorts" in markdown
 
 
 def test_markdown_includes_source_handle_and_url(tmp_path: Path, capsys):

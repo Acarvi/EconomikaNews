@@ -31,6 +31,74 @@ def load_json_file(path: Path) -> tuple[dict | None, str | None]:
     return payload, None
 
 
+def load_publish_status(path: Path) -> tuple[dict | None, str | None]:
+    if not path.exists():
+        return None, None
+    if not path.is_file():
+        return None, f"Path is not a file: {path_for_json(path)}"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return None, f"Invalid JSON file {path_for_json(path)}: {exc}"
+    if not isinstance(payload, dict):
+        return None, f"Invalid JSON file {path_for_json(path)}: top-level must be an object"
+    if not isinstance(payload.get("entries", []), list):
+        return None, f"Invalid JSON file {path_for_json(path)}: entries must be a list"
+    return payload, None
+
+
+def build_status_index(status_payload: dict | None) -> dict[tuple[str, str], dict]:
+    index: dict[tuple[str, str], dict] = {}
+    if not status_payload:
+        return index
+    entries = status_payload.get("entries", [])
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        post_id = str(entry.get("post_id") or "").strip()
+        platform = str(entry.get("platform") or "").strip()
+        if post_id and platform:
+            index[(post_id, platform)] = entry
+    return index
+
+
+def merge_publish_status_with_packets(
+    packets: list[dict],
+    status_payload: dict | None,
+) -> dict[tuple[str, str], dict]:
+    status_index = build_status_index(status_payload)
+    merged: dict[tuple[str, str], dict] = {}
+    for packet in packets:
+        post_id = str(packet.get("post_id", "")).strip()
+        platforms = packet.get("platforms", [])
+        if not post_id or not isinstance(platforms, list):
+            continue
+        for platform in platforms:
+            platform = str(platform).strip()
+            if not platform:
+                continue
+            entry = status_index.get((post_id, platform))
+            if entry:
+                merged[(post_id, platform)] = {
+                    "platform": platform,
+                    "status": entry.get("status", "pending"),
+                    "external_url": entry.get("external_url"),
+                    "updated_at": entry.get("updated_at"),
+                    "published_at": entry.get("published_at"),
+                    "notes": entry.get("notes"),
+                }
+            else:
+                merged[(post_id, platform)] = {
+                    "platform": platform,
+                    "status": "pending",
+                    "external_url": None,
+                    "updated_at": None,
+                    "published_at": None,
+                    "notes": None,
+                }
+    return merged
+
+
 def _list_of_dicts(payload: dict | None, key: str) -> list[dict[str, Any]]:
     if not isinstance(payload, dict) or not isinstance(payload.get(key), list):
         return []
@@ -188,13 +256,18 @@ def build_report_summary(
     video_payload: dict | None,
     publish_payload: dict | None,
     pipeline_payload: dict | None,
+    publish_status_payload: dict | None,
     render_manifest: Path,
     video_manifest: Path,
     publish_queue_manifest: Path,
     pipeline_summary: Path | None,
+    publish_status_file: Path,
     output_md: Path,
     output_json: Path | None,
     load_errors: dict[str, str | None],
+    publish_status_found: bool,
+    publish_status_valid: bool,
+    publish_status_error: str | None,
 ) -> dict[str, Any]:
     renders = summarize_render_manifest(render_payload)
     videos = summarize_video_manifest(video_payload)
@@ -228,6 +301,95 @@ def build_report_summary(
             errors.append("No publish packets are ready for manual upload")
     errors.extend(f"Pipeline: {error}" for error in pipeline["errors"])
 
+    if publish_status_error:
+        warnings.append(publish_status_error)
+
+    packets = publish_packets.get("packets", [])
+    merged_statuses = merge_publish_status_with_packets(packets, publish_status_payload)
+
+    publish_status_counts = {
+        "pending": 0,
+        "published": 0,
+        "drafted": 0,
+        "uploaded": 0,
+        "skipped": 0,
+        "failed": 0,
+    }
+    for item in merged_statuses.values():
+        status = item["status"]
+        if status in publish_status_counts:
+            publish_status_counts[status] += 1
+        else:
+            publish_status_counts.setdefault(status, 0)
+            publish_status_counts[status] += 1
+
+    publish_failed_count = publish_status_counts.get("failed", 0)
+    publish_pending_count = (
+        publish_status_counts.get("pending", 0)
+        + publish_status_counts.get("drafted", 0)
+        + publish_status_counts.get("uploaded", 0)
+    )
+
+    total_platforms = len(merged_statuses)
+    publish_complete = False
+    if total_platforms == 0:
+        publish_complete = True
+    else:
+        all_completed = all(item["status"] in ("published", "skipped") for item in merged_statuses.values())
+        if all_completed:
+            publish_complete = True
+
+    publish_status_by_packet = []
+    for packet in packets:
+        post_id = str(packet.get("post_id", "")).strip()
+        platforms = packet.get("platforms", [])
+        if not post_id or not isinstance(platforms, list):
+            continue
+        platform_statuses = []
+        for platform in platforms:
+            platform = str(platform).strip()
+            if not platform:
+                continue
+            merged_info = merged_statuses.get((post_id, platform), {})
+            platform_statuses.append({
+                "platform": platform,
+                "status": merged_info.get("status", "pending"),
+                "external_url": merged_info.get("external_url"),
+                "updated_at": merged_info.get("updated_at"),
+                "published_at": merged_info.get("published_at"),
+                "notes": merged_info.get("notes"),
+            })
+        publish_status_by_packet.append({
+            "post_id": post_id,
+            "platforms": platform_statuses,
+        })
+
+    unmatched_publish_status_entries = []
+    if publish_status_payload and publish_status_valid:
+        manifest_keys = set()
+        for packet in packets:
+            p_id = str(packet.get("post_id", "")).strip()
+            p_platforms = packet.get("platforms", [])
+            if p_id and isinstance(p_platforms, list):
+                for plat in p_platforms:
+                    manifest_keys.add((p_id, str(plat).strip()))
+
+        for entry in publish_status_payload.get("entries", []):
+            if not isinstance(entry, dict):
+                continue
+            entry_post_id = str(entry.get("post_id", "")).strip()
+            entry_platform = str(entry.get("platform", "")).strip()
+            if (entry_post_id, entry_platform) not in manifest_keys:
+                unmatched_publish_status_entries.append({
+                    "post_id": entry_post_id,
+                    "platform": entry_platform,
+                    "status": entry.get("status", "pending"),
+                    "external_url": entry.get("external_url"),
+                    "updated_at": entry.get("updated_at"),
+                    "published_at": entry.get("published_at"),
+                    "notes": entry.get("notes"),
+                })
+
     ready_packets = [_ready_packet_summary(packet) for packet in publish_packets["ready_packets"]]
     overall_ready = publish_payload is not None and bool(ready_packets) and not errors
     return {
@@ -256,6 +418,16 @@ def build_report_summary(
         "pipeline_summary": pipeline,
         "publish_packets": publish_packets["packets"],
         "ready_packets": ready_packets,
+        "publish_status_file": path_for_json(publish_status_file),
+        "publish_status_found": publish_status_found,
+        "publish_status_valid": publish_status_valid,
+        "publish_status_error": publish_status_error,
+        "publish_status_counts": publish_status_counts,
+        "publish_status_by_packet": publish_status_by_packet,
+        "unmatched_publish_status_entries": unmatched_publish_status_entries,
+        "publish_complete": publish_complete,
+        "publish_pending_count": publish_pending_count,
+        "publish_failed_count": publish_failed_count,
         "paths": {
             "render_manifest": path_for_json(render_manifest),
             "video_manifest": path_for_json(video_manifest),
@@ -283,6 +455,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
     counts = summary["counts"]
     pipeline = summary["pipeline_summary"]
     source_status = summary["source_status"]
+    
     lines = [
         "# Economika Local Pipeline Report",
         "",
@@ -290,12 +463,23 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
         "",
         f'- **Overall ready:** {"yes" if summary["overall_ready"] else "no"}',
         f'- **Generated at:** {summary["generated_at"]}',
+    ]
+
+    if "publish_complete" in summary:
+        lines.extend([
+            f'- **Publish complete:** {"yes" if summary["publish_complete"] else "no"}',
+            f'- **Publish pending platforms:** {summary["publish_pending_count"]}',
+            f'- **Publish failed platforms:** {summary["publish_failed_count"]}',
+        ])
+
+    lines.extend([
         f'- **Warnings:** {len(summary["warnings"])}',
         f'- **Errors:** {len(summary["errors"])}',
         "",
         "## Pipeline Summary",
         "",
-    ]
+    ])
+
     if not pipeline["provided"]:
         lines.append("No pipeline runner summary provided.")
     else:
@@ -329,22 +513,40 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
             f'- Render manifest: {source_status["render_manifest"]}',
             f'- Video manifest: {source_status["video_manifest"]}',
             f'- Publish queue manifest: {source_status["publish_queue_manifest"]}',
-            "",
-            "## Publish Queue",
-            "",
         ]
     )
+
+    if "publish_status_file" in summary:
+        status_status = "loaded" if summary["publish_status_valid"] and summary["publish_status_found"] else (
+            "invalid" if summary["publish_status_found"] else "missing"
+        )
+        lines.append(f"- Publish status file: {status_status}")
+
+    lines.extend([
+        "",
+        "## Publish Queue",
+        "",
+    ])
+
+    if not summary.get("publish_status_valid", True):
+        lines.extend([
+            "> [!WARNING]",
+            f'> Publish status could not be loaded: {summary.get("publish_status_error") or "Invalid JSON structure"}',
+            "",
+        ])
+
     packets = summary["publish_packets"]
     if not packets:
         lines.append("No publish packets found.")
     for packet in packets:
+        post_id = packet.get("post_id")
         handle = _inline(packet.get("source_account_handle"))
         source = handle if handle == "unknown" or handle.startswith("@") else f"@{handle}"
         platforms = packet.get("platforms", [])
         platform_text = ", ".join(str(platform) for platform in platforms) if isinstance(platforms, list) else "unknown"
         lines.extend(
             [
-                f'### {_inline(packet.get("post_id"), "unknown post")}',
+                f'### {_inline(post_id, "unknown post")}',
                 "",
                 f"- Source: {source}",
                 f'- Source URL: {_inline(packet.get("source_url"))}',
@@ -357,6 +559,28 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
                 "",
             ]
         )
+
+        packet_status = None
+        for p_stat in summary.get("publish_status_by_packet", []):
+            if p_stat.get("post_id") == post_id:
+                packet_status = p_stat
+                break
+
+        if packet_status and packet_status.get("platforms"):
+            lines.extend([
+                "#### Manual Publish Status",
+                "",
+                "| Platform | Status | Updated At | External URL | Notes |",
+                "| --- | --- | --- | --- | --- |",
+            ])
+            for item in packet_status["platforms"]:
+                plat = item["platform"]
+                stat = item["status"]
+                updated = item["updated_at"] or "-"
+                url = item["external_url"] or "-"
+                notes = item["notes"] or "-"
+                lines.append(f"| {plat} | {stat} | {updated} | {url} | {notes} |")
+            lines.append("")
 
     lines.extend(["## Errors and Warnings", "", "### Errors", ""])
     lines.extend(f"- {_inline(error)}" for error in summary["errors"])
@@ -371,18 +595,59 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
     if not summary["ready_packets"]:
         lines.append("No packets are ready for manual upload.")
     for packet in summary["ready_packets"]:
-        platforms = ", ".join(packet["platforms"]) or "unspecified platforms"
+        post_id = packet["post_id"]
+        packet_status = None
+        for p_stat in summary.get("publish_status_by_packet", []):
+            if p_stat.get("post_id") == post_id:
+                packet_status = p_stat
+                break
+
         lines.extend(
             [
-                f'### {_inline(packet["post_id"], "unknown post")}',
+                f'### {_inline(post_id, "unknown post")}',
                 "",
                 f'- [ ] Review video: `{_inline(packet["video_path"], "")}`',
                 f'- [ ] Copy caption: `{_inline(packet["caption_path"], "")}`',
-                f"- [ ] Upload manually to: {_inline(platforms)}",
-                "- [ ] Confirm published externally",
-                "",
             ]
         )
+
+        if packet_status and packet_status.get("platforms"):
+            for item in packet_status["platforms"]:
+                plat = item["platform"]
+                stat = item["status"]
+                ext_url = item["external_url"] or "-"
+                notes = item["notes"] or "-"
+                if stat == "published":
+                    lines.append(f"- [x] Published on {plat}: {ext_url}")
+                elif stat == "skipped":
+                    lines.append(f"- [x] Skipped {plat}: {notes}")
+                elif stat == "failed":
+                    lines.append(f"- [ ] Retry failed {plat}: {notes}")
+                else:
+                    lines.append(f"- [ ] Upload manually to: {plat}")
+        else:
+            platforms = packet.get("platforms", [])
+            for plat in platforms:
+                lines.append(f"- [ ] Upload manually to: {plat}")
+
+        lines.append("")
+
+    if summary.get("unmatched_publish_status_entries"):
+        lines.extend([
+            "## Unmatched Publish Status Entries",
+            "",
+            "| Post ID | Platform | Status | Updated At | External URL | Notes |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ])
+        for entry in summary["unmatched_publish_status_entries"]:
+            p_id = entry["post_id"]
+            plat = entry["platform"]
+            stat = entry["status"]
+            updated = entry["updated_at"] or "-"
+            url = entry["external_url"] or "-"
+            notes = entry["notes"] or "-"
+            lines.append(f"| {p_id} | {plat} | {stat} | {updated} | {url} | {notes} |")
+        lines.append("")
 
     paths = summary["paths"]
     lines.extend(
@@ -422,6 +687,7 @@ def main() -> int:
     parser.add_argument("--video-manifest", default="runtime/videos/manifest.json")
     parser.add_argument("--publish-queue-manifest", default="runtime/publish_queue/manifest.json")
     parser.add_argument("--pipeline-summary", default=None)
+    parser.add_argument("--publish-status-file", default="runtime/publish_status/status.json")
     parser.add_argument("--output-md", default="runtime/reports/latest_pipeline_report.md")
     parser.add_argument("--output-json", default=None)
     parser.add_argument("--pretty", action="store_true", default=False)
@@ -431,8 +697,19 @@ def main() -> int:
     video_manifest = Path(args.video_manifest)
     publish_queue_manifest = Path(args.publish_queue_manifest)
     pipeline_summary = Path(args.pipeline_summary) if args.pipeline_summary else None
+    publish_status_file = Path(args.publish_status_file)
     output_md = Path(args.output_md)
     output_json = Path(args.output_json) if args.output_json else None
+
+    publish_status_payload = None
+    publish_status_error = None
+    publish_status_found = publish_status_file.is_file()
+    publish_status_valid = True
+
+    if publish_status_found:
+        publish_status_payload, publish_status_error = load_publish_status(publish_status_file)
+        if publish_status_error is not None:
+            publish_status_valid = False
 
     render_payload, render_error = load_json_file(render_manifest)
     video_payload, video_error = load_json_file(video_manifest)
@@ -443,10 +720,12 @@ def main() -> int:
         video_payload=video_payload,
         publish_payload=publish_payload,
         pipeline_payload=pipeline_payload,
+        publish_status_payload=publish_status_payload,
         render_manifest=render_manifest,
         video_manifest=video_manifest,
         publish_queue_manifest=publish_queue_manifest,
         pipeline_summary=pipeline_summary,
+        publish_status_file=publish_status_file,
         output_md=output_md,
         output_json=output_json,
         load_errors={
@@ -455,6 +734,9 @@ def main() -> int:
             "publish": publish_error,
             "pipeline": pipeline_error,
         },
+        publish_status_found=publish_status_found,
+        publish_status_valid=publish_status_valid,
+        publish_status_error=publish_status_error,
     )
 
     try:
