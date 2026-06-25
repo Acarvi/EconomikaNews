@@ -37,4 +37,6 @@ This report is for local, manual operational review. It does not call TikTok, In
 
 Generated files under `runtime/reports/` are runtime artifacts and must not be committed.
 
+After manual upload, record the platform outcome with `update_publish_status.py`. This local-only tracker writes `runtime/publish_status/status.json`; the pipeline report does not claim or infer that a packet was published. See [`manual_publish_status.md`](manual_publish_status.md).
+
 For normal daily operation, [`daily_workflow.md`](daily_workflow.md) runs the pipeline and this report together. The individual report command remains available for debugging and targeted regeneration.

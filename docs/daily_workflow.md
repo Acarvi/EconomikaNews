@@ -32,6 +32,15 @@ The wrapper captures subprocess output and prints one concise final JSON summary
 
 Manual upload starts from `runtime/publish_queue/`. Opening the queue folder or report is only a local convenience; the wrapper does not publish anything.
 
+After each manual upload attempt, record the outcome with `update_publish_status.py`:
+
+```powershell
+py scripts\update_publish_status.py mark --post-id <post_id> --platform tiktok --status published --external-url "https://..."
+py scripts\update_publish_status.py summary --format text
+```
+
+The status tracker writes only to local `runtime/publish_status/status.json`. See [`manual_publish_status.md`](manual_publish_status.md) for statuses, filters, and strict manifest validation.
+
 No TikTok, Instagram, or YouTube APIs, OAuth, browser automation, scheduling, or cloud storage are implemented. Generated runtime files must not be committed.
 
 The individual pipeline and report scripts remain available for debugging and targeted reruns.
