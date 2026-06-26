@@ -3,7 +3,7 @@
 The local pipeline runner executes the complete artifact preparation flow with one command. It orchestrates existing scripts and does not upload or publish content.
 
 ```powershell
-python scripts\run_local_pipeline.py --overwrite
+py scripts\run_local_pipeline.py --overwrite
 ```
 
 ## Stages
@@ -24,6 +24,7 @@ Each stage runs as a subprocess using the selected Python executable. A failed s
 
 - `--overwrite` forwards overwrite behavior to `build_render_inputs.py`, `render_text_cards.py`, `export_card_videos.py`, and `build_publish_queue.py`.
 - `--limit N` forwards the limit to card rendering, video export, and publish queue generation. `build_render_inputs.py` does not support a limit.
+- `--duration-seconds N` forwards the MP4 duration only to `export_card_videos.py`.
 - `--python-executable PATH` selects the Python executable used for every stage.
 - `--summary-json PATH` atomically writes the final summary in addition to printing it.
 - `--continue-on-error` continues after failures. `--stop-on-error` is the default.
@@ -33,7 +34,7 @@ Individual stages can be omitted with `--skip-render-inputs`, `--skip-cards`, `-
 ## Dry Run
 
 ```powershell
-python scripts\run_local_pipeline.py --dry-run
+py scripts\run_local_pipeline.py --dry-run
 ```
 
 Dry-run is forwarded to the four scripts that support it: render input generation, card rendering, video export, and publish queue generation. The three manifest builders are skipped with reason `dry-run` because they write manifest files and do not expose their own dry-run option. This keeps the pipeline dry-run free of artifact writes. An explicitly requested `--summary-json` is still written.

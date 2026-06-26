@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from app.storage.sqlite_review_state import get_review_states
 
 DEFAULT_CANDIDATES_FILE = Path("runtime/outputs/x_candidates.json")

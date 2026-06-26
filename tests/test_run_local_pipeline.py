@@ -58,6 +58,23 @@ def test_limit_forwarded_only_to_supported_stages():
         assert "--limit" not in commands[name]
 
 
+def test_duration_seconds_forwarded_only_to_video_export_stage():
+    with patch("scripts.run_local_pipeline.subprocess.run", side_effect=lambda command, **_: _completed(command)):
+        summary = run_local_pipeline(duration_seconds=4.5, python_executable="python")
+
+    commands = {stage["name"]: stage["command"] for stage in summary["stages"]}
+    assert commands["export_videos"][-2:] == ["--duration-seconds", "4.5"]
+    for name in (
+        "build_render_inputs",
+        "render_cards",
+        "build_render_manifest",
+        "build_video_manifest",
+        "build_publish_queue",
+        "build_publish_queue_manifest",
+    ):
+        assert "--duration-seconds" not in commands[name]
+
+
 def test_skipped_stage_appears_in_summary():
     with patch("scripts.run_local_pipeline.subprocess.run", side_effect=lambda command, **_: _completed(command)):
         summary = run_local_pipeline(skip_flags={"skip_cards"}, python_executable="python")

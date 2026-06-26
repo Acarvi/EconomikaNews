@@ -32,6 +32,14 @@ The wrapper captures subprocess output and prints one concise final JSON summary
 
 Manual upload starts from `runtime/publish_queue/`. Opening the queue folder or report is only a local convenience; the wrapper does not publish anything.
 
+For the quickest local video review, generate a copied preview folder with:
+
+```powershell
+py scripts\generate_preview_reel.py --overwrite --open
+```
+
+This writes `runtime/preview_reels/<post_id>/reel.mp4`, `caption.txt`, and `preview_report.md`. See [`preview_reel.md`](preview_reel.md).
+
 After each manual upload attempt, record the outcome with `update_publish_status.py`:
 
 ```powershell
