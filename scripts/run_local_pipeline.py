@@ -46,6 +46,7 @@ STAGES = (
         "supports_overwrite": True,
         "supports_dry_run": True,
         "supports_limit": True,
+        "supports_duration_seconds": True,
         "manifest_writer": False,
     },
     {
@@ -102,6 +103,7 @@ def build_command(
     overwrite: bool,
     dry_run: bool,
     limit: int | None,
+    duration_seconds: float | None = None,
 ) -> list[str]:
     command = [python_executable, stage["script"]]
     if overwrite and stage["supports_overwrite"]:
@@ -110,6 +112,8 @@ def build_command(
         command.append("--dry-run")
     if limit is not None and stage["supports_limit"]:
         command.extend(["--limit", str(limit)])
+    if duration_seconds is not None and stage.get("supports_duration_seconds"):
+        command.extend(["--duration-seconds", str(duration_seconds)])
     return command
 
 
@@ -170,6 +174,7 @@ def run_local_pipeline(
     dry_run: bool = False,
     stop_on_error: bool = True,
     limit: int | None = None,
+    duration_seconds: float | None = None,
     skip_flags: set[str] | None = None,
     python_executable: str = sys.executable,
 ) -> dict[str, Any]:
@@ -197,6 +202,7 @@ def run_local_pipeline(
             overwrite=overwrite,
             dry_run=dry_run,
             limit=limit,
+            duration_seconds=duration_seconds,
         )
         result = run_stage(stage["name"], command)
         stages.append(result)
@@ -236,6 +242,7 @@ def main() -> int:
     parser.add_argument("--stop-on-error", action="store_true", dest="stop_on_error", default=True)
     parser.add_argument("--continue-on-error", action="store_false", dest="stop_on_error")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--duration-seconds", type=float, default=None)
     parser.add_argument("--skip-render-inputs", action="store_true", default=False)
     parser.add_argument("--skip-cards", action="store_true", default=False)
     parser.add_argument("--skip-render-manifest", action="store_true", default=False)
@@ -265,6 +272,7 @@ def main() -> int:
         dry_run=args.dry_run,
         stop_on_error=args.stop_on_error,
         limit=args.limit,
+        duration_seconds=args.duration_seconds,
         skip_flags=skip_flags,
         python_executable=args.python_executable,
     )
