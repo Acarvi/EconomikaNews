@@ -41,6 +41,16 @@ python -m compileall app tests scripts
 
 Engineering quality standards: [`docs/engineering_quality.md`](docs/engineering_quality.md).
 
+## X to Reel MVP (Fast Generation)
+
+Generate a direct vertical reel from X accounts or sample JSON without the full pipeline overhead:
+
+```bash
+python scripts\make_reels_from_x.py --input-json samples\x_posts_sample.json --top 3 --overwrite --open
+```
+
+See [`docs/x_to_reel_mvp.md`](docs/x_to_reel_mvp.md).
+
 ## Local Candidate Dashboard
 
 Generate candidate JSON:
