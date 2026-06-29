@@ -1,0 +1,40 @@
+{
+  "posts": [
+    {
+      "post_id": "1111111111111111111",
+      "account_handle": "juanrallo",
+      "text": "La economía española muestra signos de desaceleración en el último trimestre. El consumo interno se reduce y la inversión cae drásticamente debido a la incertidumbre regulatoria.",
+      "url": "https://x.com/juanrallo/status/1111111111111111111",
+      "like_count": 1250,
+      "repost_count": 450,
+      "reply_count": 120,
+      "quote_count": 30,
+      "created_at": "2026-06-27T10:00:00Z",
+      "media_urls": []
+    },
+    {
+      "post_id": "2222222222222222222",
+      "account_handle": "juanrallo",
+      "text": "Nuevo análisis: Por qué el Banco Central Europeo mantiene los tipos de interés sin cambios a pesar de las presiones inflacionistas en servicios. https://t.co/example",
+      "url": "https://x.com/juanrallo/status/2222222222222222222",
+      "like_count": 3400,
+      "repost_count": 1200,
+      "reply_count": 340,
+      "quote_count": 80,
+      "created_at": "2026-06-28T09:00:00Z",
+      "media_urls": []
+    },
+    {
+      "post_id": "3333333333333333333",
+      "account_handle": "economist_es",
+      "text": "ÚLTIMA HORA: El paro baja en 50.000 personas este mes impulsado por el sector servicios. Los datos maquillan la caída estructural en la industria.",
+      "url": "https://x.com/economist_es/status/3333333333333333333",
+      "like_count": 500,
+      "repost_count": 100,
+      "reply_count": 50,
+      "quote_count": 10,
+      "created_at": "2026-06-26T14:30:00Z",
+      "media_urls": []
+    }
+  ]
+}

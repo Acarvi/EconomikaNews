@@ -16,6 +16,16 @@ py scripts\run_daily_workflow.py --dry-run --open-report
 
 The wrapper forwards `--overwrite`, `--dry-run`, and `--continue-on-error` to the local pipeline runner. Custom paths are available through `--summary-json`, `--report-md`, `--report-json`, and `--publish-queue-dir`.
 
+## Fast Generation (MVP)
+
+If you only need to quickly generate vertical reels from X accounts or a JSON file, bypass the full pipeline and use the MVP script:
+
+```powershell
+py scripts\make_reels_from_x.py --accounts juanrallo --max-posts-per-account 20 --top 3 --overwrite --open
+```
+
+See [`x_to_reel_mvp.md`](x_to_reel_mvp.md) for details.
+
 ## Outputs
 
 Default local outputs are:
