@@ -21,7 +21,8 @@ The wrapper forwards `--overwrite`, `--dry-run`, and `--continue-on-error` to th
 If you only need to quickly generate vertical reels from X accounts or a JSON file, bypass the full pipeline and use the MVP script:
 
 ```powershell
-py scripts\make_reels_from_x.py --accounts juanrallo --max-posts-per-account 20 --top 3 --overwrite --open
+py scripts\fetch_x_posts.py --accounts juanrallo --max-posts-per-account 20 --output-json runtime\x_posts\latest_posts.json
+py scripts\make_reels_from_x.py --input-json runtime\x_posts\latest_posts.json --top 3 --overwrite --open
 ```
 
 See [`x_to_reel_mvp.md`](x_to_reel_mvp.md) for details.

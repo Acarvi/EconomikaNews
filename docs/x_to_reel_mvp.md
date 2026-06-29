@@ -2,11 +2,18 @@
 
 This script is the fastest way to generate preview reels from X accounts without the full pipeline overhead. It serves as an MVP for immediate visual output.
 
-## Providers
+## Providers and Ingestion
 
-The script uses a provider strategy to fetch posts:
-- **Manual JSON**: The guaranteed working provider in this MVP. The MVP acceptance path is `--input-json`.
-- **X API, gallery-dl, and browser cookies**: Best-effort/planned stubs in this MVP and may fail clearly if credentials or dependencies are missing.
+The X-to-Reel pipeline now uses a dedicated ingestion adapter to fetch data from real accounts.
+
+To fetch real accounts and generate reels, use the two-step process:
+
+```powershell
+py scripts\fetch_x_posts.py --accounts juanrallo --max-posts-per-account 20 --output-json runtime\x_posts\latest_posts.json
+py scripts\make_reels_from_x.py --input-json runtime\x_posts\latest_posts.json --top 3 --overwrite --open
+```
+
+See [x_ingestion_adapter.md](x_ingestion_adapter.md) for details on setting up providers like `gallery-dl` and `x-api`.
 
 ## Command Examples
 
@@ -16,10 +23,11 @@ The script uses a provider strategy to fetch posts:
 py scripts\make_reels_from_x.py --input-json samples\x_posts_sample.json --top 3 --overwrite --open
 ```
 
-### Account Mode
+### Fast Generation Pipeline
 
 ```powershell
-py scripts\make_reels_from_x.py --accounts juanrallo --max-posts-per-account 20 --top 3 --overwrite --open
+py scripts\fetch_x_posts.py --accounts juanrallo --max-posts-per-account 20 --output-json runtime\x_posts\latest_posts.json
+py scripts\make_reels_from_x.py --input-json runtime\x_posts\latest_posts.json --top 3 --overwrite --open
 ```
 
 ## Output
