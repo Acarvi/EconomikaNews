@@ -35,7 +35,15 @@ Missing and invalid input files do not crash report generation. Their status is 
 
 This report is for local, manual operational review. It does not call TikTok, Instagram, or YouTube APIs; perform OAuth or browser automation; schedule posts; or claim that any packet was published. Manual upload continues from `runtime/publish_queue/`.
 
-Generated files under `runtime/reports/` are runtime artifacts and must not be committed.
+To create a single ready-to-watch copied MP4 preview from the first ready packet, run:
+
+```powershell
+py scripts\generate_preview_reel.py --overwrite --open
+```
+
+The preview command writes `runtime/preview_reels/<post_id>/reel.mp4` plus the caption, metadata, card preview when available, and a short upload checklist. See [`preview_reel.md`](preview_reel.md).
+
+Generated files under `runtime/reports/` and `runtime/preview_reels/` are runtime artifacts and must not be committed.
 
 After manual upload, record the platform outcome with `update_publish_status.py`. This local-only tracker writes `runtime/publish_status/status.json`; the pipeline report does not claim or infer that a packet was published. See [`manual_publish_status.md`](manual_publish_status.md).
 
