@@ -46,7 +46,7 @@ Engineering quality standards: [`docs/engineering_quality.md`](docs/engineering_
 Generate a direct vertical reel from X accounts or sample JSON without the full pipeline overhead:
 
 ```bash
-python scripts\make_reels_from_x.py --input-json samples\x_posts_sample.json --top 3 --overwrite --open
+py scripts\make_reels_from_x.py --input-json samples\x_posts_sample.json --top 3 --overwrite --open
 ```
 
 See [`docs/x_to_reel_mvp.md`](docs/x_to_reel_mvp.md).

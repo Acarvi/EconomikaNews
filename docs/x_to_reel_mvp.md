@@ -5,9 +5,8 @@ This script is the fastest way to generate preview reels from X accounts without
 ## Providers
 
 The script uses a provider strategy to fetch posts:
-- **Manual JSON**: Guaranteed fallback when X APIs or scraping are unavailable.
-- **X API**: Optional, uses `X_BEARER_TOKEN` if present.
-- **Browser Download**: Optional, can use `gallery-dl` or browser cookies.
+- **Manual JSON**: The guaranteed working provider in this MVP. The MVP acceptance path is `--input-json`.
+- **X API, gallery-dl, and browser cookies**: Best-effort/planned stubs in this MVP and may fail clearly if credentials or dependencies are missing.
 
 ## Command Examples
 

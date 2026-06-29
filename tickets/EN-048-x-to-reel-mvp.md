@@ -7,7 +7,7 @@ Build a working MVP command that generates real preview reels from selected X/Tw
 - `make_reels_from_x.py` CLI script
 - Manual JSON fallback provider
 - Pillow-based text card rendering (ECONOMIKA / ÚLTIMA HORA style)
-- MP4 generation using `imageio`/`ffmpeg`
+- MP4 generation using ffmpeg
 - Caption, metadata, and preview report generation
 - Output preview directly using `--open`
 
